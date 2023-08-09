@@ -1,0 +1,16 @@
+__pycache__
+.ipynb_checkpoints/
+hidden/
+/dist/
+/docs/_build/
+/takt.egg-info/
+/takt/old/
+/takt/tests/scores
+*.dll
+*.pyd
+*.so
+*.exe
+*.o
+*.obj
+*.lib
+*.exp

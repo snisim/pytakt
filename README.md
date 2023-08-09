@@ -1,4 +1,4 @@
-# pytakt
+# Pytakt
 **リアルタイムMIDI入出力を備えた音楽情報処理ライブラリ**   
 **A Music Information Processing Library with Realtime MIDI I/O**
 
