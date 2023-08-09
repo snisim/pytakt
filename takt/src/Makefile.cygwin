@@ -1,0 +1,22 @@
+DEST = ../cmidiio.dll
+INCLUDE = -I/usr/include/python3.8
+LIBS = -lwinmm -lpython3.8
+CXXFLAGS += -shared $(INCLUDE)
+OBJS = cmidiio.o midiout.o midiin.o sysdep.o
+
+$(DEST): $(OBJS)
+	$(CXX) $(CXXFLAGS) -o $(DEST) $(OBJS) $(LIBS)
+
+clean:
+	rm -f $(DEST) $(OBJS)
+
+# DO NOT DELETE
+
+cmidiio.o: _cstddefs.h midiout.h sysdep.h sysdepWin.h sysdepGeneric.h defs.h
+cmidiio.o: midiin.h
+midiout.o: _cstddefs.h midiout.h sysdep.h sysdepWin.h sysdepGeneric.h defs.h
+midiout.o: midiin.h notemap.h
+midiin.o: _cstddefs.h midiin.h sysdep.h sysdepWin.h sysdepGeneric.h defs.h
+midiin.o: midiout.h
+sysdep.o: sysdepWin.cpp sysdepGeneric.cpp sysdep.h _cstddefs.h sysdepWin.h
+sysdep.o: sysdepGeneric.h takterror.h

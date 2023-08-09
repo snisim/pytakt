@@ -1,0 +1,6 @@
+from takt import *
+from takt.midiio import *
+import takt
+import music21
+import sys
+print("pytakt version", takt.__version__, file=sys.stderr)

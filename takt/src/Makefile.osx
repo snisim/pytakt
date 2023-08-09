@@ -1,0 +1,22 @@
+DEST = ../cmidiio.so
+INCLUDE = -I/Library/Frameworks/Python.framework/Versions/3.8/include/python3.8
+LIBS = -framework CoreFoundation -framework CoreServices -framework CoreMIDI -framework CoreAudio /Library/Frameworks/Python.framework/Versions/3.8/lib/libpython3.8.dylib
+CXXFLAGS += $(INCLUDE)
+OBJS = cmidiio.o midiout.o midiin.o sysdep.o
+
+$(DEST): $(OBJS)
+	$(CXX) -dynamiclib $(CXXFLAGS) -o $(DEST) $(OBJS) $(LIBS)
+
+clean:
+	rm -f $(DEST) $(OBJS)
+
+# DO NOT DELETE
+
+cmidiio.o: _cstddefs.h midiout.h sysdep.h sysdepMacOSX.h sysdepGeneric.h
+cmidiio.o: defs.h midiin.h
+midiout.o: _cstddefs.h midiout.h sysdep.h sysdepMacOSX.h sysdepGeneric.h
+midiout.o: defs.h midiin.h notemap.h
+midiin.o: _cstddefs.h midiin.h sysdep.h sysdepMacOSX.h sysdepGeneric.h defs.h
+midiin.o: midiout.h
+sysdep.o: sysdepMacOSX.cpp sysdepGeneric.cpp sysdep.h _cstddefs.h
+sysdep.o: sysdepMacOSX.h sysdepGeneric.h takterror.h

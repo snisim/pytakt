@@ -1,0 +1,27 @@
+DEST = ..\cmidiio.pyd
+INCL =
+LIBS = python38.lib -link winmm.lib
+CXXFLAGS = $(CXXFLAGS) /EHsc $(INCL)
+OBJS = cmidiio.obj midiout.obj midiin.obj sysdep.obj
+
+.SUFFIXES: .obj $(SUFFIXES)
+.cpp.obj:
+	cl $(CXXFLAGS) -c $*.cpp
+
+$(DEST): $(OBJS)
+	cl /LD $(CXXFLAGS) $(OBJS) $(LIBS)
+	copy cmidiio.dll $(DEST) 
+
+clean:
+	del $(DEST) $(OBJS) cmidiio.lib cmidiio.exp
+
+# DO NOT DELETE
+
+cmidiio.obj: _cstddefs.h midiout.h sysdep.h sysdepWin.h sysdepGeneric.h defs.h
+cmidiio.obj: midiin.h
+midiout.obj: _cstddefs.h midiout.h sysdep.h sysdepWin.h sysdepGeneric.h defs.h
+midiout.obj: midiin.h notemap.h
+midiin.obj: _cstddefs.h midiin.h sysdep.h sysdepWin.h sysdepGeneric.h defs.h
+midiin.obj: midiout.h
+sysdep.obj: sysdepWin.cpp sysdepGeneric.cpp sysdep.h _cstddefs.h sysdepWin.h
+sysdep.obj: sysdepGeneric.h takterror.h
