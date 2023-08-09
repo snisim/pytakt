@@ -83,8 +83,7 @@ MIDI入出力に対する操作を行わないのであれば2行目は不要で
 
     >>> mml('cde').show()
 
-<img src="https://github.com/snisim/pytakt/assets/141381385/9c366732-c97d-4e0d-a5c8-9e534d046c6d" width=500 alt="pianoroll">
-
+<img src="https://github.com/snisim/pytakt/assets/141381385/e80e8169-a7b3-491e-99dc-486c6f8f9ff1" width=500 alt="pianoroll">
 
 表示を確認したらピアノロールのウィンドウを閉じてください。
 
