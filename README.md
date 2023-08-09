@@ -39,7 +39,21 @@ Pytakt は、音符やMIDIコントロールチェンジといった**イベン�
   入力することなく、標準MIDIファイルとテキストとの相互変換、ピアノロール表示、
   再生、サマリ情報の表示、デバイスリストの表示等が行えます。
 
-
+## 動作環境
+次のプラットフォームで動作します。
+* **Windows**  
+  python.org の Python および Anaconda のどちらでも動作します。
+* **Windows (Cygwin)**  
+  pythonXX-devel と pythonXX-tkinter (XXはPythonのバージョン番号）の
+  ２つのCygwinパッケージがインストール済みであれば動作します。Cygwin の場合、
+  ピアノロールを表示するには X-Window が必要です。
+* **Mac**  
+  動作します。下に述べられているようにPC単体で音を出すためには SimpleSynth
+  などのソフトウェアシンセサイザが必要です。
+* **Linux**  
+  OS に ALSA がインストール済みであれば動作します。下に述べられているように
+  PC単体で音を出すためには TiMidity++ などのソフトウェアシンセサイザが必要です。
+  
 ## インストール方法
 https://github.com/snisim/pytakt から release されたパッケージ
 (`takt-<バージョン番号>.tar.gz`) をダウンロードし、pip によって下のように
