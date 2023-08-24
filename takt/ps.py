@@ -480,10 +480,12 @@ def sysex(data, arbitrary=False, *, duration=0, **kwargs) -> EventList:
         data(bytes, bytearray, or iterable of int):
             システム・エクスクルーシブ・メッセージの内容。
             メッセージ先頭の 0xf0 およびメッセージ末尾の 0xf7 を明示的に
-            含める必要があります。
+            含める必要があります。また、それ以外の各バイトの値は0x7f(127)以下
+            である必要があります。
         arbitrary(bool, optional):
             この値が True のときは、`data` の先頭が 0xf0、末尾が 0xf7 で
-            なくてもイベントを生成します (Falseならば例外を送出します)。
+            なくても、また0x80以上のバイトデータを含んでいてもイベントを
+            生成します (デフォルトでは例外を送出します)。
             これは、システム・エクスクルーシブ・メッセージを複数の SysEvEvent
             に分割したり、シンセサイザに任意のメッセージを送る際に使います。
         duration(ticks, optional): イベントリストの duration属性値を
@@ -502,9 +504,11 @@ def sysex(data, arbitrary=False, *, duration=0, **kwargs) -> EventList:
 = 50``
     """
     data = bytes(data)
-    if not arbitrary and \
-       (len(data) < 2 or data[0] != 0xf0 or data[-1] != 0xf7):
-        raise ValueError("Missing sysex header(F0)/footer(F7) bytes")
+    if not arbitrary:
+        if len(data) < 2 or data[0] != 0xf0 or data[-1] != 0xf7:
+            raise ValueError("Missing sysex header(F0)/footer(F7) bytes")
+        elif any(b >= 0x80 for b in data[1:-1]):
+            raise ValueError("Sysex data bytes must be less than 0x80")
     return _apply_effectors(
         EventList([SysExEvent(0, data, **_getparams(kwargs))], duration))
 
