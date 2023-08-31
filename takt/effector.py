@@ -14,8 +14,9 @@ import random
 from collections import deque
 from abc import ABC, abstractmethod
 from takt.event import Event, NoteEvent, NoteOnEvent, NoteOffEvent, \
-    NoteEventClass, CtrlEvent, KeyPressureEvent, MetaEvent, LoopBackEvent
-from takt.pitch import Interval, C4
+    NoteEventClass, CtrlEvent, KeyPressureEvent, MetaEvent, \
+    KeySignatureEvent, LoopBackEvent 
+from takt.pitch import Interval, C4, Key
 from takt.utils import int_preferred, TaktWarning, NoteDict
 from takt.context import context, newcontext
 from takt.score import Score, EventList, EventStream, Tracks, \
@@ -156,6 +157,9 @@ class Transpose(EventEffector):
         value(Interval, str, or int): 上下の幅。str型のときは
             `Interval(value)` と同じ意味になります。
         scale(Scale, optional): スケールの指定。
+        transpose_keysig: この引数が Ture (デフォルト) で、かつスケールの指定が
+            ない場合、KeySignatureEvent も移調の対象とします。それ以外の場合、
+            KeySignatureEvent はそのまま出力されます。
 
     Examples:
         * ``mml("CDE").Transpose('M3')`` は ``mml("EF#G#")``
@@ -164,15 +168,21 @@ class Transpose(EventEffector):
         * ``mml("CDE").Transpose(DEG(3), scale=Scale(C4))`` は
           ``mml("EFG")`` と等価なスコアを生成します。
     """
-    def __init__(self, value, scale=None):
+    def __init__(self, value, scale=None, transpose_keysig=True):
         self.value = Interval(value) if isinstance(value, str) else value
         self.scale = scale
+        self.transpose_keysig = transpose_keysig
 
     def _process_event(self, ev) -> 'Event':
         if hasattr(ev, 'n'):
             ev = ev.copy()
             ev.n = (ev.n + self.value) if self.scale is None \
                 else self.scale[self.scale.tonenum(ev.n) + self.value]
+        elif self.transpose_keysig and self.scale is None and \
+             isinstance(ev, KeySignatureEvent):
+            ev = ev.copy()
+            ev.value = Key.from_tonic(ev.value.gettonic() + self.value,
+                                      ev.value.minor)
         return ev
 
 

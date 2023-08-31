@@ -731,9 +731,10 @@ class Key(object):
             k -= 3
             if k < -6:
                 k += 12
+        lim = 7 if not extended else 11
         if isinstance(tonic, Pitch):
-            if tonic.sf > 0 and k < 0:
+            if tonic.sf > 0 and k < 0 and k + 12 <= lim:
                 k += 12
-            elif tonic.sf < 0 and k > 0:
+            elif tonic.sf < 0 and k > 0 and k - 12 >= -lim:
                 k -= 12
         return Key(k, minor, extended)

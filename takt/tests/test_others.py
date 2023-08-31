@@ -70,6 +70,8 @@ def test_effectors():
     assert mml("C D E").Transpose('M3') == mml("E F# G#")
     assert mml("C D E").Transpose(E4-C4) == mml("E F# G#")
     assert mml("C D E").Transpose(DEG(3), scale=Scale(C4)) == mml("E F G")
+    assert mml("$keysig('B-minor') C D E").Transpose(Interval('m2')) \
+        == mml("$keysig('C-minor') Db Eb F")
     assert mml("E F G").Invert(E4) == mml("E D# C#")
     assert mml("E F G").Invert(E4, scale=Scale(C4)) == mml("E D C")
     assert mml("CC#DbDE").ApplyScale(Scale(C4, 'minor')) == mml("CCDDEb")
