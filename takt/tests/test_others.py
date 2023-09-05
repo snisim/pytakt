@@ -62,7 +62,6 @@ def test_mml():
     assert mml("C|Modify('v+=10')") == note(C4, v=90)
     def f(x, y):
         return y + x
-    assert mml("C$f(${DE}, ${AG})") == mml("CAGDE")
 
 
 def test_effectors():

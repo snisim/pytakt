@@ -109,9 +109,13 @@ class Score(object):
             raise Exception("%r is not a valid score element" %
                             other.__class__.__name__)
         if isinstance(self, EventStream):
+            # 左項にEventStreamを許可しないのは、durationを簡単には取得でき
+            # ない (左項のストリームを全部読み取れば取得できるが結果の
+            # EventStreamが一度も読まれなくても全部読まれてしまうのは望ましく
+            # ない）ため、右項からのイベントの開始時刻を決定できないから。
             raise Exception("EventStream cannot be followed by other "
                             "score elements")
-        if isinstance(self, EventStream) or isinstance(other, EventStream):
+        if isinstance(other, EventStream):
             # 右のストリームは、tee() はしないが、イベントはコピー
             return self.stream().merged(
                 other.stream(copy=True), self.get_duration())

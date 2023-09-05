@@ -77,9 +77,7 @@ def balanced_paren(): return Sequence(RegExMatch(r'\s*\('),
                                       ZeroOrMore(balanced_paren_body),
                                       ")", skipws=False)
 def balanced_paren_body(): return [balanced_paren,
-                                   embedded_score,
                                    RegExMatch(r'[^()]')]
-def embedded_score(): return ("$", "{", ZeroOrMore(command), "}")
 
 def expression(): return term, ZeroOrMore(["+", "-"], term)
 def term(): return factor, ZeroOrMore(["*", "//", "/", "%"], factor)
@@ -276,8 +274,7 @@ class MMLConfig(object):
 class MMLEvaluator(object):
     def __init__(self, globals, locals):
         self.globals = globals
-        self.embedded_scores = []
-        self.locals = dict(locals, __scores=self.embedded_scores)
+        self.locals = locals
 
     def eval(self, node):
         method_name = "eval_" + node.rule_name
@@ -453,13 +450,6 @@ class MMLEvaluator(object):
 
     def eval_balanced_paren(self, node):
         return ''.join([self.eval(n) for n in node])
-
-    def eval_embedded_score(self, node):
-        result = EventList()
-        for child in node[2:-1]:
-            result = self.concat_scores(result, self.eval(child))
-        self.embedded_scores.append(result)
-        return '__scores[%d]' % (len(self.embedded_scores) - 1)
 
     def eval_expression(self, node):
         result = self.eval(node[0])
@@ -692,14 +682,6 @@ G/!? G/ G/!? G3*").show(True)
         メソッド (mapevなど) を適用します。
 
         例: ``{CDE}|Transpose(2)``
-
-    .. rubric:: 埋め込みスコア
-
-    MML中の <Python式> や <Python引数> の中で
-    ``${``\\ MMLコマンドの列\\ ``}`` を使用すると、その結果生成される
-    スコアを Pythonのコードへ渡すことができます。
-    例: ``$print(${CDE})``
-
     """
     global parser
     if not parser:
