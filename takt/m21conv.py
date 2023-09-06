@@ -462,7 +462,7 @@ class TaktToMusic21:
             while begin + d < end:
                 nextk = beat_div(d * k)
                 r = (begin - evlist.start) % (d * k)
-                if r > 0:
+                if r > 0 or k == 3:  # k==3 は 6/8拍子でc*c のようなときに働く
                     if begin + ((d * k) - r) >= end:
                         break
                     if (not is_rest and k == 2 and
