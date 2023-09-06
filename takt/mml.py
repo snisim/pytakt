@@ -19,10 +19,15 @@ from takt.constants import *
 import takt.gm as gm
 from takt.gm.drums import *
 from takt.frameutils import outerglobals, outerlocals
-from takt.utils import int_preferred
+from takt.utils import int_preferred, Ticks
+from typing import Optional as _Optional
+from typing import Union, Mapping, Callable
+
 
 __all__ = ['mml', 'mmlconfig', 'MMLAction']
 
+
+Char = str
 
 class MMLError(Exception):
     def __init__(self, message, source=None):
@@ -95,7 +100,7 @@ def floating(): return RegExMatch(r'\d+\.\d*|\d*\.\d+')
 _RESERVED_CHARS = r'Ln\d\s()\[\]{}=$|&/:;@'
 
 
-def check_reserved(char):
+def check_reserved(char) -> None:
     if re.match('[%s]' % _RESERVED_CHARS, char):
         raise ValueError("`%c' is not a configurable character" % char)
 
@@ -209,9 +214,9 @@ class MMLAction(object):
 
 
 class MMLConfig(object):
-    prefixes = '^_'
-    suffixes = '\',#b%*.+-!?`~><\\"'
-    char_actions = {
+    prefixes: str = '^_'
+    suffixes: str = '\',#b%*.+-!?`~><\\"'
+    char_actions: Mapping[Char, Callable[[], _Optional[Score]]] = {
         '^': MMLAction.mod_octaveup,
         '_': MMLAction.mod_octavedown,
         "'": MMLAction.mod_octaveup,
@@ -253,10 +258,10 @@ class MMLConfig(object):
         # '_': MMLAction.cmd_octavedown,
         ' ': MMLAction.no_op,
     }
-    octave_number_suffix = True
-    accent_amount = 10
-    timeshift_amount = L64
-    staccato_amount = 0.5
+    octave_number_suffix: bool = True
+    accent_amount: Ticks = 10
+    timeshift_amount: Ticks = L64
+    staccato_amount: float = 0.5
 
     @staticmethod
     def show_config():
@@ -276,20 +281,20 @@ class MMLEvaluator(object):
         self.globals = globals
         self.locals = locals
 
-    def eval(self, node):
+    def evalnode(self, node) -> Union[Score, int, float, Ticks, str, None]:
         method_name = "eval_" + node.rule_name
         if hasattr(self, method_name):
             return getattr(self, method_name)(node)
         else:
             if isinstance(node, NonTerminal):
-                return self.eval(node[0])
+                return self.evalnode(node[0])
             else:
                 return node.value
 
-    def eval_EOF(self, node):
+    def eval_EOF(self, node) -> None:
         pass
 
-    def concat_scores(self, score1, score2):
+    def concat_scores(self, score1, score2) -> _Optional[Score]:
         if score1 is None:
             return score2
         elif score2 is None:
@@ -298,7 +303,7 @@ class MMLEvaluator(object):
             score1 += score2
             return score1
 
-    def merge_scores(self, score1, score2):
+    def merge_scores(self, score1, score2) -> _Optional[Score]:
         if score1 is None:
             return score2
         elif score2 is None:
@@ -307,21 +312,21 @@ class MMLEvaluator(object):
             score1 &= score2
             return score1
 
-    def eval_score(self, node):
+    def eval_score(self, node) -> Score:
         result = EventList()
         for child in node:
-            result = self.concat_scores(result, self.eval(child))
+            result = self.concat_scores(result, self.evalnode(child))
         return result
 
-    def eval_comment_string(self, node):
+    def eval_comment_string(self, node) -> None:
         pass
 
-    def eval_setlength(self, node):
+    def eval_setlength(self, node) -> None:
         context().L = eval(node.value, self.globals, self.locals)
 
-    def eval_assignment(self, node):
+    def eval_assignment(self, node) -> None:
         varname = node[0].value
-        rhs = self.eval(node[2])
+        rhs = self.evalnode(node[2])
         if node[1].value == '=':
             setattr(context(), varname, rhs)
         elif node[1].value == '+=':
@@ -339,12 +344,12 @@ class MMLEvaluator(object):
         else:
             assert False
 
-    def eval_modified_command(self, node):
+    def eval_modified_command(self, node) -> _Optional[Score]:
         com = 0
         while node[com].rule_name == 'prefixchar':
             com += 1
         if node[com][0].value == '$':
-            nc = eval(self.eval(node[com][1]),
+            nc = eval(self.evalnode(node[com][1]),
                       self.globals, self.locals).copy()
         else:
             nc = newcontext()
@@ -356,13 +361,13 @@ class MMLEvaluator(object):
             result = None
             # evaluate prefixes (pre-modifiers)
             for k in range(0, com):
-                result = self.merge_scores(result, self.eval(node[k]))
+                result = self.merge_scores(result, self.evalnode(node[k]))
             # evaluate suffixes (post-modifiers)
             for k in range(com + 1, len(node)):
-                result = self.merge_scores(result, self.eval(node[k]))
+                result = self.merge_scores(result, self.evalnode(node[k]))
             MMLAction.update_length()
             # evaluate body command
-            result = self.merge_scores(result, self.eval(node[com]))
+            result = self.merge_scores(result, self.evalnode(node[com]))
             if context()._effectors and result is not None:
                 try:
                     result = eval("__result." + ".".join(context()._effectors),
@@ -374,17 +379,17 @@ class MMLEvaluator(object):
                 result = EventList(result, duration=0)
             return result
 
-    def eval_primary_command(self, node):
+    def eval_primary_command(self, node) -> _Optional[Score]:
         if node[0].value == '{' or node[0].value == '$':
             result = EventList()
             for i in range(1 if node[0].value == '{' else 4, len(node) - 1):
-                result = self.concat_scores(result, self.eval(node[i]))
+                result = self.concat_scores(result, self.evalnode(node[i]))
         elif node[0].value == '[':
             result = EventList()
             for i in range(1, len(node) - 1):
-                result = self.merge_scores(result, self.eval(node[i]))
+                result = self.merge_scores(result, self.evalnode(node[i]))
         elif node[0].rule_name == 'python_expression':
-            result = self.eval(node[0])
+            result = self.evalnode(node[0])
         else:
             try:
                 action = MMLConfig.char_actions[node.value]
@@ -394,14 +399,15 @@ class MMLEvaluator(object):
             result = action()
         return result
 
-    def eval_modifier(self, node):
+    def eval_modifier(self, node) -> _Optional[Score]:
         if node[0].rule_name == 'integer':
             if MMLConfig.octave_number_suffix:
-                context().o = self.eval(node[0])
+                context().o = self.evalnode(node[0])
             else:
-                context().L = int_preferred(Fraction(L1, self.eval(node[0])))
+                context().L = int_preferred(Fraction(L1,
+                                                     self.evalnode(node[0])))
         elif node[0].value == '/':
-            div = 2 if len(node) == 1 else self.eval(node[1])
+            div = 2 if len(node) == 1 else self.evalnode(node[1])
             if type(context().L) == float:
                 context().L = int_preferred(context().L / div)
             else:
@@ -412,84 +418,89 @@ class MMLEvaluator(object):
             if node[1].value == '@':
                 context()._effectors.append('Repeat()')
             else:
-                context()._effectors.append('Repeat(%d)' % self.eval(node[1]))
+                context()._effectors.append('Repeat(%d)' %
+                                            self.evalnode(node[1]))
         elif node[0].value == '(':
             result = None
             for i in range(1, len(node) - 1):
-                result = self.merge_scores(result, self.eval(node[i]))
+                result = self.merge_scores(result, self.evalnode(node[i]))
             return result
         elif node[0].value == '|':
-            context()._effectors.append(self.eval(node[1]))
+            context()._effectors.append(self.evalnode(node[1]))
         elif node[0].value == ':':
-            eval("context().update" + self.eval(node[1]),
+            eval("context().update" + self.evalnode(node[1]),
                  self.globals, self.locals)
         else:
-            return self.eval(node[0])
+            return self.evalnode(node[0])
 
-    def eval_prefixchar(self, node):
+    def eval_prefixchar(self, node) -> _Optional[Score]:
         try:
-            MMLConfig.char_actions[node.value]()
+            return MMLConfig.char_actions[node.value]()
         except KeyError:
             MMLAction.mod_undefined(node.value)()
+
     eval_suffixchar = eval_prefixchar
 
-    def eval_context_variable(self, node):
+    def eval_context_variable(self, node) -> Union[int, float, Ticks, None]:
         return getattr(context(), node.value)
 
-    def eval_length_constant(self, node):
+    def eval_length_constant(self, node) -> Ticks:
         return eval(node.value, self.globals, self.locals)
 
-    def eval_python_expression(self, node):
+    def eval_python_expression(self, node) -> Union[Score, int, float,
+                                                    Ticks, None]:
         try:
-            return eval(self.eval(node[-1]), self.globals, self.locals)
+            return eval(self.evalnode(node[-1]), self.globals, self.locals)
         except Exception as e:
             raise MMLError('python expression', e)
 
-    def eval_python_funcall(self, node):
-        return ''.join([self.eval(n) for n in node])
+    def eval_python_funcall(self, node) -> str:
+        return ''.join([self.evalnode(n) for n in node])
 
-    def eval_balanced_paren(self, node):
-        return ''.join([self.eval(n) for n in node])
+    def eval_balanced_paren(self, node) -> str:
+        return ''.join([self.evalnode(n) for n in node])
 
-    def eval_expression(self, node):
-        result = self.eval(node[0])
+    def eval_expression(self, node) -> Union[int, float, Ticks, None]:
+        result = self.evalnode(node[0])
         for i in range(1, len(node), 2):
             if node[i].value == '+':
-                result += self.eval(node[i + 1])
+                result += self.evalnode(node[i + 1])
             elif node[i].value == '-':
-                result -= self.eval(node[i + 1])
+                result -= self.evalnode(node[i + 1])
             else:
                 assert False
         return result
 
-    def eval_term(self, node):
-        result = self.eval(node[0])
+    def eval_term(self, node) -> Union[int, float, Ticks, None]:
+        result = self.evalnode(node[0])
         for i in range(1, len(node), 2):
             if node[i].value == '*':
-                result *= self.eval(node[i + 1])
+                result *= self.evalnode(node[i + 1])
             elif node[i].value == '/':
-                result /= self.eval(node[i + 1])
+                result /= self.evalnode(node[i + 1])
             elif node[i].value == '//':
-                result //= self.eval(node[i + 1])
+                result //= self.evalnode(node[i + 1])
             elif node[i].value == '%':
-                result %= self.eval(node[i + 1])
+                result %= self.evalnode(node[i + 1])
             else:
                 assert False
         return result
 
-    def eval_factor(self, node):
-        return self.eval(node[0]) if len(node) == 1 else -self.eval(node[1])
+    def eval_factor(self, node) -> Union[int, float, Ticks, None]:
+        return self.evalnode(node[0]) if len(node) == 1 \
+            else -self.evalnode(node[1])
 
-    def eval_primary(self, node):
-        return self.eval(node[0]) if len(node) == 1 else self.eval(node[1])
+    def eval_primary(self, node) -> Union[int, float, Ticks, None]:
+        return self.evalnode(node[0]) if len(node) == 1 \
+            else self.evalnode(node[1])
 
-    def eval_integer(self, node):
+    def eval_integer(self, node) -> int:
         return int(node.value)
 
-    def eval_hexinteger(self, node):
+    def eval_hexinteger(self, node) -> int:
         return int(node.value, 16)
 
-    def eval_floating(self, node):
+    def eval_floating(self, node) -> float:
         return float(node.value)
 
 
@@ -703,7 +714,7 @@ G/!? G/ G/!? G3*").show(True)
     effectors = context().effectors
     with newcontext(effectors=[]):
         try:
-            s = evaluator.eval(parse_tree)
+            s = evaluator.evalnode(parse_tree)
         except MMLError as e:
             if e.source is not None:
                 raise e.source from None
