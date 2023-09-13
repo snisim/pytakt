@@ -368,13 +368,8 @@ class MMLEvaluator(object):
             MMLAction.update_length()
             # evaluate body command
             result = self.merge_scores(result, self.evalnode(node[com]))
-            if context()._effectors and result is not None:
-                try:
-                    result = eval("__result." + ".".join(context()._effectors),
-                                  self.globals,
-                                  dict(self.locals, __result=result))
-                except Exception as e:
-                    raise MMLError('effector evaluation', e)
+            while context()._effectors and result is not None:
+                result = context()._effectors.pop(0)(result)
             if context()._ampersand and result is not None:
                 result = EventList(result, duration=0)
             return result
@@ -415,18 +410,22 @@ class MMLEvaluator(object):
         elif node[0].value == '&':
             context()._ampersand = True
         elif node[0].value == '@':
+            from takt.effector import Repeat
             if node[1].value == '@':
-                context()._effectors.append('Repeat()')
+                context()._effectors.append(Repeat())
             else:
-                context()._effectors.append('Repeat(%d)' %
-                                            self.evalnode(node[1]))
+                context()._effectors.append(Repeat(self.evalnode(node[1])))
         elif node[0].value == '(':
             result = None
             for i in range(1, len(node) - 1):
                 result = self.merge_scores(result, self.evalnode(node[i]))
             return result
         elif node[0].value == '|':
-            context()._effectors.append(self.evalnode(node[1]))
+            try:
+                eff = eval(self.evalnode(node[1]), self.globals, self.locals)
+            except Exception as e:
+                raise MMLError('effector evaluation', e)
+            context()._effectors.append(eff)
         elif node[0].value == ':':
             eval("context().update" + self.evalnode(node[1]),
                  self.globals, self.locals)
@@ -687,11 +686,9 @@ G/!? G/ G/!? G3*").show(True)
         例: ``C(v=30 dt+=10)``
     ``:(``\\ <Python識別子>\\ ``=``\\ <Python式>\\ ``,`` ... ``)``
         任意のコンテキスト属性を一時的に変更します。
-        例: ``mml("{CDE}:(user_attr=1)")``
+        例: ``{CDE}:(user_attr=1)``
     ``|``\\ <Python識別子>\\ ``(``\\ <Python引数>\\ ``,`` ... ``)``
-        エフェクタ、もしくはそれと同じように振る舞うScoreクラスの
-        メソッド (mapevなど) を適用します。
-
+        エフェクタを適用します。
         例: ``{CDE}|Transpose(2)``
     """
     global parser
