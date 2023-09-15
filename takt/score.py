@@ -1131,7 +1131,8 @@ class Tracks(Score, list):
 
 class EventStream(Score):
     """
-    イベントを時刻順に yield するジェネレータのクラスです。
+    イベントを時刻順に yield するジェネレータ（ジェネレータイテレータ）の
+    クラスです。
     これによって無限長のスコアを構築することが可能となります。
 
     Args:

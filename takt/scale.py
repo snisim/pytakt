@@ -24,7 +24,7 @@ class Scale(object):
     スケール (音階) を表すオブジェクトのクラスです。
 
     Attributes:
-        tonic(Pitch or int): スケール開始音のピッチ (オクターブも
+        tonic(Pitch or int): スケール開始音 (主音) のピッチ (オクターブも
             意味を持ちます)
         tone_list(list of Interval or int): スケール構成音のリスト。
             各要素は `tonic` からの音程 (Interval オブジェクトもしくは
@@ -63,6 +63,8 @@ Interval('P4'), Interval('P5'), Interval('M6'), Interval('M7')], 0))
     * len(Scaleオブジェクト) は、スケール構成音の数を返します。
     * Scaleオブジェクトどうしの等価比較('==')は、すべての属性値が
       等価であるときのみ真となります。
+    * s を Scaleオブジェクトとするとき、p ``in`` s は s.is_scale_tone(p) と
+      等価です。
     """
 
     def __init__(self, tonic, type='major'):
@@ -104,6 +106,9 @@ Interval('P4'), Interval('P5'), Interval('M6'), Interval('M7')], 0))
     def __iter__(self):
         raise TypeError("'Scale' object is not iterable")
 
+    def __contains__(self, pitch):
+        return self.is_scale_tone(pitch)
+
     def to_key(self) -> Key:
         """
         同じ主音を持った、minor_like属性が0なら長調、1なら短調の
@@ -111,13 +116,14 @@ Interval('P4'), Interval('P5'), Interval('M6'), Interval('M7')], 0))
         """
         return Key.from_tonic(self.tonic, self.minor_like, extended=True)
 
-    def is_scale_tone(self, note_number) -> bool:
-        """ `note_number` がスケール上の音であれば真を返します。
+    def is_scale_tone(self, pitch) -> bool:
+        """ `pitch` がスケール上の音であれば真を返します。
+        なお、pitch ``in`` self は self.is_scale_tone(pitch) と等価です。
 
         Args:
-            note_number(int): MIDIノート番号
+            pitch(int): MIDIノート番号
         """
-        return self.tone_list.count(chroma(note_number - self.tonic)) > 0
+        return self.tone_list.count(chroma(pitch - self.tonic)) > 0
 
     def _extended_tone_list(self):
         return self.tone_list + [self.tone_list[0] + Interval('P8')]
@@ -192,12 +198,22 @@ Interval('P4'), Interval('P5'), Interval('M6'), Interval('M7')], 0))
         else:
             return Pitch(n).fixsf(self.to_key())
 
-    def pitches(self) -> List[Pitch]:
-        """ スケール構成音のピッチのリストを返します。"""
-        return [(self.tonic + iv) if
-                isinstance(self.tonic, Pitch) and isinstance(iv, Interval)
-                else Pitch(self.tonic + iv).fixsf(self.to_key())
-                for iv in self.tone_list]
+    def pitches(self, low=None, high=None) -> List[Pitch]:
+        """ スケール上の音のピッチのリストを返します。
+
+        Args:
+            low(Pitch or int, optional):
+                この値以上のピッチのみを含めます。デフォルトでは、スケール
+                開始音になります。
+            high(Pitch or int, optional):
+                この値以下のピッチのみを含めます。デフォルトでは、スケール
+                構成音のうち最も高いものになります。
+        """
+        low_tonenum = 0 if low is None else math.ceil(self.tonenum(low))
+        high_tonenum = len(self) - 1 if high is None \
+                       else math.floor(self.tonenum(high))
+        return [self.pitch(tn) for tn in range(low_tonenum, high_tonenum + 1)]
+
 
     def get_near_scale_tone(self, pitch, round_mode='nearestup') -> Pitch:
         """ `pitch` に近いスケール上の音のピッチを返します。

@@ -298,6 +298,8 @@ class Chord(object):
 
     * Chordオブジェクトどうしの等価比較('==')は、すべての属性値が
       等価であるときのみ真となります。
+    * chord をChordオブジェクトとするとき、pitch ``in`` chord は 
+      chord.is_chord_tone(pitch) と等価です。
     """
     def __init__(self, name=None, *, kind=None, root=None, bass=None,
                  modifications=[]):
@@ -332,6 +334,9 @@ class Chord(object):
         if not isinstance(other, Chord):
             return NotImplemented
         return self.__dict__ == other.__dict__
+
+    def __contains__(self, pitch):
+        return self.is_chord_tone(pitch)
 
     def copy(self) -> 'Chord':
         """
@@ -744,6 +749,7 @@ class Chord(object):
         """
         コード構成音に `pitch` と同じピッチクラスの音が含まれていれば
         真を返し、そうでなければ偽を返します。
+        なお、pitch ``in`` self は self.is_chord_tone(pitch) と等価です。
 
         Args:
             maxinterval(Interval or int, optional): :meth:`degrees` の
