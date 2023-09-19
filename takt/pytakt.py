@@ -41,7 +41,7 @@ def error_exit(str_or_excp, option=None):
 
 def set_device(args):
     if args.device is not None:
-        os.environ['TAKT_OUTPUT_DEVICE'] = args.device
+        os.environ['PYTAKT_OUTPUT_DEVICE'] = args.device
 
 
 def filter_tracks(args, score):

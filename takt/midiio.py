@@ -22,9 +22,9 @@ LoopBackEvent以外のイベントについても、そのメッセージ送受�
 
 入力、出力デバイスのそれぞれに、現在選択されているデバイスが存在します。
 これの初期値はプラットフォームごとに決まっています。ただし、
-出力デバイスについては、環境変数 TAKT_OUTPUT_DEVICE に
-:func:`find_output_device` で認識できるような文字列を設定することで、
-初期値を変えることができます。
+環境変数 PYTAKT_OUTPUT_DEVICE や PYTAKT_INPUT_DEVICE に
+:func:`find_output_device` や :func:`find_input_device` で認識できるような
+文字列を設定することで、初期値を変えることができます。
 
 .. rubric:: 入出力キュー
 
@@ -92,7 +92,7 @@ DEV_LOOPBACK = -2
 
 
 _output_devnum = DEV_DUMMY
-_input_devnum = _cmidiio.default_input_device()
+_input_devnum = DEV_DUMMY
 
 
 _loopback_events = {}  # 送出されてから受信されるまでLoopBackEventを保管
@@ -702,11 +702,18 @@ __all__.extend([name for name, value in globals().items()
                 value.__module__ == 'takt.midiio'])
 
 
-# current_device は、TAKT_OUTPUT_DEVICE 環境変数が定義されていればその値
-# (-1 でも可) になり、そうでなけれあば default output deivce になる。
-set_output_device(os.environ['TAKT_OUTPUT_DEVICE']
-                  if 'TAKT_OUTPUT_DEVICE' in os.environ
+# current output device は、PYTAKT_OUTPUT_DEVICE 環境変数が定義されていれば
+# その値 (-1 でも可) になり、そうでなければ default output deivce になる。
+set_output_device(os.environ['PYTAKT_OUTPUT_DEVICE']
+                  if 'PYTAKT_OUTPUT_DEVICE' in os.environ
                   else _cmidiio.default_output_device())
+
+
+# current input device は、PYTAKT_INPUT_DEVICE 環境変数が定義されていれば
+# その値 (-1 でも可) になり、そうでなければ default input deivce になる。
+set_input_device(os.environ['PYTAKT_INPUT_DEVICE']
+                  if 'PYTAKT_INPUT_DEVICE' in os.environ
+                  else _cmidiio.default_input_device())
 
 
 # midiioモジュールのインポートより前に設定されたいたテンポを引き継ぐ
