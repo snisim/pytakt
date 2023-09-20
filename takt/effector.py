@@ -13,6 +13,7 @@ import heapq
 import random
 from collections import deque
 from abc import ABC, abstractmethod
+from typing import Optional
 from takt.event import Event, NoteEvent, NoteOnEvent, NoteOffEvent, \
     NoteEventClass, CtrlEvent, KeyPressureEvent, MetaEvent, \
     KeySignatureEvent, LoopBackEvent 
@@ -1203,7 +1204,7 @@ class _StreamReader:
         self.limit = None
         self.read_next()
 
-    def read_next(self):
+    def read_next(self) -> None:
         try:
             ev = next(self.stream)
             ev = ev.copy().update(t=ev.t+self.time_offset)
@@ -1224,13 +1225,13 @@ class _StreamReader:
             self.topev = NoteOffEvent(self.limit, ev.n, None, ev.tk, ev.ch,
                                       **ev.__dict__)
 
-    def top(self):
+    def top(self) -> Optional[Event]:
         return self.topev
 
-    def end(self):
+    def end(self) -> bool:
         return self.topev is None
 
-    def terminate(self, limit):
+    def terminate(self, limit) -> None:
         self.limit = limit
         ev = self.topev
         if ev is not None and ev.t >= limit:
@@ -1346,8 +1347,6 @@ class Product(Effector):
         readers = []
         notedict = NoteDict()
         lbobj = ['_product']
-        if isinstance(self.score, RealTimeStream):
-            lbev = LoopBackEvent(0, lbobj)
 
         while nexttime != math.inf:
             try:
@@ -1407,7 +1406,9 @@ class Product(Effector):
                     break
                 elif rmin.top().t > nexttime:
                     if isinstance(self.score, RealTimeStream):
-                        self.score.queue_event(lbev, rmin.top().t)
+                        if rmin.top().t != math.inf:
+                            self.score.queue_event(LoopBackEvent(rmin.top().t,
+                                                                 lbobj))
                     break
                 else:
                     yield rmin.top()
