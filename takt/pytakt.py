@@ -241,8 +241,13 @@ When invoked with no arguments, it enters interactive mode.""",
         takt.timemap.set_tempo(org_score.default_tempo)
     else:
         try:
-            org_score = eval(args.python_expr)
-            if not isinstance(org_score, Score):
+            # ここで from takt import * は実行できないで、dirを使ってtaktの
+            # 名前空間を取得し、locals として指定する。
+            org_score = eval(args.python_expr, globals(),
+                             {name: getattr(takt, name)
+                              for name in dir(takt)
+                              if not name.startswith('_')})
+            if not isinstance(org_score, takt.Score):
                 raise TypeError("not a Score object")
         except Exception as e:
             error_exit(e, '-e/--eval')
