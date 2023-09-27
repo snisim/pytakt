@@ -92,6 +92,8 @@ def test_effectors():
                                      periodic=True) \
         == mml("{C.D/E.F/}/")
     assert mml("CDEF").Swing(L2, 0.75, False) == mml("C.D/E.F/")
+    assert mml("$tempo(120) C $tempo(240) D(dt=-60)").ToMilliseconds() \
+        == mml("L=500 C L=250 D(dt=-62.5 du=281.25)")
 
     s = mml("$tempo(150) $keysig(1) $prog(49) C $vol(80) D(ch=5 v=30)")
     assert s.Filter(NoteEvent, TempoEvent) == mml("$tempo(150) C D(ch=5 v=30)")

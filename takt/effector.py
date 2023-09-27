@@ -16,7 +16,7 @@ from abc import ABC, abstractmethod
 from typing import Optional
 from takt.event import Event, NoteEvent, NoteOnEvent, NoteOffEvent, \
     NoteEventClass, CtrlEvent, KeyPressureEvent, MetaEvent, \
-    KeySignatureEvent, LoopBackEvent 
+    KeySignatureEvent, LoopBackEvent, TempoEvent
 from takt.pitch import Interval, C4, Key
 from takt.utils import int_preferred, TaktWarning, NoteDict
 from takt.context import context, newcontext
@@ -27,7 +27,7 @@ from takt.interpolator import Interpolator
 from takt.ps import note
 from takt.constants import L32, L1, MAX_DELTA_TIME, EPSILON, LOG_EPSILON, \
     BEGIN, END
-from takt.timemap import TimeSignatureMap
+from takt.timemap import TimeSignatureMap, TempoMap
 import takt.frameutils
 
 __all__ = []  # extended later
@@ -510,7 +510,8 @@ class TimeDeform(Effector):
                 _check_dt(ev)
             if isinstance(ev, NoteEvent):
                 ev.L = offtime - time
-                if hasattr(ev, 'du'):
+                if hasattr(ev, 'du') or abs(pofftime - ptime - ev.L) > EPSILON:
+                    # 元々duが無くても、時間変換の結果、必要になる場合がある。
                     ev.du = pofftime - ptime
         return ev
 
@@ -538,6 +539,26 @@ class Swing(TimeDeform):
     def __init__(self, period, rate=2/3, perf_only=True):
         super().__init__([0, period * rate, (period, period)],
                          periodic=True, perf_only=perf_only)
+
+
+class ToMilliseconds(TimeDeform):
+    """
+    スコア中のすべて時間をミリ秒へ変換した上で、テンポイベントを取り除きます。
+
+    Examples:
+        >>> mml("$tempo(120) c $tempo(240) d").ToMilliseconds()
+        EventList(duration=750.0, events=[
+            NoteEvent(t=0.0, n=C4, L=500.0, v=80, nv=None, tk=1, ch=1),
+            NoteEvent(t=500.0, n=D4, L=250.0, v=80, nv=None, tk=1, ch=1)]
+    """
+
+    def __init__(self):
+        super().__init__([0])
+
+    def __call__(self, score):
+        self.tempo_map = TempoMap(score)
+        self.deformed_time = lambda time: self.tempo_map.ticks2sec(time) * 1000
+        return super().__call__(score.Reject(TempoEvent))
 
 
 _RAND_LIMIT = 3

@@ -825,6 +825,7 @@ isinstance(ev, (NoteEvent, NoteOnEvent))])
     Quantize: Callable[..., 'Score'] = None
     TimeDeform: Callable[..., 'Score'] = None
     Swing: Callable[..., 'Score'] = None
+    ToMilliseconds: Callable[..., 'Score'] = None
     Randomize: Callable[..., 'Score'] = None
     Clip: Callable[..., 'Score'] = None
     Arpeggio: Callable[..., 'Score'] = None
