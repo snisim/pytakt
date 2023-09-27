@@ -60,6 +60,16 @@ def filter_tracks(args, score):
             score[i] = takt.EventList()
     return score
 
+
+def pytakt_eval(expr, _locals={}):
+    # ここで from takt import * は実行できないで、dirを使ってtaktの
+    # 名前空間を取得し、locals として指定する。
+    tdict = {name: getattr(takt, name) for name in dir(takt)
+             if not name.startswith('_')}
+    tdict.update(**_locals)
+    return eval(expr, globals(), tdict)
+
+
 # SMFを '-t' オプションでテキストに変換したときの可逆性について:
 # 下のようにするとで、Raw モードを使用したときには原則バイナリレベルで
 # 同じ SMF へ戻る。
@@ -241,12 +251,7 @@ When invoked with no arguments, it enters interactive mode.""",
         takt.timemap.set_tempo(org_score.default_tempo)
     else:
         try:
-            # ここで from takt import * は実行できないで、dirを使ってtaktの
-            # 名前空間を取得し、locals として指定する。
-            org_score = eval(args.python_expr, globals(),
-                             {name: getattr(takt, name)
-                              for name in dir(takt)
-                              if not name.startswith('_')})
+            org_score = pytakt_eval(args.python_expr)
             if not isinstance(org_score, takt.Score):
                 raise TypeError("not a Score object")
         except Exception as e:
@@ -273,8 +278,8 @@ When invoked with no arguments, it enters interactive mode.""",
     if args.effectors:
         for eff in args.effectors:
             try:
-                score = eval("score.%s" % eff)
-                if not isinstance(score, Score):
+                score = pytakt_eval("_score.%s" % eff, {'_score': score})
+                if not isinstance(score, takt.Score):
                     raise TypeError("not a valid effector")
             except Exception as e:
                 error_exit(e, '-a/--apply')
@@ -314,7 +319,7 @@ When invoked with no arguments, it enters interactive mode.""",
         set_device(args)
         ctrlnums = re.sub(r'\bC_', '', '[%s]' % ','.join(args.ctrlnums))
         ctrlnums = re.sub(r'\b([A-Za-z])', r'C_\1', ctrlnums)
-        score.show(args.velocity is not None, ctrlnums=eval(ctrlnums),
+        score.show(args.velocity is not None, ctrlnums=pytakt_eval(ctrlnums),
                    bar0len=args.bar0len, **({} if args.INFILE is None
                                             else {'title': args.INFILE}))
 
