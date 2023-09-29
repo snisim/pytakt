@@ -57,15 +57,15 @@ class TempoMap(object):
     テンポマップは、テンポ値の取得やティック数と秒数との相互変換に
     利用できます。
 
-    スコア冒頭部分にテンポイベントがない区間が存在する場合、その区間のテンポは
-    :func:`.current_tempo` の値であると仮定されます。
-
     Args:
         score(Score): 対象となるスコア (無限長スコア可)
+        default_tempo(float): スコア冒頭部分にテンポイベントがない区間が
+            存在する場合、その区間のテンポはこの値であると仮定されます。
+
     """
-    def __init__(self, score):
+    def __init__(self, score, default_tempo=125.0):
         self.event_iterator = score.tee().stream()
-        self.tempo_list = [current_tempo()]
+        self.tempo_list = [default_tempo]
         self.ticks_list = [0]
         self.seconds_list = [0]
         self.last_event_time = 0

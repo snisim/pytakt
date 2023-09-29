@@ -233,7 +233,7 @@ When invoked with no arguments, it enters interactive mode.""",
     # read INFILE, eval PYTHON_EXPR, or read PYTHONFILE
     if args.INFILE is not None:
         try:
-            ext = takt.utils.get_file_ext(args.INFILE, ('smf', 'json'))
+            ext = takt.get_file_ext(args.INFILE, ('smf', 'json'))
             if ext == 'smf':
                 org_score = takt.readsmf(
                     args.INFILE, supply_tempo=False, encoding=args.encoding,
@@ -242,13 +242,13 @@ When invoked with no arguments, it enters interactive mode.""",
                 org_score = takt.readjson(args.INFILE)
         except Exception as e:
             error_exit(e)
-        takt.timemap.set_tempo(120.0)
+        takt.set_tempo(120.0)
     elif args.pythonfile is not None:
         try:
             org_score = takt.evalpyfile(args.pythonfile, supply_tempo=False)
         except Exception as e:
             error_exit(e)
-        takt.timemap.set_tempo(org_score.default_tempo)
+        takt.set_tempo(org_score.default_tempo)
     else:
         try:
             org_score = pytakt_eval(args.python_expr)
@@ -256,7 +256,7 @@ When invoked with no arguments, it enters interactive mode.""",
                 raise TypeError("not a Score object")
         except Exception as e:
             error_exit(e, '-e/--eval')
-        takt.timemap.set_tempo(125.0)
+        takt.set_tempo(125.0)
 
     # get format & resolution info
     if not hasattr(org_score, 'smf_format'):
@@ -290,25 +290,28 @@ When invoked with no arguments, it enters interactive mode.""",
             print("SMF format: %r   SMF resolution: %r   Number of tracks: %r"
                   % (org_score.smf_format, org_score.smf_resolution,
                      len(org_score)))
-        takt.showsummary(score.Render())
+        takt.showsummary(score.Render(), takt.current_tempo())
     elif args.mode == 't':
         try:
-            smf_info = {'format': org_score.smf_format,
-                        'resolution': org_score.smf_resolution} \
-                        if hasattr(org_score, 'smf_resolution') else {}
+            end_score_args = {}
+            if hasattr(org_score, 'smf_resolution'):
+                end_score_args['format'] = org_score.smf_format
+                end_score_args['resolution'] = org_score.smf_resolution
+            end_score_args['default_tempo'] = takt.current_tempo()
             score.writepyfile('-', rawmode=args.raw is not None,
-                              time=args.time, smf_info=smf_info,
-                              bar0len=args.bar0len, **resolution)
+                              time=args.time, bar0len=args.bar0len,
+                              end_score_args=end_score_args, **resolution)
         except BrokenPipeError:
             # to avoid BrokenPipeError when using the 'head' command  in WSL
             sys.stdout = os.fdopen(0)
     elif args.mode == 'o':
         try:
-            ext = takt.utils.get_file_ext(args.outfile, ('smf', 'json'))
+            ext = takt.get_file_ext(args.outfile, ('smf', 'json'))
         except Exception as e:
             error_exit(e)
         if ext == 'smf':
             score.writesmf(args.outfile, encoding=args.encoding,
+                           supply_tempo=takt.current_tempo(),
                            format=org_score.smf_format, **resolution)
         else:
             score.writejson(args.outfile)

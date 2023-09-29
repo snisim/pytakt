@@ -194,8 +194,8 @@ def showtext(score, rawmode=False, time='measures',
 
 
 def writepyfile(score, filename, rawmode=False, time='measures',
-                resolution=TICKS_PER_QUARTER, smf_info=None,
-                limit=DEFAULT_LIMIT, bar0len=None) -> None:
+                resolution=TICKS_PER_QUARTER, limit=DEFAULT_LIMIT,
+                bar0len=None, end_score_args={}) -> None:
     """
     :func:`showtext` によって変換されたテキストを、ヘッダ、フッタとともに
     ファイルへ出力します。このファイルは Python のプログラムとして実行可能
@@ -218,23 +218,20 @@ def writepyfile(score, filename, rawmode=False, time='measures',
 引数は :func:`.writejson` へ渡される。
 
     Args:
-        filename: 出力ファイル名 ('-' なら標準出力)
+        filename(str): 出力ファイル名 ('-' なら標準出力)
+        end_score_args(dict, optional): end_score関数へ渡される追加の引数
 
     他の引数の意味は :func:`showtext` と同じです:
     """
     def _writepyfile(f):
         print("from takt import *", file=f)
         print("from takt.ps import *", file=f)
-        if smf_info:
-            print("smf_info = %r" % (smf_info,), file=f)
         print("\nscore = ", end='', file=f)
         showtext(score, rawmode, time, resolution, limit, bar0len, f)
         print("", file=f)
         print("end_score(score", end='', file=f)
-        if not score.active_events_at(0, TempoEvent):
-            print(", default_tempo=%r" % current_tempo(), end='', file=f)
-        if smf_info:
-            print(", **smf_info", end='', file=f)
+        for key, value in end_score_args.items():
+            print(", %s=%r" % (key, value), end='', file=f)
         print(")", file=f)
 
     if filename == '-':
@@ -263,6 +260,9 @@ def evalpyfile(filename, supply_tempo=True) -> Score:
         supply_tempo(bool, optional): Trueであると、時刻 0 にテンポイベントが
             ない場合に、:func:`end_score` の `default_tempo` 引数に指定され
             ている値のテンポイベントが補われます。
+            有効なテンポ値(BPM)を指定すると、時刻 0 にテンポイベントがない
+            場合に、その値のテンポイベントが補われます。
+            Falseの場合、テンポイベントは補われません。
 
     Returns:
         :func:`end_score` に引数として渡されたスコア。このスコア
@@ -284,7 +284,8 @@ def evalpyfile(filename, supply_tempo=True) -> Score:
         raise Exception("No 'end_score' found in %r" % filename)
     score = _returned_score
     if supply_tempo and not score.active_events_at(0, TempoEvent):
-        ev = TempoEvent(0, score.default_tempo)
+        ev = TempoEvent(0, score.default_tempo if supply_tempo is True
+                        else supply_tempo)
         if isinstance(score, Tracks):
             if not score:
                 score.append(EventList())
@@ -533,16 +534,18 @@ def statis(values=(), weights=itertools.repeat(1), times=itertools.repeat(0)):
                 round(maxat, S_ROUND), round(minat, S_ROUND))
 
 
-def showsummary(score) -> None:
+def showsummary(score, default_tempo=125.0) -> None:
     """
     スコアに関して、演奏長、小節数、音域、イベント数などのサマリー情報を表示
     します。
 
     Args:
         score(Score): 入力スコア
+        default_tempo(float): スコア冒頭部分にテンポイベントがない区間が
+            存在する場合、その区間のテンポはこの値であると仮定されます。
     """
     evlist = EventList(score).ConnectTies()
-    tempomap = TempoMap(evlist)
+    tempomap = TempoMap(evlist, default_tempo)
     tsigmap = TimeSignatureMap(evlist)
     bycategory = [[] for cat in range(0, 14)]
     bytrack = {}
@@ -602,7 +605,7 @@ def showsummary(score) -> None:
 
     print("Tempo (BPM):   ", end='')
     if not bycategory[9]:
-        print("%r (default)" % current_tempo())
+        print("%r (default)" % default_tempo)
     else:
         times = [ev.t for ev in bycategory[9]]
         timespans = (max(0, t2 - t1) for t1, t2 in

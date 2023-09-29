@@ -228,8 +228,12 @@ def readsmf(filename, supply_tempo=True, pair_note_events=True,
 
     Args:
         filename(str): ファイル名 ('-' なら標準入力)
-        supply_tempo(bool, optional): Trueであると、時刻 0 にテンポイベントが
-            ない場合に、120 BPM のテンポイベントが補われます。
+        supply_tempo(bool or float, optional): 
+            Trueであると、時刻 0 にテンポイベントがない場合に、
+            120 BPM のテンポイベントが補われます。
+            有効なテンポ値(BPM)を指定すると、時刻 0 にテンポイベントがない
+            場合に、その値のテンポイベントが補われます。
+            Falseの場合、テンポイベントは補われません。
         pair_note_events(bool): Trueの場合、ノートオンとノートオフは組み合わ
             されてすべて NoteEvent として出力されます。Falseの場合、独立した
             NoteOnEvent と NoteOffEvent として出力されます。
@@ -249,7 +253,8 @@ def readsmf(filename, supply_tempo=True, pair_note_events=True,
     if supply_tempo and not tracks.active_events_at(0, TempoEvent):
         if not tracks:
             tracks.append(EventList())
-        tracks[0].insert(0, TempoEvent(0, 120))
+        tracks[0].insert(0, TempoEvent(0, 120 if supply_tempo is True
+                                       else supply_tempo))
     if pair_note_events:
         tracks = tracks.PairNoteEvents()
     ksmap = KeySignatureMap(tracks)
@@ -287,11 +292,11 @@ def writesmf(score, filename, format=1, resolution=480, ntrks=None,
         retrigger_notes(bool, optional): Trueであると、SMFに書き出される前に、
             衝突noteに対するリトリガー処理
             (:meth:`.EventList.retrigger_notes` を参照)が適用されます。
-        supply_tempo(bool, float, or int, optional):
+        supply_tempo(float or bool, optional):
+            Trueであると、時刻 0 にテンポイベントがない場合に、テンポ値が
+            125 BPM のテンポイベントが補われます。
             有効なテンポ値(BPM)を指定すると、時刻 0 にテンポイベントがない
             場合に、その値のテンポイベントが補われます。
-            Trueであると、時刻 0 にテンポイベントがない場合に、テンポ値が
-            :func:`.current_tempo` であるテンポイベントが補われます。
             Falseの場合、テンポイベントは補われません。
         render(bool, optional):
             デフォルト(True)の場合、演奏上の時間でイベントを出力します。
@@ -324,8 +329,8 @@ def writesmf(score, filename, format=1, resolution=480, ntrks=None,
         if not tracks.active_events_at(0, TempoEvent):
             if not tracks:
                 tracks.append(EventList())
-            tracks[0].insert(0, TempoEvent(0, current_tempo() if supply_tempo
-                                           is True else supply_tempo))
+            tracks[0].insert(0, TempoEvent(0, 125 if supply_tempo is True
+                                           else supply_tempo))
 
     check_eot(tracks)
     if filename == '-':
