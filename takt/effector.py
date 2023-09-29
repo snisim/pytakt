@@ -46,7 +46,7 @@ class Effector(ABC):
     (callable object) で、下の例のようにエフェクタオブジェクトに対して
     スコアを引数として呼び出すと、変換されたスコアを返します。
 
-        >>> eff = Transpose(2)
+        >>> eff = Transpose('M2')
         >>> eff(note(C4))
         EventList(duration=480, events=[
             NoteEvent(t=0, n=D4, L=480, v=80, nv=None, tk=1, ch=1)])
@@ -68,7 +68,7 @@ class Effector(ABC):
     各エフェクタクラスのコンストラクタは、Scoreクラスのメソッドとしても利用
     できます。
     その場合はエフェクタインスタンスの生成とスコア変換が連続して行われます
-    (例: ``note(C4).Transpose(2)``)。
+    (例: ``note(C4).Transpose('M2')``)。
 
     """
 
@@ -107,7 +107,7 @@ class EventEffector(Effector):
     このクラスのエフェクタは、スコアだけでなく、単独のイベントに対しても変換
     を適用することができます。
 
-        >>> eff = Transpose(2)
+        >>> eff = Transpose('M2')
         >>> eff(NoteOnEvent(0, C4))
         NoteOnEvent(t=0, n=D4, v=80, tk=1, ch=1)
     """

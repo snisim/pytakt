@@ -689,7 +689,7 @@ G/!? G/ G/!? G3*").show(True)
         例: ``{CDE}:(user_attr=1)``
     ``|``\\ <Python識別子>\\ ``(``\\ <Python引数>\\ ``,`` ... ``)``
         エフェクタを適用します。
-        例: ``{CDE}|Transpose(2)``
+        例: ``{CDE}|Transpose('M2')``
     """
     global parser
     if not parser:

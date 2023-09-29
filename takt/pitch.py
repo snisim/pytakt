@@ -131,8 +131,6 @@ class Pitch(int):
         Cs4             # Pitch(61, 1) と同等
         >>> Pitch(61, -1)
         Db4
-        >>> Pitch(61, -1) + 2
-        Eb4
         >>> Pitch(61, key='Db major')
         Db4
         >>> Pitch(C4, 1)
@@ -143,6 +141,8 @@ class Pitch(int):
         Cs3
         >>> Pitch('Cn', key=3, octave=5)
         C5
+        >>> Db4 + 2
+        63
 
     .. rubric:: ピッチ定数
 
@@ -157,8 +157,6 @@ class Pitch(int):
     * Pitch型どうしの比較 (等値比較、大小比較) はノート番号だけで行われ、
       sf の値は比較の結果に影響しません。例えば、
       Cs4 == Db4 は True になります。
-    * Pitch + int, int + Pitch, Pitch - int の結果は Pitch 型になり、
-      sf は元の値のままとなります。
     * Pitch - Pitch の結果は Interval型になります。
     * Pitch + Interval, Interval + Pitch, Pitch - Interval の結果は Pitch 型
       となり、sf は +-2 の範囲内である限り正しく計算されます。
@@ -223,8 +221,8 @@ class Pitch(int):
     def __add__(self, other):
         if isinstance(other, Interval):
             return Interval._add_pitch_interval(self, other)
-        elif type(other) == int:
-            return Pitch(int(self) + other, self.sf)
+#        elif type(other) == int:
+#            return Pitch(int(self) + other, self.sf)
         else:
             return int.__add__(self, other)
     __radd__ = __add__
@@ -234,8 +232,8 @@ class Pitch(int):
             return Interval._pitch_subtract(self, other)
         elif isinstance(other, Interval):
             return Interval._add_pitch_interval(self, -other)
-        elif type(other) == int:
-            return Pitch(int(self) - other, self.sf)
+#        elif type(other) == int:
+#            return Pitch(int(self) - other, self.sf)
         else:
             return int.__sub__(self, other)
 
