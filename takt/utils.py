@@ -236,11 +236,16 @@ def get_file_ext(path, types=('smf', 'json', 'mxl')) -> str:
     """
     _, ext = os.path.splitext(path)
     ext = ext.lower()
-    if 'smf' in types and ext in ('.mid', '.midi', '.smf'):
-        return 'smf'
-    elif 'json' in types and ext == '.json':
-        return 'json'
-    elif 'mxl' in types and ext in ('.mxl', '.musicxml', '.xml'):
-        return 'mxl'
-    else:
-        raise Exception("Unsupported file type %r" % ext)
+    extdict = {}
+    for typ in types:
+        elist = ('.mid', '.midi', '.smf') if typ == 'smf' else \
+                ('.json',) if typ == 'json' else \
+                ('.mxl', '.musicxml', '.xml') if typ == 'mxl' \
+                else ()
+        for x in elist:
+            extdict[x] = typ
+    try:
+        return extdict[ext]
+    except KeyError:
+        raise Exception("Only the following file types supported: "
+                        + ' '.join(extdict))

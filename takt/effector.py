@@ -1811,9 +1811,9 @@ class PairNoteEvents(Effector):
             for ev in outqueue:
                 if isinstance(ev, NoteEvent) and ev.L is None:
                     warnings.warn("forced to close unterminated notes "
-                                  "(t=%r, n=%r)" % (ev.t, ev.n),
+                                  "(tk=%r, t=%r, n=%r)" % (ev.tk, ev.t, ev.n),
                                   TaktWarning, stacklevel=1)
-                    ev.L = max(stream.duration - ev.t, 0)
+                    ev.L = max(e.value - ev.t, 0)
                 yield ev
             return e.value
 
