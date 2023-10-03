@@ -11,9 +11,11 @@ import math
 import takt
 
 
-def StoreAndCheck(valid_modes, append=False):
+def StoreAndCheck(valid_modes, append=False, const=None):
     class StoreAndCheckClass(argparse.Action):
         def __call__(self, parser, namespace, values, option_string):
+            if const is not None:
+                values = const
             if append:
                 items = getattr(namespace, self.dest)
                 items = [] if items is None else items
@@ -54,7 +56,7 @@ def filter_tracks(args, score):
             xs.append(x if len(x) == 1 else
                       range(x[0], x[1]+1) if len(x) == 2 else 0/0)
         except Exception:
-            error_exit("Bad track-number spec %s" % args.tracks)
+            error_exit("Bad track-number spec '%s'" % args.tracks)
     for i in range(len(score)):
         if not any(i in x for x in xs):
             score[i] = takt.EventList()
@@ -96,8 +98,10 @@ INFILE/OUTFILE is either a standard MIDI file or a Pytakt JSON file.
 When invoked with no arguments, it enters interactive mode.""",
         usage='%(prog)s [options] [INFILE]',
         formatter_class=argparse.RawDescriptionHelpFormatter,
+        prefix_chars='-+',
         epilog="""examples:
-  pytakt -v -c7,11,PROG,BEND,TEMPO a.mid
+  pytakt -c7 -cPROG -cBEND a.mid
+  pytakt -C -cTEMPO a.mid
   pytakt -d1 a.mid
   pytakt -p --device=SomeSoftSynth a.mid
   pytakt -t -T0,3-6 -r100 --start=16 a.mid
@@ -141,11 +145,21 @@ When invoked with no arguments, it enters interactive mode.""",
     group2.add_argument('-r', '--resolution', action=StoreAndCheck('to'),
                         type=int, help="specify time resolution"
                         " in displayed text (-t) or output MIDI file (-o)")
-    group2.add_argument('-v', '--velocity', action=StoreAndCheck('g'), nargs=0,
-                        help='add velocity pane (-g)')
-    group2.add_argument('-c', '--ctrlnums',
+    group2.add_argument('+v', '++velocity',
+                        action=StoreAndCheck('g', const=True), nargs=0,
+                        default='auto', help='show velocity pane (-g)')
+    group2.add_argument('-v', '--velocity',
+                        action=StoreAndCheck('g', const=False), nargs=0,
+                        default='auto', help='hide velocity pane (-g)')
+    group2.add_argument('-c', '--ctrl',
                         action=StoreAndCheck('g', append=True),
-                        default=[], help="add controller pane(s) (-g)")
+                        default=[], help="add controller pane (-g)")
+    group2.add_argument('-C', '--allctrls', dest='ctrl', nargs=0, default=[],
+                        action=StoreAndCheck('g', const=['auto']), 
+                        help="show all actively used controller(s) (-g)")
+    group2.add_argument('+C', '++allctrls', dest='ctrl', nargs=0, default=[],
+                        action=StoreAndCheck('g', const=['verbose']),
+                        help="show all used controller(s) (-g)")
     group2.add_argument('-d', '--device', action=StoreAndCheck('gpli'),
                         help="select MIDI output device for playback"
                         " (-g/-p/iteractive)")
@@ -320,9 +334,22 @@ When invoked with no arguments, it enters interactive mode.""",
         score.play()
     else:  # -g option
         set_device(args)
-        ctrlnums = re.sub(r'\bC_', '', '[%s]' % ','.join(args.ctrlnums))
-        ctrlnums = re.sub(r'\b([A-Za-z])', r'C_\1', ctrlnums)
-        score.show(args.velocity is not None, ctrlnums=pytakt_eval(ctrlnums),
+        for i, celm in enumerate(args.ctrl):
+            if celm not in ('auto', 'verbose'):
+                iv = None
+                try:
+                    iv = int(celm, 0)
+                except ValueError:
+                    pass
+                if iv is None:
+                    try:
+                        iv = getattr(takt, 'C_' + celm.upper())
+                    except AttributeError:
+                        pass
+                if iv is None:
+                    raise Exception('%r: No such controller' % celm)
+                args.ctrl[i] = iv
+        score.show(velocity=args.velocity, ctrlnums=args.ctrl,
                    bar0len=args.bar0len, **({} if args.INFILE is None
                                             else {'title': args.INFILE}))
 

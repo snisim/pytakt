@@ -37,6 +37,7 @@ def setup_globals(mag):
         NOTE_PANE_VIEW_HEIGHT=round(10 * mag) * 88,
         CTRL_PANE_VIEW_HEIGHT=round(120 * mag),
         CTRL_PANE_YMARGIN=round(10 * mag),
+        CTRL_THICKNESS=round(2 * mag),
         MSG_FONT=(FONT_FAMILY, round(13 * mag)),
         # WindowsではSCROLLBAR_WIDTHを11未満にすると矢印が不自然になる。
         SCROLLBAR_WIDTH=max(round(12 * mag),
@@ -51,6 +52,8 @@ def setup_globals(mag):
         SNAP_PIXELS=round(5 * mag),
         CURSOR_UPDATE_PERIOD=30,
         XRULER_CURSOR_WIDTH=round(6 * mag),
+        CLOSE_BUTTON_SIZE=round(20 * mag),
+        CLOSE_BUTTON_LINE_WIDTH=round(1 * mag),
         AUTO_SCROLL_THRES=0.8,
         MAX_TRACK_BUTTONS=30,
         TRACK_BUTTON_FONT=(FONT_FAMILY, round(13 * mag)),
@@ -564,10 +567,19 @@ class CtrlViewPaneBase(ViewPaneBase):
                   side=tkinter.BOTTOM, fill='x')
         self.canvas.xview_moveto(self.master.xscroll.get()[0])
 
+    def create_widgets(self, viewwidth, viewheight, no_yscroll):
+        super().create_widgets(viewwidth, viewheight, no_yscroll)
+        self.pane_close_button = tkinter.Canvas(
+            self, width=CLOSE_BUTTON_SIZE, height=CLOSE_BUTTON_SIZE,
+            background=CL_BACK)
+        self.pane_close_button.place(x=0, y=0)
+
     def bind_actions(self):
         super().bind_actions()
         self.bind("<Control-d>",
                   lambda e: self.master.close_ctrlpane(self.ctrlnum))
+        self.pane_close_button.bind("<ButtonPress-1>", lambda e:
+                                    self.master.close_ctrlpane(self.ctrlnum))
 
     def gety(self, value):
         return self.height - 1 - \
@@ -578,6 +590,10 @@ class CtrlViewPaneBase(ViewPaneBase):
         self.draw_horizontal_lines()
         super().draw()
         self.draw_yruler()
+        a, b = int(CLOSE_BUTTON_SIZE * 0.2), int(CLOSE_BUTTON_SIZE * 0.6)
+        self.pane_close_button.create_line(
+            a, a, a, b, b, b, b, a, a, a, b, b, a, b, b, a,
+            fill=CL_VLINE_ORG, width=CLOSE_BUTTON_LINE_WIDTH)
 
     def draw_horizontal_lines(self):
         for i in range(-(self.low // -self.minorstep),
@@ -629,7 +645,8 @@ class VelocityViewPane(CtrlViewPaneBase):
         y = self.gety(ev.v)
         color = TRACK_COLORS[ev.tk % len(TRACK_COLORS)]
         rect = self.canvas.create_rectangle(
-            x1, y - 2, x2, y + 2, fill=color, outline=CL_OUTLINE,
+            x1, y - CTRL_THICKNESS, x2, y + CTRL_THICKNESS,
+            fill=color, outline=CL_OUTLINE,
             tags=('ctrl', 'tk%d' % ev.tk, 'id%x' % id(ev)))
 #        circle = self.canvas.create_oval(
 #            x1 - 3, y - 3, x1 + 3, y + 3,
@@ -666,7 +683,8 @@ class CtrlEventViewPane(CtrlViewPaneBase):
         # テンポイベントはTrack 0が非表示になっていても表示する
         htag = ('nohide',) if self.ctrlnum == C_TEMPO else ()
         rect = self.canvas.create_rectangle(
-            x1, y - 2, x2, y + 2, fill=color, outline=CL_OUTLINE,
+            x1, y - CTRL_THICKNESS, x2, y + CTRL_THICKNESS,
+            fill=color, outline=CL_OUTLINE,
             tags=('ctrl', 'tk%d' % ev.tk, 'id%x' % id(ev), *htag))
 #        circle = self.canvas.create_oval(
 #            x1 - 3, y - 3, x1 + 3, y + 3,
@@ -1041,7 +1059,6 @@ class TrackButtonPane(tkinter.Frame):
 class ViewerMain(tkinter.Frame):
     def __init__(self, master, score, velocity, ctrlnums, limit, bar0len,
                  width, height, pixels_per_tick, pixels_per_notenum):
-        super().__init__(master)
         self.evlist_org = EventList(score, limit=limit)\
             .Filter(NoteEventClass, CtrlEvent, SysExEvent, MetaEvent)\
             .ConnectTies().PairNoteEvents()
@@ -1064,6 +1081,9 @@ class ViewerMain(tkinter.Frame):
         self.playstart_tmp = None
         self.playingpos = None
         self.temposcale = 1.0
+        velocity = self.parse_velocity(velocity)
+        ctrlnums = self.parse_ctrlnums(ctrlnums)
+        super().__init__(master)
         self.create_bitmaps()
         self.create_widgets(height, velocity, ctrlnums)
         self.create_menus()
@@ -1071,6 +1091,61 @@ class ViewerMain(tkinter.Frame):
         self.pack(expand=1, fill='both')
         self.notepane.canvas.update()
         self.notepane.ycenter()
+
+    def parse_velocity(self, velocity):
+        if isinstance(velocity, str):
+            if velocity == 'auto':
+                events = self.evlist.Filter(NoteEvent)
+                return min(ev.v for ev in events) != max(ev.v for ev in events)
+            else:
+                raise Exception("Unrecognized description '%s'" % velocity)
+        else:
+            return velocity
+
+    def get_auto_ctrlnums(self):
+        if not hasattr(self, '_auto_ctrlnums'):
+            events = self.evlist.Filter(CtrlEvent, TempoEvent)
+            result_auto = set()
+            result_verbose = set()
+            ctrldict = {}  # key=(ctrlnum, tk, ch)
+            tempo = None
+            for ev in events:
+                result_verbose.add(C_TEMPO if isinstance(ev, TempoEvent)
+                                   else ev.ctrlnum)
+                if isinstance(ev, TempoEvent):
+                    if tempo is not None and tempo != ev.value:
+                        result_auto.add(C_TEMPO)
+                    tempo = ev.value
+                else:
+                    key = (ev.ctrlnum, ev.tk, ev.ch)
+                    if key in ctrldict and ctrldict[key] != ev.value:
+                        result_auto.add(ev.ctrlnum)
+                    ctrldict[key] = ev.value
+            self._auto_ctrlnums = (sorted(result_auto), sorted(result_verbose))
+        return self._auto_ctrlnums
+
+    def parse_ctrlnums(self, ctrlnums):
+        if isinstance(ctrlnums, str):
+            ctrlnums = (ctrlnums,)
+        result = []
+        for ctrlnum in ctrlnums:
+            if ctrlnum in ('auto', 'verbose'):
+                for c in self.get_auto_ctrlnums()[ctrlnum == 'verbose']:
+                    if c not in result:
+                        result.append(c)
+            elif type(ctrlnum) == int:
+                if ctrlnum < 0:
+                    try:
+                        result.remove(-ctrlnum & 0xff)
+                    except ValueError:
+                        pass
+                else:
+                    if ctrlnum not in result:
+                        result.append(ctrlnum)
+            else:
+                raise Exception("Unrecognized entry '%r' in ctrlnums" %
+                                ctrlnum)
+        return result
 
     def save_event_repr(self):
         for ev, ev_org in zip(self.evlist, self.evlist_org):
@@ -1083,7 +1158,7 @@ class ViewerMain(tkinter.Frame):
         self.trackbuttonpane = TrackButtonPane(self)
         self.xruler = XRulerPane(self)
         self.notepane = NoteViewPane(self, notepane_viewheight)
-        self.ctrlpanedict = {}
+        self.ctrlpanedict = {}  # 現在表示されているpaneの辞書
         if velocity:
             self.ctrlpanedict[-1] = VelocityViewPane(self,
                                                      CTRL_PANE_VIEW_HEIGHT)
@@ -1092,8 +1167,7 @@ class ViewerMain(tkinter.Frame):
                                                      CTRL_PANE_VIEW_HEIGHT, i)
 
     def create_menus(self):
-        viewmenuctrls = [-1, 1, 7, 10, 11, 64,
-                         C_BEND, C_KPR, C_CPR, C_PROG, C_TEMPO]
+        viewmenuctrls = [-1] + self.get_auto_ctrlnums()[1]
         for ctrlnum in self.ctrlpanedict:
             if ctrlnum not in viewmenuctrls:
                 viewmenuctrls.append(ctrlnum)
@@ -1103,6 +1177,15 @@ class ViewerMain(tkinter.Frame):
                                      font=MENU_FONT)
         self.zoommenu = self.create_zoommenu(self.mainmenu)
         self.midimenu = self.create_midimenu(self.mainmenu)
+        self.viewmenu.add_command(label='Show all actively used controllers',
+                                  accelerator='c',
+                                  command=lambda: self.open_all_ctrlpanes(0))
+        self.viewmenu.add_command(label='Show all used controllers',
+                                  command=lambda: self.open_all_ctrlpanes(1))
+        self.viewmenu.add_command(label='Hide all controllers',
+                                  accelerator='x',
+                                  command=lambda: self.close_all_ctrlpanes())
+        self.viewmenu.add_separator()
         self.viewmenu.add_separator()
         self.viewmenu.add_command(label='Other controller',
                                   command=lambda: self.viewmenu_other_action())
@@ -1124,7 +1207,7 @@ class ViewerMain(tkinter.Frame):
                                   command=self.play)
         self.mainmenu.add_command(label='Pause/Continue', accelerator='Space',
                                   command=self.pause)
-        self.mainmenu.add_command(label='Reset Cursors', accelerator='c',
+        self.mainmenu.add_command(label='Reset Cursors', accelerator='r',
                                   command=self.reset_cursors)
         self.mainmenu.add_separator()
         self.mainmenu.add_command(label='Close Window', accelerator='Ctrl+W',
@@ -1147,34 +1230,61 @@ class ViewerMain(tkinter.Frame):
             command=(lambda: self.viewmenu_action(ctrlnum, tkvar)))
 
     def open_ctrlpane(self, ctrlnum):
-        self.ctrlpanedict[ctrlnum] = (
-            VelocityViewPane(self, CTRL_PANE_VIEW_HEIGHT) if ctrlnum == -1
-            else CtrlEventViewPane(self, CTRL_PANE_VIEW_HEIGHT, ctrlnum))
-        self.viewmenuvars[ctrlnum].set(True)
-        self.trackbuttonpane.update_panes()
+        if ctrlnum not in self.ctrlpanedict:
+            self.ctrlpanedict[ctrlnum] = (
+                VelocityViewPane(self, CTRL_PANE_VIEW_HEIGHT) if ctrlnum == -1
+                else CtrlEventViewPane(self, CTRL_PANE_VIEW_HEIGHT, ctrlnum))
+            self.viewmenuvars[ctrlnum].set(True)
+            self.trackbuttonpane.update_panes()
+
+    def open_all_ctrlpanes(self, verbose):
+        act = False
+        for cnum in self.get_auto_ctrlnums()[verbose]:
+            if cnum not in self.ctrlpanedict:
+                self.open_ctrlpane(cnum)
+                act = True
+        if not act:
+            print("show: All such controllers are already shown",
+                  file=sys.stderr)
 
     def close_ctrlpane(self, ctrlnum):
-        self.ctrlpanedict[ctrlnum].destroy()
-        del self.ctrlpanedict[ctrlnum]
-        self.viewmenuvars[ctrlnum].set(False)
+        if ctrlnum in self.ctrlpanedict:
+            self.ctrlpanedict[ctrlnum].destroy()
+            del self.ctrlpanedict[ctrlnum]
+            self.viewmenuvars[ctrlnum].set(False)
+
+    def close_all_ctrlpanes(self):
+        act = False
+        for cnum in list(self.ctrlpanedict):
+            if cnum != -1:
+                self.close_ctrlpane(cnum)
+                act = True
+        if not act:
+            print("show: All controllers are already hidden", file=sys.stderr)
 
     def viewmenu_action(self, ctrlnum, tkvar):
         if tkvar.get():
-            if ctrlnum not in self.ctrlpanedict:
-                self.open_ctrlpane(ctrlnum)
+            self.open_ctrlpane(ctrlnum)
         else:
-            if ctrlnum in self.ctrlpanedict:
-                self.close_ctrlpane(ctrlnum)
+            self.close_ctrlpane(ctrlnum)
 
     def viewmenu_other_action(self):
         ctrlnum = tkinter.simpledialog.askinteger(
             "Add Pane", "Enter a controller number:")
         if ctrlnum is not None:
-            if ctrlnum not in self.viewmenuvars:
-                self.add_viewmenuitem(ctrlnum)
-            tkvar = self.viewmenuvars[ctrlnum]
-            tkvar.set(True)
-            self.viewmenu_action(ctrlnum, tkvar)
+            if 0 <= ctrlnum < 256:
+                if ctrlnum not in self.viewmenuvars:
+                    self.add_viewmenuitem(ctrlnum)
+                tkvar = self.viewmenuvars[ctrlnum]
+                tkvar.set(True)
+                self.viewmenu_action(ctrlnum, tkvar)
+            else:
+                print("show: Controller number out of range", file=sys.stderr)
+
+    def toggle_velocity_pane(self):
+        tkvar = self.viewmenuvars[-1]
+        tkvar.set(not tkvar.get())
+        self.viewmenu_action(-1, tkvar)
 
     def create_zoommenu(self, parentmenu):
         zoommenu = tkinter.Menu(parentmenu, tearoff=False, font=MENU_FONT)
@@ -1247,12 +1357,17 @@ class ViewerMain(tkinter.Frame):
             lambda e: self.trackbuttonpane.button_click_action(-1))
         self.master.bind_class("Frame", 'p', lambda e: self.play())
         self.master.bind_class("Frame", '<space>', lambda e: self.pause())
-        self.master.bind_class("Frame", 'c', lambda e: self.reset_cursors())
+        self.master.bind_class("Frame", 'r', lambda e: self.reset_cursors())
+        self.master.bind_class("Frame", 'c',
+                               lambda e: self.open_all_ctrlpanes(0))
+        self.master.bind_class("Frame", 'x',
+                               lambda e: self.close_all_ctrlpanes())
+        self.master.bind_class("Frame", 'v',
+                               lambda e: self.toggle_velocity_pane())
         self.master.bind_class("Frame", '<Prior>', lambda e:
                                self.trackbuttonpane.tempo_scale_up())
         self.master.bind_class("Frame", '<Next>', lambda e:
                                self.trackbuttonpane.tempo_scale_down())
-
     #
     def update_playing_cursor(self):
         self.playingpos = midiio.current_time() - self.toffset
@@ -1376,17 +1491,28 @@ class ViewerMain(tkinter.Frame):
                 0x00, 0x00};""")
 
 
-def show(score, velocity=False, ctrlnums=(), limit=SHOW_LIMIT, bar0len=None,
-         magnify=MAGNIFY, geometry=GEOMETRY, title="Takt") -> None:
+def show(score, velocity='auto', ctrlnums='auto', limit=SHOW_LIMIT,
+         bar0len=None, magnify=MAGNIFY, geometry=GEOMETRY,
+         title="Pytakt") -> None:
     """
     スコア `score` についてのピアノロールを表示します。
 
     Args:
         score(Score): 表示するスコア。
-        velocity(bool, optional): Trueにすると、ベロシティーPaneを表示します。
-        ctrlnums(iterable of int, optional): 表示するコントローラPaneの
-            種類を指定します (例: ``show(s, ctrlnums=[C_VOL])``) 。テンポを
-            表示したい場合には C_TEMPO を指定します。
+        velocity(bool or str, optional): Trueならば、ベロシティーPaneを
+            表示します。Falseなら表示しません。'auto' の場合、何らかの変化が
+            あるときに限り表示を行います。
+        ctrlnums(iterable of int or str, or str, optional):
+            表示するコントローラPaneの種類を指定します
+            (例: ``show(s, ctrlnums=[C_VOL])``) 。
+            'auto' を指定すると、同一トラック同一チャネルに値の異なる
+            2つ以上のイベントを含むようなコントローラをすべて表示します。
+            'verbose' を指定すると、イベントが存在するコントローラをすべて
+            表示します。'auto' や　'verbose' は iterable の中に含めることも
+            でき、それに対してさらに追加、あるは符号反転したコントローラ番号を
+            指定して削除することができます
+            (例: ``ctrlnums=('auto', C_PROG, -C_DATA)``) 。
+            0番(C_BANK)のコントローラを削除したいときは、-256を指定します。
         limit(ticks, optional):
             スコアの長さを制限します。
             制限の詳細については、:meth:`.Score.stream` の同名の引数
@@ -1436,8 +1562,12 @@ def show(score, velocity=False, ctrlnums=(), limit=SHOW_LIMIT, bar0len=None,
     - **ショートカットキー**:
         - p: Playボタンと同じ
         - space: Pause/Continueボタンと同じ
-        - c: カーソルのリセット
+        - r: カーソルのリセット
         - a: ALLボタンと同じ
+        - c: 値に動きのあるすべてのコントローラPaneを表示 
+          (ctrlnums='auto'と同等)
+        - x: すべてのコントローラPaneを消去
+        - v: ベロシティpaneの表示/消去
         - 0-9: トラック番号ボタンと同じ (+ALT で トラック10～19)
         - 矢印キー: スクロール (+SHIFT でページ単位)
         - Home/End: 曲の先頭/末尾へ移動
@@ -1454,7 +1584,12 @@ def show(score, velocity=False, ctrlnums=(), limit=SHOW_LIMIT, bar0len=None,
         root.geometry(geometry)
     root.title(title)
     midiio.open_output_device()
-    ViewerMain(root, score, velocity, ctrlnums, limit, bar0len,
-               VIEW_WIDTH, NOTE_PANE_VIEW_HEIGHT,
-               PIXELS_PER_QUARTER_NOTE / TICKS_PER_QUARTER,
-               PIXELS_PER_NOTE_NUM).mainloop()
+    try:
+        ViewerMain(root, score, velocity, ctrlnums, limit, bar0len,
+                   VIEW_WIDTH, NOTE_PANE_VIEW_HEIGHT,
+                   PIXELS_PER_QUARTER_NOTE / TICKS_PER_QUARTER,
+                   PIXELS_PER_NOTE_NUM).mainloop()
+    except Exception:
+        root.update()
+        root.destroy()  # これを行わないと再度ウィンドウを開けなくなる
+        raise
