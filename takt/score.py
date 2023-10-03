@@ -21,7 +21,7 @@ from takt.utils import int_preferred, std_time_repr, NoteDict, Ticks
 from takt.context import context
 
 __all__ = ['Score', 'EventList', 'Tracks', 'EventStream', 'RealTimeStream',
-           'seq', 'par', 'genseq'] 
+           'seq', 'par', 'genseq']
 
 
 DEFAULT_LIMIT = 2e6

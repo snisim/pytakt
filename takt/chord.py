@@ -14,7 +14,7 @@ from takt.constants import L16
 from takt.utils import TaktWarning
 
 __all__ = ['Chord']
-           
+
 
 _CHORD_KIND_DICT = {
     'major-seventh': {1: (0,), 3: (0,), 5: (0,), 7: (1,)},
@@ -298,7 +298,7 @@ class Chord(object):
 
     * Chordオブジェクトどうしの等価比較('==')は、すべての属性値が
       等価であるときのみ真となります。
-    * chord をChordオブジェクトとするとき、pitch ``in`` chord は 
+    * chord をChordオブジェクトとするとき、pitch ``in`` chord は
       chord.is_chord_tone(pitch) と等価です。
     """
     def __init__(self, name=None, *, kind=None, root=None, bass=None,

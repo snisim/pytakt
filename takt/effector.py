@@ -179,8 +179,8 @@ class Transpose(EventEffector):
             ev = ev.copy()
             ev.n = (ev.n + self.value) if self.scale is None \
                 else self.scale[self.scale.tonenum(ev.n) + self.value]
-        elif self.transpose_keysig and self.scale is None and \
-             isinstance(ev, KeySignatureEvent):
+        elif (self.transpose_keysig and self.scale is None and
+              isinstance(ev, KeySignatureEvent)):
             ev = ev.copy()
             ev.value = Key.from_tonic(ev.value.gettonic() + self.value,
                                       ev.value.minor)
@@ -990,7 +990,7 @@ class Filter(Effector):
 
         ``Filter('ctrlnum == C_PROG', negate=True)``
             プログラムチェンジイベントを取り除きます。
-            ``Filter('ctrlnum != C_PROG')`` あるいは 
+            ``Filter('ctrlnum != C_PROG')`` あるいは
             ``Reject('ctrlnum == C_PROG')`` でも同じ意味になります。
 
         ``Filter('n >= C4')``
@@ -1060,7 +1060,7 @@ class Reject(Filter):
     """
     def __init__(self, *conds, globals=None, locals=None):
         super().__init__(*conds, negate=True, globals=globals, locals=locals)
-    
+
 
 class Cond(Effector):
     """
@@ -1931,5 +1931,5 @@ class RetriggerNotes(Effector):
 
 # Effectorとそのサブクラスを自動的に __all__ に含める
 __all__.extend([name for name, value in globals().items()
-               if name[0] != '_' and isinstance(value, type) and 
+               if name[0] != '_' and isinstance(value, type) and
                issubclass(value, Effector)])

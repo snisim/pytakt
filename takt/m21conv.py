@@ -190,7 +190,7 @@ class TaktToMusic21:
             warnings.warn("Unrecognized characters in text events. "
                           "Please check the 'encoding' argument when the "
                           "score is read from a MIDI file.",
-                          TaktWarning) 
+                          TaktWarning)
             return string.encode(errors='surrogateescape').\
                 decode(errors='replace')
 
@@ -248,9 +248,9 @@ class TaktToMusic21:
                             else:
                                 # 小節区切りで終わる音符
                                 continue
-                        elif self.quantize(ev.t + ev.L, quant) == bar.start \
-                             and (ev.t + ev.L - bar.start < \
-                                  self.GRACE_NOTE_THRES):
+                        elif (self.quantize(ev.t + ev.L, quant) == bar.start
+                              and (ev.t + ev.L - bar.start <
+                                   self.GRACE_NOTE_THRES)):
                             # クオンタイズの結果zero-durationになり、かつ
                             # 音長が閾値未満のものは、前の小節のみに含める。
                             continue
@@ -262,9 +262,9 @@ class TaktToMusic21:
                                 ev = ev.copy().update(
                                     L=bar.duration - ev.t,
                                     tie=getattr(ev, 'tie', 0) | BEGIN)
-                        elif self.quantize(ev.t + ev.L, quant) > bar.duration \
-                             or (ev.t + ev.L - bar.duration >= \
-                                 self.GRACE_NOTE_THRES):
+                        elif (self.quantize(ev.t + ev.L, quant) > bar.duration
+                              or (ev.t + ev.L - bar.duration >=
+                                  self.GRACE_NOTE_THRES)):
                             continue
                 newbar.append(ev)
             result.append(newbar)
@@ -281,7 +281,7 @@ class TaktToMusic21:
         # -quant/2にするための補正
         qofftime = max(self.quantize(t + L + (offquant - quant) / 2, offquant),
                        qtime)
-            
+
         # 元の音価がスレッショルド以下でない限り、zero-durationを避ける。
         if qofftime <= qtime and L >= self.GRACE_NOTE_THRES:
             # qofftime を、qtimeを超える一番近い offquantの倍数にする。
@@ -400,8 +400,8 @@ class TaktToMusic21:
                     elif (div == 3 and
                           (ontime - tstart + tolerance) % unit <= tolerance*2):
                         result += self.INEXACT_NOTE_ON_MATCH_REWARD
-                    elif (ontime - tstart + tolerance) % (unit/2) \
-                         <= tolerance*2:
+                    elif ((ontime - tstart + tolerance) % (unit/2)
+                          <= tolerance*2):
                         result -= self.TUPLET_MIDNOTE_PENALTY
                     else:
                         result = 0
@@ -658,7 +658,7 @@ class TaktToMusic21:
         # 音価がGRACS_NOTE_THRES未満のものは原則として装飾音にする
         self.GRACE_NOTE_THRES = min_note / 4
         evlist = EventList(score, limit=limit).Reject(CtrlEvent) \
-            .PairNoteEvents() # .Quantize(min_note, saveorg=True)
+            .PairNoteEvents()  # .Quantize(min_note, saveorg=True)
         tracks = evlist.ToTracks()
         keysigs = tracks.Filter(KeySignatureEvent)
         tsigmap = TimeSignatureMap(tracks[0], bar0len)
@@ -989,7 +989,7 @@ class Music21ToTakt:
     def conv_stafftext(self, m21textexpr, offset, tknum) -> XmlEvent:
         return XmlEvent(int_preferred(offset * TICKS_PER_QUARTER),
                         'text', m21textexpr.content, tknum)
-                       
+
     def conv_metadata(self, m21metadata) -> List[MetaEvent]:
         result = []
         if m21metadata.title is not None:

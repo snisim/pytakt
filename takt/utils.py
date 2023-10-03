@@ -231,7 +231,7 @@ def get_file_ext(path, types=('smf', 'json', 'mxl')) -> str:
         types(tuple of str): 受け入れ可能なファイル形式
 
     Returns:
-        str: 標準MIDIファイルなら 'smf', jsonファイルなら 'json', 
+        str: 標準MIDIファイルなら 'smf', jsonファイルなら 'json',
         MusicXMLファイルなら 'mxl'
     """
     _, ext = os.path.splitext(path)

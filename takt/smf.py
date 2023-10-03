@@ -228,7 +228,7 @@ def readsmf(filename, supply_tempo=True, pair_note_events=True,
 
     Args:
         filename(str): ファイル名 ('-' なら標準入力)
-        supply_tempo(bool or float, optional): 
+        supply_tempo(bool or float, optional):
             Trueであると、時刻 0 にテンポイベントがない場合に、
             120 BPM のテンポイベントが補われます。
             有効なテンポ値(BPM)を指定すると、時刻 0 にテンポイベントがない

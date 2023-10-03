@@ -623,7 +623,7 @@ def marker(string, **kwargs) -> EventList:
 
 
 def chprefix(value, **kwargs) -> EventList:
-    """ MIDIチャネルプレフィックスのイベント (mtype=0x20 のメタイベント) 
+    """ MIDIチャネルプレフィックスのイベント (mtype=0x20 のメタイベント)
     を含むEventList を生成します。``meta(0x20, bytes((value,)), **kwargs)`` と
     等価です。"""
     return meta(M_CHPREFIX, bytes((value,)), **kwargs)

@@ -29,6 +29,7 @@ __all__ = ['mml', 'mmlconfig', 'MMLAction']
 
 Char = str
 
+
 class MMLError(Exception):
     def __init__(self, message, source=None):
         super().__init__(message)
@@ -661,7 +662,7 @@ G/!? G/ G/!? G3*").show(True)
         複数の（空を含む）音価指定を結合してその和をとります。たとえば、
         ``*~/`` は音価を2.5倍、``~`` は2倍、``~~`` は3倍、``~..`` は
         2.75倍にすることを意味します。
-    :code:`\``
+    :code:`\\``
         ベロシティを 10 増やします。``(v+=10)`` と等価です。
     ``?``
         ベロシティを 10 減らします。``(v-=10)`` と等価です。
@@ -798,7 +799,7 @@ def mmlconfig(translate=("", ""), *,
             True (default) ならばオクターブ番号を指定する意味、
             Falseなら音価を全音符のその整数分の1に設定する意味になります。
         accent_amount(int or float, optional):
-            標準設定で :code:`\`` および ``?`` に割り当てられている機能に
+            標準設定で :code:`\\`` および ``?`` に割り当てられている機能に
             ついて、ベロシティの増減の大きさを指定します。(デフォルト値: 10)
         timeshift_amount(ticks, optional):
             標準設定で ``<`` および ``>`` に割り当てられている機能について、

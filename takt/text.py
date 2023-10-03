@@ -328,7 +328,7 @@ def end_score(score, default_tempo=125.0, format=1, resolution=480) -> None:
             print("'write' requires a filename")
             return
         try:
-            ext = get_file_ext(sys.argv[2], ('smf', 'json')) 
+            ext = get_file_ext(sys.argv[2], ('smf', 'json'))
         except Exception as e:
             print(e)
             return
@@ -363,8 +363,8 @@ def writejson(score, filename, **kwargs) -> Optional[str]:
     ただし、`score` に下のクラス以外のオブジェクトが含まれている場合は
     使用できません。
 
-        int, float, str, bool, None, Fraction, Pitch, Interval, Key, list, 
-        tuple, dict (キーは文字列に限る), bytes, bytearray, 
+        int, float, str, bool, None, Fraction, Pitch, Interval, Key, list,
+        tuple, dict (キーは文字列に限る), bytes, bytearray,
         Event とそのサブクラス, EventList, Tracks, Chord
 
     EventStreamを除くスコアは、通常、上のオブジェクトのみで構成されています
@@ -374,7 +374,7 @@ def writejson(score, filename, **kwargs) -> Optional[str]:
 
     Args:
         filename: 出力ファイル名 ('-' なら標準出力)
-        kwargs: json.dump へ渡されるその他の引数 
+        kwargs: json.dump へ渡されるその他の引数
 
     Examples:
         >>> writejson(note(C4), '-', indent=4)
@@ -395,9 +395,9 @@ def writejson(score, filename, **kwargs) -> Optional[str]:
                     "ch": 1
                 }
             ]
-        }>>> 
+        }>>>
         >>> s = mml("C C# Db> D")
-        >>> writejson(s, 'a.json') 
+        >>> writejson(s, 'a.json')
         >>> s == readjson('a.json')
         True
     """
@@ -482,7 +482,7 @@ def readjson(filename) -> Score:
                 evclass = getattr(takt.event, dic['__event__'])
                 if not issubclass(evclass, Event):
                     raise Exception()
-            except:
+            except Exception:
                 raise Exception('%r: No such event class' %
                                 (dic['__event__'],))
             del dic['__event__']
@@ -491,7 +491,7 @@ def readjson(filename) -> Score:
             else:
                 obj = evclass(**dic)
         elif '__event_list__' in dic:
-            if type(dic['events']) != list: 
+            if type(dic['events']) != list:
                 raise TypeError('__event_list__')
             del dic['__event_list__']
             return EventList(**dic)

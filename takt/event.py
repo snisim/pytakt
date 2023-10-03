@@ -912,7 +912,7 @@ def message_to_event(msg, time, tk, encoding='utf-8') -> Event:
             except UnicodeDecodeError:
                 # warnings.warn("Unrecognized characters in text events. "
                 #               "Please check the 'encoding' argument.",
-                #               TaktWarning) 
+                #               TaktWarning)
                 strvalue = msg[2:].decode(encoding, errors='surrogateescape')
             return MetaEvent(time, msg[1], strvalue, tk)
         elif msg[1] == M_KEYSIG:
@@ -928,5 +928,5 @@ def message_to_event(msg, time, tk, encoding='utf-8') -> Event:
 
 # Eventとそのサブクラスを自動的に __all__ に含める
 __all__.extend([name for name, value in globals().items()
-               if name[0] != '_' and isinstance(value, type) and 
+               if name[0] != '_' and isinstance(value, type) and
                issubclass(value, Event)])

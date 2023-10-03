@@ -712,8 +712,8 @@ set_output_device(os.environ['PYTAKT_OUTPUT_DEVICE']
 # current input device は、PYTAKT_INPUT_DEVICE 環境変数が定義されていれば
 # その値 (-1 でも可) になり、そうでなければ default input deivce になる。
 set_input_device(os.environ['PYTAKT_INPUT_DEVICE']
-                  if 'PYTAKT_INPUT_DEVICE' in os.environ
-                  else _cmidiio.default_input_device())
+                 if 'PYTAKT_INPUT_DEVICE' in os.environ
+                 else _cmidiio.default_input_device())
 
 
 # midiioモジュールのインポートより前に設定されたいたテンポを引き継ぐ

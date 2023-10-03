@@ -4,7 +4,7 @@ pianoroll.py pitch.py ps.py pytakt.py scale.py score.py smf.py text.py \
 timemap.py utils.py gm/__init__.py gm/drums.py
 
 pycodestyle:
-	pycodestyle $(PYFILES) | grep -v -f pycodestyle.expect || true
+	pycodestyle $(PYFILES) | fgrep -v -x -f pycodestyle.expect || true
 	python3 tests/len79.py $(PYFILES)
 
 test:

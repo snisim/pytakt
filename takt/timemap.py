@@ -16,7 +16,7 @@ from takt.pitch import Key
 from takt.utils import int_preferred, Ticks
 
 
-__all__ = ['current_tempo', 'set_tempo', 
+__all__ = ['current_tempo', 'set_tempo',
            'TempoMap', 'TimeSignatureMap', 'KeySignatureMap']
 
 

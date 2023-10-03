@@ -210,10 +210,9 @@ Interval('P4'), Interval('P5'), Interval('M6'), Interval('M7')], 0))
                 構成音のうち最も高いものになります。
         """
         low_tonenum = 0 if low is None else math.ceil(self.tonenum(low))
-        high_tonenum = len(self) - 1 if high is None \
-                       else math.floor(self.tonenum(high))
+        high_tonenum = (len(self) - 1 if high is None
+                        else math.floor(self.tonenum(high)))
         return [self.pitch(tn) for tn in range(low_tonenum, high_tonenum + 1)]
-
 
     def get_near_scale_tone(self, pitch, round_mode='nearestup') -> Pitch:
         """ `pitch` に近いスケール上の音のピッチを返します。

@@ -155,7 +155,7 @@ When invoked with no arguments, it enters interactive mode.""",
                         action=StoreAndCheck('g', append=True),
                         default=[], help="add controller pane (-g)")
     group2.add_argument('-C', '--allctrls', dest='ctrl', nargs=0, default=[],
-                        action=StoreAndCheck('g', const=['auto']), 
+                        action=StoreAndCheck('g', const=['auto']),
                         help="show all actively used controller(s) (-g)")
     group2.add_argument('+C', '++allctrls', dest='ctrl', nargs=0, default=[],
                         action=StoreAndCheck('g', const=['verbose']),

@@ -1368,6 +1368,7 @@ class ViewerMain(tkinter.Frame):
                                self.trackbuttonpane.tempo_scale_up())
         self.master.bind_class("Frame", '<Next>', lambda e:
                                self.trackbuttonpane.tempo_scale_down())
+
     #
     def update_playing_cursor(self):
         self.playingpos = midiio.current_time() - self.toffset
@@ -1564,7 +1565,7 @@ def show(score, velocity='auto', ctrlnums='auto', limit=SHOW_LIMIT,
         - space: Pause/Continueボタンと同じ
         - r: カーソルのリセット
         - a: ALLボタンと同じ
-        - c: 値に動きのあるすべてのコントローラPaneを表示 
+        - c: 値に動きのあるすべてのコントローラPaneを表示
           (ctrlnums='auto'と同等)
         - x: すべてのコントローラPaneを消去
         - v: ベロシティpaneの表示/消去

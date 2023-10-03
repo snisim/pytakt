@@ -250,7 +250,7 @@ class Pitch(int):
         """ 音高を表す文字列('C4', 'Gbb6' など)に変換します。
 
         Args:
-            lossless(bool): デフォルト(False)では、常に `pitch_strings` と 
+            lossless(bool): デフォルト(False)では、常に `pitch_strings` と
                 `sfn` を使った文字列を返します。
                 Trueのときは、eval関数を適用したときに
                 元のPitchオブジェクトへ正確に戻るよう、必要に応じて
