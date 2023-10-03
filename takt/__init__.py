@@ -16,4 +16,4 @@ from takt.utils import *
 from takt.text import *
 import takt.gm as gm
 
-__version__ = '0.33'
+__version__ = '0.34'
