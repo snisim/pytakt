@@ -8,6 +8,9 @@ Pytakt は、音符やMIDIコントロールチェンジといった**イベン�
 る音楽情報科学分野における研究のほか、テキストベースの簡易的な音楽制作
 や、このライブラリを使用した音楽アプリケーションの構築を想定しています。
 
+* [スライド: Pytaktの紹介](http://u-aizu.ac.jp/~nisim/PtU7c5Hy7f/Introduction_to_Pytakt.pdf)
+* [Pytakt API ドキュメント](http://u-aizu.ac.jp/~nisim/PtU7c5Hy7f/index.html)
+
 
 ## 主な機能
 
