@@ -397,6 +397,15 @@ def queue_event(ev, time=None, devnum=None) -> None:
             _cmidiio.queue_message(devnum, time, ev.tk, ev.to_message())
 
 
+def recv_ready() -> bool:
+    """
+    入力キューにメッセージがあれば True, そうでなければ False を返します。
+    この値が True であれば、次に :func:`recv_event` を呼んだときにブロック
+    状態にならないことが保証されます。
+    """
+    return _cmidiio.recv_ready()
+
+
 def recv_event() -> Optional[Event]:
     """
     入力デバイスからのメッセージを受け取りイベントとして返します。

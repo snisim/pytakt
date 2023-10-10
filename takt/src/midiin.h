@@ -28,6 +28,9 @@ public:
     static void closeDevice(int devNum);
     static bool isOpenedDevice(int devNum);
 
+    /* test if there is a message in the queue - called from MAIN thread */
+    static bool receiveReady();
+
     /* receive a message from the message queue - called from MAIN thread */
     static void receiveMessage(int &devNum, double &ticks, int &tk,
 			       message_t& msg);

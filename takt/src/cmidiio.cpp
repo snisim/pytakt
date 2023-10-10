@@ -235,6 +235,11 @@ static PyObject* takt_stop(PyObject *self)
     return Py_BuildValue("");
 }
 
+static PyObject* takt_recv_ready(PyObject *self)
+{
+    return Py_BuildValue("O", MidiIn::receiveReady() ? Py_True : Py_False);
+}
+
 static PyObject* takt_recv_message(PyObject *self)
 {
     int devNum, tk;
@@ -296,6 +301,7 @@ static PyMethodDef cmidiio_methods[] = {
     { "current_tempo_scale", (PyCFunction)takt_current_tempo_scale, METH_NOARGS },
     { "set_tempo_scale", takt_set_tempo_scale, METH_VARARGS },
     { "stop", (PyCFunction)takt_stop, METH_NOARGS },
+    { "recv_ready", (PyCFunction)takt_recv_ready, METH_NOARGS },
     { "recv_message", (PyCFunction)takt_recv_message, METH_NOARGS },
     { "_interrupt_recv_message", (PyCFunction)takt_interrupt_recv_message, METH_NOARGS },
     { "cancel_messages", takt_cancel_messages, METH_VARARGS },

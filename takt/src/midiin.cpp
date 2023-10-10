@@ -123,6 +123,15 @@ static void midiInSigIntHandler(int signum)
     MidiIn::interrupt();
 }
 
+bool MidiIn::receiveReady()
+{
+    bool rtn;
+    SysDep::mutex_lock(&midiInMutex);
+    rtn = !miEventQueue.empty();
+    SysDep::mutex_unlock(&midiInMutex);
+    return rtn;
+}
+
 void MidiIn::receiveMessage(int &devNum, double &ticks, int &tk, message_t& msg)
 {
     SysDep::set_signal_handler(midiInSigIntHandler);
