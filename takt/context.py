@@ -6,11 +6,15 @@
 
 import numbers
 import os
+import threading
 from typing import List, Tuple, Any
 from takt.utils import int_preferred
 from takt.constants import L4
 
 __all__ = ['Context', 'context', 'newcontext']
+
+
+thread_local = threading.local()
 
 
 class Context(object):
@@ -34,6 +38,11 @@ class Context(object):
     Context クラスのメソッドとしても使用でき、コンテキストを指定した
     スコア生成が可能です
     (例: ``mycontext.note(C4)``、``mycontext.mml('CDE')`` など)。
+
+    マルチスレッド環境でも安全に使用できるように、現在有効なコンテキストは
+    スレッドごと別々に管理されています。新しいスレッドが生成されたとき、
+    そのスレッドのコンテキストは常にデフォルトコンテキスト (Context() で
+    得られるコンテキスト) になります。
 
     Attributes:
         dt (ticks): 生成されるイベントの dt 属性の値 (楽譜上の時刻と
@@ -120,7 +129,6 @@ class Context(object):
     """
     __slots__ = ('dt', 'tk', 'ch', 'v', 'nv', 'L', 'duoffset', 'durate',
                  'o', 'key', 'effectors', '_outer_context', '__dict__')
-    _current_context = None
     _newtrack_count = 1
 
     def __init__(self, dt=0, L=L4, v=80, nv=None, duoffset=0, durate=100,
@@ -237,14 +245,15 @@ class Context(object):
 
     @staticmethod
     def _push(ctxt):
-        ctxt._outer_context = Context._current_context
-        Context._current_context = ctxt
+        ctxt._outer_context = context()
+        thread_local.current_context = ctxt
 
     @staticmethod
     def _pop():
-        if Context._current_context._outer_context is None:
+        ctxt = context()
+        if ctxt._outer_context is None:
             raise RuntimeError("pop on empty context stack")
-        Context._current_context = Context._current_context._outer_context
+        thread_local.current_context = ctxt._outer_context
 
     # example:
     #  with newcontext(ch=2): note(C4)
@@ -295,9 +304,6 @@ class Context(object):
         return self
 
 
-Context._current_context = Context()
-
-
 # 理想を言えば context をグローバル変数としたいが、python では import
 # するときにグローバル変数のコピーが行われるので、モジュール内から global文で
 # もって書き換えることができない。
@@ -306,7 +312,7 @@ def context() -> Context:
     """
     現在有効になっているコンテキストを返します。
     """
-    return Context._current_context
+    pass
 
 
 # 上の context() の定義だと、 'context().attr = value' を誤って、
@@ -316,7 +322,9 @@ class _context_function(object):
     __slots__ = ()
 
     def __call__(self) -> Context:
-        return Context._current_context
+        if not hasattr(thread_local, 'current_context'):
+            thread_local.current_context = Context()
+        return thread_local.current_context
 
 
 if '__SPHINX_AUTODOC__' not in os.environ:
@@ -329,7 +337,7 @@ def newcontext(**kwargs) -> Context:
     属性値を変更したものを返します。``context().copy().update(**kwargs)`` と
     等価です。
     """
-    ctxt = Context._current_context.copy()
+    ctxt = context().copy()
     ctxt.update(**kwargs)
     return ctxt
 
