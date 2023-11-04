@@ -53,7 +53,7 @@ def primary_command(): return [cmdchar,
                                ("$", python_id, ":", "{",
                                 ZeroOrMore(command), "}"),
                                python_expression]
-def cmdchar(): return RegExMatch('[^%s%s%s]' %
+def cmdchar(): return RegExMatch('[^%s%s%s]((?<=[A-Z])bb*)?' %
                                  (_RESERVED_CHARS,
                                   re.escape(MMLConfig.prefixes),
                                   re.escape(MMLConfig.suffixes)))
@@ -216,14 +216,13 @@ class MMLAction(object):
 
 class MMLConfig(object):
     prefixes: str = '^_'
-    suffixes: str = '\',#b%*.+-!?`~><\\"'
+    suffixes: str = '\',#%*.+-!?`~><\\"'
     char_actions: Mapping[Char, Callable[[], _Optional[Score]]] = {
         '^': MMLAction.mod_octaveup,
         '_': MMLAction.mod_octavedown,
         "'": MMLAction.mod_octaveup,
         ',': MMLAction.mod_octavedown,
         '#': MMLAction.mod_sharp,
-        'b': MMLAction.mod_flat,
         '%': MMLAction.mod_natural,
         '*': MMLAction.mod_double_length,
         '.': MMLAction.mod_dotted_note,
@@ -245,14 +244,13 @@ class MMLConfig(object):
         'G': MMLAction.cmd_note('G'),
         'A': MMLAction.cmd_note('A'),
         'B': MMLAction.cmd_note('B'),
-        'H': MMLAction.cmd_note('B'),
         'c': MMLAction.cmd_note('C'),
         'd': MMLAction.cmd_note('D'),
         'e': MMLAction.cmd_note('E'),
         'f': MMLAction.cmd_note('F'),
         'g': MMLAction.cmd_note('G'),
         'a': MMLAction.cmd_note('A'),
-        'h': MMLAction.cmd_note('B'),
+        'b': MMLAction.cmd_note('B'),
         'R': MMLAction.cmd_rest,
         'r': MMLAction.cmd_rest,
         # '^': MMLAction.cmd_octaveup,
@@ -388,10 +386,13 @@ class MMLEvaluator(object):
             result = self.evalnode(node[0])
         else:
             try:
-                action = MMLConfig.char_actions[node.value]
+                action = MMLConfig.char_actions[node.value[0]]
             except KeyError:
                 raise MMLError("Unknown command `%c' at position %d"
                                % (node.value, node.position))
+            for flat_sign in node.value[1:]:
+                if flat_sign == 'b':
+                    MMLAction.mod_flat()
             result = action()
         return result
 
@@ -555,20 +556,22 @@ G/!? G/ G/!? G3*").show(True)
     コマンドから成り、``C``, ``D``, ``E`` がそれぞれ基本コマンド、``#`` と
     ``4`` は ``D`` に対する後置修飾子、``^`` は ``E`` に対する前置修飾子です。
 
-    空白文字(スペース、タブ、改行)は、識別子、数値、および2文字以上からなる
-    演算子の途中を除き、自由に挿入できます。セミコロン (';') から
-    行の終わりまではコメントとみなされ、コマンドとコマンドの間に自由に挿入
-    できます。
+    空白文字(スペース、タブ、改行)は、識別子、数値、2文字以上からなる
+    演算子、およびフラットを表す `b` の前を除き、自由に挿入できます。
+    セミコロン (';') から行の終わりまではコメントとみなされ、コマンドと
+    コマンドの間に自由に挿入できます。
 
     .. rubric:: 基本コマンド一覧
 
     デフォルト設定で使用可能な基本コマンドは以下の通りです。
 
-    ``A`` ～ ``H`` または ``a`` ～ ``h`` (``b`` を除く)
+    ``A`` ～ ``G`` または ``a`` ～ ``g``
         :func:`.note` 関数によって指定された音名の音符を生成します。
-        ``B`` と ``H`` は、ともに ``C`` の長七度上の音を表します。
-        小文字も使用でき、意味は変わりません（ただし、``b`` はフラットに
-        割り当てられているため使用できません）。
+        ``B`` は ``C`` の長七度上の音を表します。
+        小文字も使用でき、大文字と意味は同じです。ただし、``b`` は
+        英大文字の直後に置かれた場合はフラット (2個置かれた場合はダブル
+        フラット) の意味になります (例えば、``gab`` の b は１つの音符ですが、
+        ``G Ab`` の b はフラットの意味になります)。 
         オクターブ番号はコンテキストのo属性から取得されます。
     ``r`` または ``R``
         :func:`.rest` 関数によって休符を生成します。
@@ -639,9 +642,9 @@ G/!? G/ G/!? G3*").show(True)
 
     <整数>
         数値によってオクターブを指定します (4が中央ハを含むオクターブ)。
-    ``#`` または ``+``
+    ``+`` または ``#``
         シャープ。ピッチを半音上げます。
-    ``b`` または ``-``
+    ``-``
         フラット。ピッチを半音下げます。
     ``%``
         ナチュラル。keyコンテキスト属性の値が0以外のときのみ有効で、シャープや
@@ -809,10 +812,6 @@ def mmlconfig(translate=("", ""), *,
             drコンテキスト属性値に乗じる係数を指定します。(デフォルト値: 0.5)
 
     Examples:
-        下の設定は ``b`` をフラットではなく ``B`` と同じ意味に変更します::
-
-            mmlconfig(translate=('b', 'B'), del_suffixes='b')
-
         下の設定は、日本語仮名文字による音符、休符、および音価を伸ばす操作\
 の記述を可能にします (このような表記はストトン表記として知られています)::
 
