@@ -1777,7 +1777,16 @@ class PairNoteEvents(Effector):
     対応する NoteOffEvent が無い NoteOnEvent を含む場合は、警告が出されると
     ともに、当該 EventList または EventStream の演奏長まで続く音符（それが
     不可能な場合は音価0の音符）として NoteEvent が生成されます。
+
+    Args:
+        ref_links(bool):
+            Trueにすると、生成された各NoteEventについて、その元となった
+            NoteOnEventおよびNoteOffEventへの参照を、それぞれnoteonev,
+            noteoffevという名の属性として追加します。
     """
+    def __init__(self, ref_links=False):
+        self.ref_links = ref_links
+
     def _pair_note_events(self, stream):
         notedict = NoteDict()
         outqueue = deque()
@@ -1790,6 +1799,8 @@ class PairNoteEvents(Effector):
                 if isinstance(ev, NoteOnEvent):
                     noteev = NoteEvent(ev.t, ev.n, None, ev.v, None,
                                        tk=ev.tk, ch=ev.ch, **ev.__dict__)
+                    if self.ref_links:
+                        noteev.noteonev = ev
                     notedict.pushnote(ev, noteev)
                     outqueue.append(noteev)
                 elif isinstance(ev, NoteOffEvent):
@@ -1802,6 +1813,8 @@ class PairNoteEvents(Effector):
                     else:
                         noteev.L = ev.t - noteev.t
                         noteev.nv = ev.nv
+                        if self.ref_links:
+                            noteev.noteoffev = ev
                         if abs(noteev.get_dt() - ev.get_dt()) > EPSILON:
                             noteev.du = noteev.L - noteev.get_dt() \
                                         + ev.get_dt()
@@ -1826,7 +1839,16 @@ class UnpairNoteEvents(Effector):
     スコア中に含まれる NoteEvent を、NoteOnEvent と NoteOffEvent の
     対に変換します。NoteOffEvent の時刻は、元の NoteEvent の時刻に
     L属性値を加えたものになります。
+
+    Args:
+        ref_links(bool):
+            Trueにすると、生成された各NoteOnEventおよびNoteOffEventについて、
+            その元となったNoteEventへの参照を、noteevという名の属性として
+            追加します。
     """
+    def __init__(self, ref_links=False):
+        self.ref_links = ref_links
+
     def _unpair_note_events(self, stream):
         noteoffbuf = []
         seqno = itertools.count()
@@ -1839,6 +1861,8 @@ class UnpairNoteEvents(Effector):
                 if isinstance(ev, NoteEvent):
                     dic = ev.__dict__.copy()
                     dic.pop('du', None)
+                    if self.ref_links:
+                        dic['noteev'] = ev
                     offev = NoteOffEvent(ev.t + ev.L, ev.n, ev.nv,
                                          ev.tk, ev.ch, **dic)
                     if hasattr(ev, 'du'):

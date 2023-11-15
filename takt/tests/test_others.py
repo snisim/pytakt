@@ -133,6 +133,11 @@ def test_effectors():
     with pytest.warns(TaktWarning):
         assert mml("CE").UnpairNoteEvents().Filter(NoteOnEvent). \
             PairNoteEvents() == mml("[C* {rE}]")
+    s2 = s.UnpairNoteEvents(True)
+    assert s2[3].noteev is s[3]
+    assert s2[4].noteev is s[3]
+    assert s2.PairNoteEvents(True)[3].noteonev is s2[3]
+    assert s2.PairNoteEvents(True)[3].noteoffev is s2[4]
 
 
 def test_tie():
