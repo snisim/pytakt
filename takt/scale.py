@@ -13,7 +13,7 @@ import itertools
 from typing import Union, List
 from takt.pitch import chroma, octave, Pitch, Key, Interval
 from takt.utils import takt_round, takt_roundx
-from takt.ps import note
+from takt.sc import note
 from takt.score import seq, Score
 
 __all__ = ['Scale', 'ScaleLibrary', 'DEG']

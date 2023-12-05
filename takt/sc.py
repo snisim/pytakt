@@ -1,9 +1,9 @@
 # coding:utf-8
 """
-このモジュールには、音符など基本的なスコア (primitive score) を生成するための
-関数が定義されています。
+このモジュールには、音符など基本的なスコアを生成するための関数が定義されて
+います。
 noteとrest以外の関数は、上位モジュール（taktモジュール）の名前空間に取り
-込まれませんので、ps.ctrl のようにサブモジュール名をつけて呼び出して下さい。
+込まれませんので、sc.ctrl のようにサブモジュール名をつけて呼び出して下さい。
 """
 # Copyright (C) 2023  Satoshi Nishimura
 
@@ -166,20 +166,20 @@ def ctrl(ctrlnum, value, *, n=None, word=False, duration=0,
         dt, tk, ch, effectors
 
     Examples:
-        >>> ps.ctrl(7, 60, ch=2)  # volume control: value=60  MIDI_channel=2
+        >>> sc.ctrl(7, 60, ch=2)  # volume control: value=60  MIDI_channel=2
         EventList(duration=0, events=[
             CtrlEvent(t=0, ctrlnum=C_VOL, value=60, tk=1, ch=2)])
-        >>> ps.ctrl(7, [0, (L4, 100)], tstep=120)  # linearly increasing volume
+        >>> sc.ctrl(7, [0, (L4, 100)], tstep=120)  # linearly increasing volume
         EventList(duration=480, events=[
             CtrlEvent(t=0, ctrlnum=C_VOL, value=0.0, tk=1, ch=1),
             CtrlEvent(t=120, ctrlnum=C_VOL, value=25.0, tk=1, ch=1),
             CtrlEvent(t=240, ctrlnum=C_VOL, value=50.0, tk=1, ch=1),
             CtrlEvent(t=360, ctrlnum=C_VOL, value=75.0, tk=1, ch=1),
             CtrlEvent(t=480, ctrlnum=C_VOL, value=100, tk=1, ch=1)])
-        >>> ps.ctrl(1, 80, duration=120)
+        >>> sc.ctrl(1, 80, duration=120)
         EventList(duration=120, events=[
             CtrlEvent(t=0, ctrlnum=C_MOD, value=80, tk=1, ch=1)])
-        >>> ps.ctrl(0, (2, 3))  # specifying the value with (MSB,LSB) pair
+        >>> sc.ctrl(0, (2, 3))  # specifying the value with (MSB,LSB) pair
         EventList(duration=0, events=[
             CtrlEvent(t=0, ctrlnum=C_BANK, value=2, tk=1, ch=1),
             CtrlEvent(t=0, ctrlnum=C_BANK_L, value=3, tk=1, ch=1)])
@@ -398,7 +398,7 @@ def rpc(rpn, data, nrpc=False, **kwargs) -> EventList:
         dt, tk, ch, effectors
 
     Examples:
-        >>> ps.rpc((0, 1), 8835, word=True)  # Fine tuning to A=442Hz
+        >>> sc.rpc((0, 1), 8835, word=True)  # Fine tuning to A=442Hz
         EventList(duration=0, events=[
             CtrlEvent(t=0, ctrlnum=C_RPCL, value=1, tk=1, ch=1),
             CtrlEvent(t=0, ctrlnum=C_RPCH, value=0, tk=1, ch=1),
@@ -498,9 +498,9 @@ def sysex(data, arbitrary=False, *, duration=0, **kwargs) -> EventList:
         dt, tk, effectors
 
     Examples:
-        ``ps.sysex((0xf0, 0x7e, 0x7f, 0x09, 0x01, 0xf7))  # GM On``
+        ``sc.sysex((0xf0, 0x7e, 0x7f, 0x09, 0x01, 0xf7))  # GM On``
 
-        ``ps.sysex((0xf0, 0x7f, 0x7f, 4, 1, 0, 50, 0xf7))  # Master volume \
+        ``sc.sysex((0xf0, 0x7f, 0x7f, 4, 1, 0, 50, 0xf7))  # Master volume \
 = 50``
     """
     data = bytes(data)
@@ -663,7 +663,7 @@ def timesig(num, den, cc=None, *, duration=0, **kwargs) -> EventList:
         dt, effectors
 
     Examples:
-        ``ps.timesig(4,4)   ps.timesig(5,8)``
+        ``sc.timesig(4,4)   sc.timesig(5,8)``
     """
     with newcontext(tk=0):
         return _apply_effectors(
@@ -686,7 +686,7 @@ def keysig(keydesc, minor=0, **kwargs) -> EventList:
         dt, effectors
 
     Examples:
-        ``ps.keysig('Eb-major')   ps.keysig(0)``
+        ``sc.keysig('Eb-major')   sc.keysig(0)``
     """
     key = Key(keydesc, minor)
     with newcontext(tk=0):
@@ -734,7 +734,7 @@ def xml(xtype, value, *, duration=0, **kwargs) -> EventList:
 # モジュールで定義された関数を自動的に __all__ に含める
 __all__.extend([name for name, value in globals().items()
                 if name[0] != '_' and callable(value) and
-                value.__module__ == 'takt.ps'])
+                value.__module__ == 'takt.sc'])
 
 
 # 関数をContextクラスのメソッドとして利用できるようにする

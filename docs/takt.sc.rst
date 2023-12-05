@@ -1,7 +1,7 @@
-takt.ps module
+takt.sc module
 ==============
 
-.. automodule:: takt.ps
+.. automodule:: takt.sc
    :members:
    :undoc-members:
    :show-inheritance:

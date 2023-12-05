@@ -4,8 +4,8 @@ from takt.event import *
 from takt.constants import *
 from takt.score import *
 from takt.effector import *
-import takt.ps as ps
-from takt.ps import note, rest
+import takt.sc as sc
+from takt.sc import note, rest
 from takt.smf import *
 from takt.mml import *
 from takt.scale import *
@@ -16,4 +16,4 @@ from takt.utils import *
 from takt.text import *
 import takt.gm as gm
 
-__version__ = '0.35'
+__version__ = '0.35b'

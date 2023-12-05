@@ -14,7 +14,7 @@ from fractions import Fraction
 from takt.score import Score, EventList
 from takt.context import context, newcontext, Context
 from takt.pitch import *
-from takt.ps import *
+from takt.sc import *
 from takt.constants import *
 import takt.gm as gm
 from takt.gm.drums import *
@@ -612,7 +612,7 @@ G/!? G/ G/!? G3*").show(True)
         なお、次のモジュールで定義されている名前、および takt.gm モジュールを
         表す 'gm' は、たとえ mml関数の外では直接参照できない場合でも、
         MML文字列の中ではパッケージ名やモジュール名を指定せずに使えます:
-        takt.pitch, takt.ps, takt.constants, takt.gm.drums。
+        takt.pitch, takt.sc, takt.constants, takt.gm.drums。
 
     .. rubric:: 単純式
 

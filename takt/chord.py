@@ -770,7 +770,7 @@ class Chord(object):
         Args:
              kwargs: note関数に渡される追加の引数
         """
-        from takt.ps import note
+        from takt.sc import note
         from takt.score import par
         score = par(note(p, **kwargs) for p in self.pitches())
         return score * 4 + score.TimeStretch(3).Arpeggio(L16)

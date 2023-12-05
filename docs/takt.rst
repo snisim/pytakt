@@ -22,7 +22,7 @@ Submodules
    takt.mml
    takt.pianoroll
    takt.pitch
-   takt.ps
+   takt.sc
    takt.scale
    takt.score
    takt.text

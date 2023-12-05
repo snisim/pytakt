@@ -24,7 +24,7 @@ from takt.score import Score, EventList, EventStream, Tracks, \
     DEFAULT_LIMIT, genseq, RealTimeStream
 from takt.mml import mml
 from takt.interpolator import Interpolator
-from takt.ps import note
+from takt.sc import note
 from takt.constants import L32, L1, MAX_DELTA_TIME, EPSILON, LOG_EPSILON, \
     BEGIN, END
 from takt.timemap import TimeSignatureMap, TempoMap

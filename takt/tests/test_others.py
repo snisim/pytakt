@@ -42,7 +42,7 @@ def test_mml():
         return note(C4)
     assert mml("E$f()(v=90)[F$(x)]") == \
         note(E4) + note(C4,v=90) + (note(F4) & note(C4))
-    assert mml("C$vol(80)E") == note(C4) + ps.vol(80) + note(E4)
+    assert mml("C$vol(80)E") == note(C4) + sc.vol(80) + note(E4)
     assert mml("key=3 CC##C#CbC%") == \
            note(Cs4) + note(Css4) + note(Cs4) + note(Cb4) + note(C4)
     assert mml("{C*/5C/C..}/") == \
@@ -52,7 +52,7 @@ def test_mml():
     assert mml("{C~}~") == note(C4, L1)
     assert mml("C`??!<<>") == note(C4, v=70, dr=50, dt=-L64)
     assert mml("{C(v+=10)}(v=90)") == note(C4, v=100)
-    assert mml("C($bend(100))") == ps.bend(100) & note(C4)
+    assert mml("C($bend(100))") == sc.bend(100) & note(C4)
     assert mml("C@2") == note(C4) + note(C4)
     context().addattr('userattr', 0)
     assert mml("$note(context().userattr):(userattr=D4)") == note(D4)
@@ -214,7 +214,7 @@ def test_apply():
 def test_chord_iterator():
     c4 = NoteEvent(t=0, n=C4, L=480, v=80, nv=None, tk=1, ch=1)
     e4 = NoteEvent(t=0, n=E4, L=240, v=80, nv=None, tk=1, ch=1)
-    s = note(C4) & note(E4, 240) & ps.vol([(120, 50)])
+    s = note(C4) & note(E4, 240) & sc.vol([(120, 50)])
     assert list(s.chord_iterator()) == \
         [EventList([c4, e4, CtrlEvent(120, C_VOL, 50)], 240, start=0),
          EventList([c4], 480, start=240)]

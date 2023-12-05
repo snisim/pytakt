@@ -225,7 +225,7 @@ def writepyfile(score, filename, rawmode=False, time='measures',
     """
     def _writepyfile(f):
         print("from takt import *", file=f)
-        print("from takt.ps import *", file=f)
+        print("from takt.sc import *", file=f)
         print("\nscore = ", end='', file=f)
         showtext(score, rawmode, time, resolution, limit, bar0len, f)
         print("", file=f)

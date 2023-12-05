@@ -12,8 +12,8 @@ include takt/m21conv.py
 include takt/mml.py
 include takt/pianoroll.py
 include takt/pitch.py
-include takt/ps.py
 include takt/pytakt.py
+include takt/sc.py
 include takt/scale.py
 include takt/score.py
 include takt/smf.py

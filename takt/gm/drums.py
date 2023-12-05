@@ -30,7 +30,7 @@ Examples:
 """
 # Copyright (C) 2023  Satoshi Nishimura
 
-from takt.ps import note
+from takt.sc import note
 
 #
 # Definitions for note numbers of drum sets
