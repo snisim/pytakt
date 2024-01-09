@@ -1096,7 +1096,8 @@ class ViewerMain(tkinter.Frame):
         if isinstance(velocity, str):
             if velocity == 'auto':
                 events = self.evlist.Filter(NoteEvent)
-                return min(ev.v for ev in events) != max(ev.v for ev in events)
+                return events and \
+                    min(ev.v for ev in events) != max(ev.v for ev in events)
             else:
                 raise Exception("Unrecognized description '%s'" % velocity)
         else:
