@@ -252,11 +252,12 @@ When invoked with no arguments, it enters interactive mode.""",
                 org_score = takt.readsmf(
                     args.INFILE, supply_tempo=False, encoding=args.encoding,
                     pair_note_events=args.mode != 't' or args.raw is None)
+                takt.set_tempo(120.0)
             else:
                 org_score = takt.readjson(args.INFILE)
+                takt.set_tempo(125.0)
         except Exception as e:
             error_exit(e)
-        takt.set_tempo(120.0)
     elif args.pythonfile is not None:
         try:
             org_score = takt.evalpyfile(args.pythonfile, supply_tempo=False)
