@@ -122,11 +122,12 @@ class Score(object):
         else:
             # 属性はなくなる。
             result = EventList(self)
+            offset = result.duration
             if isinstance(other, Tracks):
                 for evlist in other:
-                    result.merge(evlist.deepcopy(), result.duration)
+                    result.merge(evlist.deepcopy(), offset)
             else:
-                result.merge(other.deepcopy(), result.duration)
+                result.merge(other.deepcopy(), offset)
             return result
 
     def __iand__(self, other):
