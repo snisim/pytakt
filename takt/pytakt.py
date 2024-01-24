@@ -301,7 +301,8 @@ When invoked with no arguments, it enters interactive mode.""",
 
     # mode-specific actions
     if args.mode == 's':
-        if args.INFILE is not None:
+        if args.INFILE is not None and hasattr(org_score, 'smf_format') and \
+           hasattr(org_score, 'smf_resolution'):
             print("SMF format: %r   SMF resolution: %r   Number of tracks: %r"
                   % (org_score.smf_format, org_score.smf_resolution,
                      len(org_score)))
