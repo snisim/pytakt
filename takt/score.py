@@ -124,9 +124,9 @@ class Score(object):
             result = EventList(self)
             if isinstance(other, Tracks):
                 for evlist in other:
-                    result.merge(evlist.deepcopy(), self.duration)
+                    result.merge(evlist.deepcopy(), result.duration)
             else:
-                result.merge(other.deepcopy(), self.duration)
+                result.merge(other.deepcopy(), result.duration)
             return result
 
     def __iand__(self, other):
