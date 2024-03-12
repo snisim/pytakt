@@ -571,6 +571,8 @@ isinstance(ev, (NoteEvent, NoteOnEvent))])
                 nexttime += time_sequence
             elif time_sequence is not None:
                 nt = next(time_sequence, math.inf)
+                if nt < 0:
+                    raise Exception("can't use the negative time %r" % nt)
                 if nt < nexttime:
                     raise Exception("can't use a decreasing time sequence")
                 nexttime = nt

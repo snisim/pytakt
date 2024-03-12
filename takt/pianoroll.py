@@ -24,8 +24,8 @@ __all__ = ['show']
 
 
 FONT_FAMILY = 'Helvetica' if sys.platform == 'win32' else 'TkDefaultFont'
-MAGNIFY = float(os.environ.get('TAKT_MAGNIFY', "1.0"))
-GEOMETRY = os.environ.get('TAKT_GEOMETRY')
+MAGNIFY = float(os.environ.get('PYTAKT_MAGNIFY', "1.0"))
+GEOMETRY = os.environ.get('PYTAKT_GEOMETRY')
 
 
 def setup_globals(mag):
@@ -1527,8 +1527,8 @@ def show(score, velocity='auto', ctrlnums='auto', limit=SHOW_LIMIT,
            ウィンドウのサイズ、位置を指定します (例: "800x600+0+0")
         title(str, optional): ウィンドウのタイトル文字列を指定します。
 
-    magnify と geoemtry 引数のデフォルト値は、環境変数 TAKT_MAGNIFY と
-    TAKT_GEOMETRY によってそれぞれ指定することができます。
+    magnify と geoemtry 引数のデフォルト値は、環境変数 PYTAKT_MAGNIFY と
+    PYTAKT_GEOMETRY によってそれぞれ指定することができます。
 
     .. rubric:: ウィンドウにおける操作
 

@@ -222,9 +222,9 @@ When invoked with no arguments, it enters interactive mode.""",
                       option_string, file=sys.stderr)
 
     if args.magnify is not None:
-        os.environ['TAKT_MAGNIFY'] = str(args.magnify)
+        os.environ['PYTAKT_MAGNIFY'] = str(args.magnify)
     if args.geometry is not None:
-        os.environ['TAKT_GEOMETRY'] = args.geometry
+        os.environ['PYTAKT_GEOMETRY'] = args.geometry
 
     if args.mode == 'i':
         print("pytakt version", takt.__version__)
