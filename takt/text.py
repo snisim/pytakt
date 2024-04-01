@@ -32,10 +32,9 @@ S_ROUND = 5   # round precision for summary output
 
 def eventrepr(ev, step, timereprfunc):
     attrrepr = ''.join([
-        ', dt=%s' % timereprfunc(ev.dt) if hasattr(ev, 'dt') else '',
+        ', dt=%s' % timereprfunc(ev.dt) if ev.dt != 0 else '',
         ', du=%s' % timereprfunc(ev.du) if hasattr(ev, 'du') else '',
-        *(', %s=%r' % (k, v) for k, v in ev.__dict__.items()
-          if k not in ('dt', 'du'))])
+        *(', %s=%r' % (k, v) for k, v in ev.__dict__.items() if k != 'du')])
     steprepr = ', duration=%s' % timereprfunc(step) if step else ''
     trackrepr = ', tk=%r' % ev.tk if ev.tk != 0 else ''
 

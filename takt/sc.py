@@ -44,8 +44,6 @@ def _getparams(kwargs, *attrs):
             rtn[k] = v
     if abs(rtn['dt']) > MAX_DELTA_TIME:
         raise ValueError("`dt' has too large absolute value")
-    elif rtn['dt'] == 0:
-        del rtn['dt']
     return rtn
 
 

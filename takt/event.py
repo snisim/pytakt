@@ -31,15 +31,15 @@ class Event(object):
     Attributes:
         t (ticks): ティック単位で表されたイベントの時刻
         tk (int): トラック番号 (0から始まる)
-        dt (ticks, optional): 楽譜上の時刻と演奏上の時刻との差を表し、
+        dt (ticks): 楽譜上の時刻と演奏上の時刻との差を表し、
             演奏のときは t にこの値(単位はティック)を加えた時刻が
-            用いられます。この属性が無いとき、dt値は0とみなされます。
-            dt値の大きさには制限があります
+            用いられます。dt値の大きさには制限があります
             (:const:`takt.constants.MAX_DELTA_TIME` を参照)。
 
     Args:
         t(ticks): t属性の値
         tk(int): tk属性の値
+        dt(ticks, optional): dt属性の値
         kwargs: イベントに対して追加の属性を指定します。
 
     .. rubric:: 演算規則
@@ -54,21 +54,22 @@ class Event(object):
 
     __slots__ = ('t',   # time in ticks
                  'tk',  # track number (base-0)
+                 'dt',  # time deviation in ticks
                  '__dict__')
 
-    def __init__(self, t, tk, **kwargs):
-        if not isinstance(t, numbers.Real):
+    def __init__(self, t, tk, dt=0, **kwargs):
+        if not isinstance(t, numbers.Real) or not isinstance(dt, numbers.Real):
             raise TypeError("time must be int, float, or Fraction")
         if not isinstance(tk, numbers.Integral) or tk < 0:
             raise TypeError("track number must be non-negative int")
-        (self.t, self.tk) = (t, tk)
+        (self.t, self.tk, self.dt) = (t, tk, dt)
         self.__dict__.update(kwargs)
 
     def copy(self) -> 'Event':
         """
         複製されたイベントを返します(浅いコピー)。
         """
-        return self.__class__(self.t, self.tk, **self.__dict__)
+        return self.__class__(self.t, self.tk, self.dt, **self.__dict__)
     __copy__ = copy
 
     def update(self, **kwargs) -> 'Event':
@@ -100,6 +101,8 @@ class Event(object):
         attrs = [key for key in ('t', 'n', 'mtype', 'xtype', 'L', 'v', 'nv',
                                  'ctrlnum', 'value', 'tk', 'ch')
                  if hasattr(self, key) and key not in self.__dict__]
+        if self.dt != 0:
+            attrs.append('dt')
         attrs += self.__dict__
         return attrs
 
@@ -200,13 +203,9 @@ ctrlnum=%r, ch=%r)" % (self.value, self.ctrlnum, self.ch),
         else:
             return bytes(self.value)
 
-    def get_dt(self) -> Ticks:
-        """ dt属性の値(なければ0)を返します。"""
-        return getattr(self, 'dt', 0)
-
     def ptime(self) -> Ticks:
         """ 演奏上の時刻 (t属性値とdt属性値の和) を返します。"""
-        return self.t + self.get_dt()
+        return self.t + self.dt
 
 
 class NoteEventClass(Event):
@@ -234,7 +233,7 @@ class NoteEvent(NoteEventClass):
             を表します。この属性が無いとき、L属性と同じ値であるとみなされます。
 
     継承された他の属性
-        t, tk, (dt)
+        t, tk, dt
 
     Args:
         t(ticks): t属性の値
@@ -245,6 +244,7 @@ class NoteEvent(NoteEventClass):
         du(ticks, optional): du属性の値
         tk(int, optional): tk属性の値
         ch(int, optional): ch属性の値
+        dt(ticks, optional): dt属性の値
         kwargs: イベントに対して追加の属性を指定します。
     """
 
@@ -254,15 +254,17 @@ class NoteEvent(NoteEventClass):
                  'v',   # MIDI velocity
                  'nv')  # nv: MIDI note-off velocity (possibly None)
 
-    def __init__(self, t, n, L, v=80, nv=None, du=None, tk=1, ch=1, **kwargs):
+    def __init__(self, t, n, L, v=80, nv=None, du=None, tk=1, ch=1, dt=0,
+                 **kwargs):
         (self.ch, self.n, self.L, self.v, self.nv) = (ch, n, L, v, nv)
         if du is not None:
             self.du = du
-        Event.__init__(self, t, tk, **kwargs)
+        Event.__init__(self, t, tk, dt, **kwargs)
 
     def copy(self) -> Event:
         return self.__class__(self.t, self.n, self.L, self.v, self.nv,
-                              tk=self.tk, ch=self.ch, **self.__dict__)
+                              tk=self.tk, ch=self.ch, dt=self.dt,
+                              **self.__dict__)
     __copy__ = copy
 
     def get_du(self) -> Ticks:
@@ -290,7 +292,7 @@ class NoteOnEvent(NoteEventClass):
         v (int): MIDIベロシティ
 
     継承された他の属性
-        t, tk, (dt)
+        t, tk, dt
 
     Args:
         t(ticks): t属性の値
@@ -298,6 +300,7 @@ class NoteOnEvent(NoteEventClass):
         v(int, optional): v属性の値
         tk(int, optional): tk属性の値
         ch(int, optional): ch属性の値
+        dt(ticks, optional): dt属性の値
         kwargs: イベントに対して追加の属性を指定します。
     """
 
@@ -305,13 +308,13 @@ class NoteOnEvent(NoteEventClass):
                  'n',   # MIDI note number
                  'v')   # MIDI velocity
 
-    def __init__(self, t, n, v=80, tk=1, ch=1, **kwargs):
+    def __init__(self, t, n, v=80, tk=1, ch=1, dt=0, **kwargs):
         (self.ch, self.n, self.v) = (ch, n, v)
-        Event.__init__(self, t, tk, **kwargs)
+        Event.__init__(self, t, tk, dt, **kwargs)
 
     def copy(self) -> Event:
         return self.__class__(self.t, self.n, self.v,
-                              self.tk, self.ch, **self.__dict__)
+                              self.tk, self.ch, self.dt, **self.__dict__)
     __copy__ = copy
 
     def to_message(self) -> Union[bytes, bytearray]:
@@ -335,7 +338,7 @@ class NoteOffEvent(NoteEventClass):
             バイト列に変換したときにベロシティ0のノートオンが使用されます。
 
     継承された他の属性
-        t, tk, (dt)
+        t, tk, dt
 
     Args:
         t(ticks): t属性の値
@@ -343,6 +346,7 @@ class NoteOffEvent(NoteEventClass):
         nv(int or None, optional): nv属性の値
         tk(int, optional): tk属性の値
         ch(int, optional): ch属性の値
+        dt(ticks, optional): dt属性の値
         kwargs: イベントに対して追加の属性を指定します。
     """
 
@@ -350,13 +354,13 @@ class NoteOffEvent(NoteEventClass):
                  'n',   # MIDI note number
                  'nv', )  # nv: MIDI note-off velocity (possibly None)
 
-    def __init__(self, t, n, nv=None, tk=1, ch=1, **kwargs):
+    def __init__(self, t, n, nv=None, tk=1, ch=1, dt=0, **kwargs):
         (self.ch, self.n, self.nv) = (ch, n, nv)
-        Event.__init__(self, t, tk, **kwargs)
+        Event.__init__(self, t, tk, dt, **kwargs)
 
     def copy(self) -> Event:
         return self.__class__(self.t, self.n, self.nv,
-                              self.tk, self.ch, **self.__dict__)
+                              self.tk, self.ch, self.dt, **self.__dict__)
     __copy__ = copy
 
     def to_message(self) -> Union[bytes, bytearray]:
@@ -395,7 +399,7 @@ class CtrlEvent(Event):
         value (int, etc.): コントロール値
 
     継承された他の属性
-        t, tk, (dt)
+        t, tk, dt
 
     Args:
         t(ticks): t属性の値
@@ -403,24 +407,25 @@ class CtrlEvent(Event):
         value(int, etc.): value属性の値
         tk(int, optional): tk属性の値
         ch(int, optional): ch属性の値
+        dt(ticks, optional): dt属性の値
         kwargs: イベントに対して追加の属性を指定します。
     """
     __slots__ = 'ch', 'ctrlnum', 'value'
 
-    def __init__(self, t, ctrlnum, value, tk=1, ch=1, **kwargs):
+    def __init__(self, t, ctrlnum, value, tk=1, ch=1, dt=0, **kwargs):
         if not isinstance(ctrlnum, numbers.Integral):
             raise TypeError("controller number must be int")
         if ctrlnum in (C_KPR, C_TEMPO):
             raise ValueError("Use other constructors for that type of event")
-        self._init_base(t, ctrlnum, value, tk, ch, **kwargs)
+        self._init_base(t, ctrlnum, value, tk, ch, dt, **kwargs)
 
-    def _init_base(self, t, ctrlnum, value, tk, ch, **kwargs):
+    def _init_base(self, t, ctrlnum, value, tk, ch, dt, **kwargs):
         (self.ch, self.ctrlnum, self.value) = (ch, ctrlnum, value)
-        super().__init__(t, tk, **kwargs)
+        super().__init__(t, tk, dt, **kwargs)
 
     def copy(self) -> Event:
         return self.__class__(self.t, self.ctrlnum, self.value,
-                              self.tk, self.ch, **self.__dict__)
+                              self.tk, self.ch, self.dt, **self.__dict__)
     __copy__ = copy
 
     def to_message(self) -> Union[bytes, bytearray]:
@@ -453,7 +458,7 @@ class KeyPressureEvent(CtrlEvent):
         value (int or float): コントロール値(0～127)
 
     継承された他の属性
-        t, tk, (dt), ch, ctrlnum
+        t, tk, dt, ch, ctrlnum
 
     Args:
         t(ticks): t属性の値
@@ -461,17 +466,18 @@ class KeyPressureEvent(CtrlEvent):
         value(int, etc.): value属性の値
         tk(int, optional): tk属性の値
         ch(int, optional): ch属性の値
+        dt(ticks, optional): dt属性の値
         kwargs: イベントに対して追加の属性を指定します。
     """
     __slots__ = ('n',)
 
-    def __init__(self, t, n, value, tk=1, ch=1, **kwargs):
+    def __init__(self, t, n, value, tk=1, ch=1, dt=0, **kwargs):
         self.n = n
-        super()._init_base(t, C_KPR, value, tk, ch, **kwargs)
+        super()._init_base(t, C_KPR, value, tk, ch, dt, **kwargs)
 
     def copy(self) -> Event:
         return self.__class__(self.t, self.n, self.value,
-                              self.tk, self.ch, **self.__dict__)
+                              self.tk, self.ch, self.dt, **self.__dict__)
     __copy__ = copy
 
     def _getattrs(self):
@@ -494,22 +500,24 @@ class SysExEvent(Event):
             その場合は、最初のイベントに0xf0、最後のイベントに0xf7を置きます。
 
     継承された他の属性
-        t, tk, (dt)
+        t, tk, dt
 
     Args:
         t(ticks): t属性の値
         value(bytes, bytearray, or iterable of int): value属性の値
         tk(int, optional): tk属性の値
+        dt(ticks, optional): dt属性の値
         kwargs: イベントに対して追加の属性を指定します。
     """
     __slots__ = ('value',)
 
-    def __init__(self, t, value, tk=1, **kwargs):
+    def __init__(self, t, value, tk=1, dt=0, **kwargs):
         self.value = value  # should be bytes or list/tupple of int
-        super().__init__(t, tk, **kwargs)
+        super().__init__(t, tk, dt, **kwargs)
 
     def copy(self) -> Event:
-        return self.__class__(self.t, self.value, self.tk, **self.__dict__)
+        return self.__class__(self.t, self.value, self.tk, self.dt,
+                              **self.__dict__)
     __copy__ = copy
 
     def to_message(self) -> Union[bytes, bytearray]:
@@ -536,7 +544,7 @@ class MetaEvent(Event):
             bytearray もしくは整数のイテラブルが推奨されます。
 
     継承された他の属性
-        t, tk, (dt)
+        t, tk, dt
 
     Args:
         t(ticks): t属性の値
@@ -544,6 +552,7 @@ class MetaEvent(Event):
         value(bytes, bytearray, str, Key, int, float, or iterable of int):
             value属性の値
         tk(int, optional): tk属性の値
+        dt(ticks, optional): dt属性の値
         kwargs: イベントに対して追加の属性を指定します。
 
     Notes:
@@ -558,7 +567,7 @@ class MetaEvent(Event):
 
     __slots__ = ('mtype', 'value')
 
-    def __init__(self, t, mtype, value, tk=1, **kwargs):
+    def __init__(self, t, mtype, value, tk=1, dt=0, **kwargs):
         if not isinstance(mtype, numbers.Integral):
             raise TypeError("meta-event type must be int")
         if mtype == M_TEMPO:
@@ -570,15 +579,15 @@ class MetaEvent(Event):
                     "value must be a Key object for key-signature event")
         elif mtype == M_TIMESIG:
             self.__class__ = TimeSignatureEvent
-        self._init_base(t, mtype, value, tk, **kwargs)
+        self._init_base(t, mtype, value, tk, dt, **kwargs)
 
-    def _init_base(self, t, mtype, value, tk, **kwargs):
+    def _init_base(self, t, mtype, value, tk, dt, **kwargs):
         (self.mtype, self.value) = (mtype, value)
-        super().__init__(t, tk, **kwargs)
+        super().__init__(t, tk, dt, **kwargs)
 
     def copy(self) -> Event:
         return MetaEvent(self.t, self.mtype, self.value,
-                         self.tk, **self.__dict__)
+                         self.tk, self.dt, **self.__dict__)
     __copy__ = copy
 
     def to_message(self, encoding='utf-8') -> Union[bytes, bytearray]:
@@ -610,18 +619,19 @@ class KeySignatureEvent(MetaEvent):
     """ 調号イベントのクラスです。
 
     継承された属性
-        t, tk, (dt), mtype, value
+        t, tk, dt, mtype, value
 
     Args:
         t(ticks): t属性の値
         value(Key, int, or str): Keyコンストラクタの第１引数
         tk(int, optional): tk属性の値
+        dt(ticks, optional): dt属性の値
         kwargs: イベントに対して追加の属性を指定します。
     """
     __slots__ = ()
 
-    def __init__(self, t, value, tk=0, **kwargs):
-        super().__init__(t, M_KEYSIG, Key(value), tk, **kwargs)
+    def __init__(self, t, value, tk=0, dt=0, **kwargs):
+        super().__init__(t, M_KEYSIG, Key(value), tk, dt, **kwargs)
 
     def _getattrs(self):
         attrs = super()._getattrs()
@@ -640,7 +650,7 @@ class TimeSignatureEvent(MetaEvent):
     """ 拍子イベントのクラスです。
 
     継承された属性
-        t, tk, (dt), mtype, value
+        t, tk, dt, mtype, value
 
     Args:
         t(ticks): t属性の値
@@ -650,6 +660,7 @@ class TimeSignatureEvent(MetaEvent):
             として表したもの。デフォルトでは、`num` と `den` から自動的に
             推測されます。
         tk(int, optional): tk属性の値
+        dt(ticks, optional): dt属性の値
         kwargs: イベントに対して追加の属性を指定します。
 
     Examples:
@@ -657,13 +668,13 @@ class TimeSignatureEvent(MetaEvent):
     """
     __slots__ = ()
 
-    def __init__(self, t, num, den, cc=None, tk=0, **kwargs):
+    def __init__(self, t, num, den, cc=None, tk=0, dt=0, **kwargs):
         if den <= 0 or den & (den - 1) != 0:
             raise ValueError("TimeSignatureEvent: Bad denominator")
         value = (num, (den - 1).bit_length(),
                  cc if cc is not None else self._guess_cc(num, den), 8)
         value = kwargs.pop('value', value)
-        super().__init__(t, M_TIMESIG, bytes(value), tk, **kwargs)
+        super().__init__(t, M_TIMESIG, bytes(value), tk, dt, **kwargs)
 
     def _getattrs(self):
         attrs = super()._getattrs()
@@ -730,21 +741,23 @@ class TempoEvent(MetaEvent):
             1分あたりの4分音符数で表されたテンポ値 (最低値は4)
 
     継承された他の属性
-        t, tk, (dt), mtype, value
+        t, tk, dt, mtype, value
 
     Args:
         t(ticks): t属性の値
         value(int or float): value属性の値
         tk(int, optional): tk属性の値
+        dt(ticks, optional): dt属性の値
         kwargs: イベントに対して追加の属性を指定します。
     """
     __slots__ = ()
 
-    def __init__(self, t, value, tk=0, **kwargs):
-        super()._init_base(t, M_TEMPO, value, tk, **kwargs)
+    def __init__(self, t, value, tk=0, dt=0, **kwargs):
+        super()._init_base(t, M_TEMPO, value, tk, dt, **kwargs)
 
     def copy(self) -> Event:
-        return self.__class__(self.t, self.value, self.tk, **self.__dict__)
+        return self.__class__(self.t, self.value, self.tk, self.dt,
+                              **self.__dict__)
     __copy__ = copy
 
     def _getattrs(self):
@@ -772,22 +785,24 @@ class LoopBackEvent(Event):
         value: イベントを区別するための任意のデータ
 
     継承された他の属性
-        t, tk, (dt)
+        t, tk, dt
 
     Args:
         t(ticks): t属性の値
         value(str): value属性の値
         tk(int, optional): tk属性の値
+        dt(ticks, optional): dt属性の値
         kwargs: イベントに対して追加の属性を指定します。
     """
     __slots__ = ('value',)
 
-    def __init__(self, t, value, tk=0, **kwargs):
+    def __init__(self, t, value, tk=0, dt=0, **kwargs):
         self.value = value
-        super().__init__(t, tk, **kwargs)
+        super().__init__(t, tk, dt, **kwargs)
 
     def copy(self) -> Event:
-        return self.__class__(self.t, self.value, self.tk, **self.__dict__)
+        return self.__class__(self.t, self.value, self.tk, self.dt,
+                              **self.__dict__)
     __copy__ = copy
 
     def to_message(self) -> Union[bytes, bytearray]:
@@ -802,13 +817,14 @@ class XmlEvent(Event):
         value: 情報の内容データ
 
     継承された他の属性
-        t, tk, (dt)
+        t, tk, dt
 
     Args:
         t(ticks): t属性の値
         xtype(str): xtype属性の値
         value: value属性の値
         tk(int, optional): tk属性の値
+        dt(ticks, optional): dt属性の値
         kwargs: イベントに対して追加の属性を指定します。
 
     有効なイベントの一覧
@@ -830,14 +846,14 @@ class XmlEvent(Event):
     """
     __slots__ = ('xtype', 'value',)
 
-    def __init__(self, t, xtype, value, tk=1, **kwargs):
+    def __init__(self, t, xtype, value, tk=1, dt=0, **kwargs):
         self.xtype = xtype
         self.value = value
-        super().__init__(t, tk, **kwargs)
+        super().__init__(t, tk, dt, **kwargs)
 
     def copy(self) -> Event:
         return self.__class__(self.t, self.xtype, self.value,
-                              self.tk, **self.__dict__)
+                              self.tk, self.dt, **self.__dict__)
     __copy__ = copy
 
     def to_message(self) -> Union[bytes, bytearray]:

@@ -272,8 +272,6 @@ def writesmf(score, filename, format=1, resolution=480, ntrks=None,
     `score` はどのような構造のスコアであっても構いません。
     format-0以外のSMFでは、
     各イベントが持つtk属性の値に従って、SMF中での格納トラックが決まります。
-    SMF中でのイベントの時刻は、各イベントのt属性の値に
-    (あれば)dt属性の値を加えたものになります。
     各トラックの最後にEnd-of-trackイベントがない場合は補われます。
 
     Args:

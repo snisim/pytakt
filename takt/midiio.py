@@ -565,7 +565,7 @@ def _play_rec(score, rec=False, outdev=None, indev=None, metro=None,
                 break
             if isinstance(ev, (NoteEventClass, CtrlEvent, MetaEvent,
                                SysExEvent, LoopBackEvent)):
-                queue_event(ev, ev.t + ev.get_dt() + toffset, devnum)
+                queue_event(ev, ev.t + ev.dt + toffset, devnum)
 
     except KeyboardInterrupt:
         stop()

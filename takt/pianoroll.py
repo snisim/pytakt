@@ -1057,14 +1057,17 @@ class TrackButtonPane(tkinter.Frame):
 
 
 class ViewerMain(tkinter.Frame):
-    def __init__(self, master, score, velocity, ctrlnums, limit, bar0len,
-                 width, height, pixels_per_tick, pixels_per_notenum):
+    def __init__(self, master, score, velocity, ctrlnums, limit, render,
+                 bar0len, width, height, pixels_per_tick, pixels_per_notenum):
         self.evlist_org = EventList(score, limit=limit)\
             .Filter(NoteEventClass, CtrlEvent, SysExEvent, MetaEvent)\
             .ConnectTies().PairNoteEvents()
-        render = Render()
-        self.evlist = EventList((render(ev) for ev in self.evlist_org),
-                                duration=self.evlist_org.duration)
+        if render:
+            rend = Render()
+            self.evlist = EventList((rend(ev) for ev in self.evlist_org),
+                                    duration=self.evlist_org.duration)
+        else:
+            self.evlist = self.evlist_org
         self.save_event_repr()
         if not self.evlist.active_events_at(0, TempoEvent):
             self.evlist.insert(0, TempoEvent(0, current_tempo()))
@@ -1494,7 +1497,7 @@ class ViewerMain(tkinter.Frame):
 
 
 def show(score, velocity='auto', ctrlnums='auto', limit=SHOW_LIMIT,
-         bar0len=None, magnify=MAGNIFY, geometry=GEOMETRY,
+         render=True, bar0len=None, magnify=MAGNIFY, geometry=GEOMETRY,
          title="Pytakt") -> None:
     """
     スコア `score` についてのピアノロールを表示します。
@@ -1519,12 +1522,15 @@ def show(score, velocity='auto', ctrlnums='auto', limit=SHOW_LIMIT,
             スコアの長さを制限します。
             制限の詳細については、:meth:`.Score.stream` の同名の引数
             の項目を見てください。
+        render(bool, optional):
+            デフォルト(True)の場合、演奏上の時間に従ってイベントを表示します。
+            Falseの場合は、楽譜上の時間で表示します。
         bar0len(ticks, optional):
-           指定すると、小節番号 0 の小節の長さをこのティック数に修正します。
+            指定すると、小節番号 0 の小節の長さをこのティック数に修正します。
         magnify(float, optional):
-           全体の拡大率を指定します。
+            全体の拡大率を指定します。
         geometry(str, optional):
-           ウィンドウのサイズ、位置を指定します (例: "800x600+0+0")
+            ウィンドウのサイズ、位置を指定します (例: "800x600+0+0")
         title(str, optional): ウィンドウのタイトル文字列を指定します。
 
     magnify と geoemtry 引数のデフォルト値は、環境変数 PYTAKT_MAGNIFY と
@@ -1587,7 +1593,7 @@ def show(score, velocity='auto', ctrlnums='auto', limit=SHOW_LIMIT,
     root.title(title)
     midiio.open_output_device()
     try:
-        ViewerMain(root, score, velocity, ctrlnums, limit, bar0len,
+        ViewerMain(root, score, velocity, ctrlnums, limit, render, bar0len,
                    VIEW_WIDTH, NOTE_PANE_VIEW_HEIGHT,
                    PIXELS_PER_QUARTER_NOTE / TICKS_PER_QUARTER,
                    PIXELS_PER_NOTE_NUM).mainloop()

@@ -34,7 +34,7 @@ __all__ = []  # extended later
 
 
 def _check_dt(ev):
-    if abs(ev.get_dt()) > MAX_DELTA_TIME:
+    if abs(ev.dt) > MAX_DELTA_TIME:
         warnings.warn("`dt' has too large absolute value",
                       TaktWarning, stacklevel=2)
 
@@ -344,9 +344,8 @@ class TimeStretch(Effector):
     def _time_stretch(self, ev):
         ev = ev.copy()
         ev.t = self._scale_time(ev.t)
-        if hasattr(ev, 'dt'):
-            ev.dt = self._scale_time(ev.dt)
-            _check_dt(ev)
+        ev.dt = self._scale_time(ev.dt)
+        _check_dt(ev)
         if hasattr(ev, 'L'):
             ev.L = self._scale_time(ev.L)
         if hasattr(ev, 'du'):
@@ -494,10 +493,10 @@ class TimeDeform(Effector):
     def _time_deform(self, ev):
         ev = ev.copy()
         time = self.deformed_time(ev.t)
-        ptime = self.deformed_time(ev.t + ev.dt) if hasattr(ev, 'dt') else time
+        ptime = self.deformed_time(ev.t + ev.dt)
         if isinstance(ev, NoteEvent):
             offtime = self.deformed_time(ev.t + ev.L)
-            pofftime = self.deformed_time(ev.t + ev.get_dt() + ev.get_du())
+            pofftime = self.deformed_time(ev.t + ev.dt + ev.get_du())
         if self.perf_only:
             ev.dt = ptime - ev.t
             _check_dt(ev)
@@ -505,9 +504,8 @@ class TimeDeform(Effector):
                 ev.du = pofftime - ptime
         else:
             ev.t = time
-            if hasattr(ev, 'dt'):
-                ev.dt = ptime - time
-                _check_dt(ev)
+            ev.dt = ptime - time
+            _check_dt(ev)
             if isinstance(ev, NoteEvent):
                 ev.L = offtime - time
                 if hasattr(ev, 'du') or abs(pofftime - ptime - ev.L) > EPSILON:
@@ -636,7 +634,7 @@ class Randomize(Effector):
                     ev.v = max(1, min(127, ev.v + self.fveloc()))
                     r = self.ftime()
                     self.notequeue.append((ev, ev.ptime()))
-                    ev.dt = ev.get_dt() + r
+                    ev.dt += r
                     _check_dt(ev)
                     if isinstance(ev, NoteOnEvent):
                         notedict.pushnote(ev, r)
@@ -647,7 +645,7 @@ class Randomize(Effector):
                     except KeyError:
                         pass
                     else:
-                        ev = ev.copy().update(dt=ev.get_dt() + r)
+                        ev = ev.copy().update(dt=ev.dt + r)
                 if self.adjust_ctrl:
                     outqueue.append(ev)
                 else:
@@ -774,10 +772,7 @@ class Arpeggio(Effector):
                 d = i * self.delay
             if d != 0:
                 ev = ev.copy()
-                if hasattr(ev, 'dt'):
-                    ev.dt += d
-                else:
-                    ev.dt = d
+                ev.dt += d
                 _check_dt(ev)
                 if isinstance(ev, NoteEvent):
                     ev.du = max(0, ev.get_du() - d)
@@ -921,7 +916,7 @@ class Arpeggio(Effector):
 
 
 def _event_dict(ev):
-    return dict(ev=ev, t=ev.t, tk=ev.tk, dt=ev.get_dt(),
+    return dict(ev=ev, t=ev.t, tk=ev.tk, dt=ev.dt,
                 n=getattr(ev, 'n', None),
                 v=getattr(ev, 'v', None),
                 nv=getattr(ev, 'nv', None),
@@ -955,10 +950,9 @@ class Filter(Effector):
               'L', 'du', 'ctrlnum', 'mtype', 'xtype', 'value' はイベントの
               属性値を表す定数として使用できます。
               イベントが持っていない属性については、これらの定数の値は
-              None になります (ただし、'dt'については 0, NoteEventに
-              対する'du'については 'L'と同じ値となります)。式の評価において
-              TypeError 例外が発生した場合は、式の値をFalseだとみなして処理を
-              続けます。
+              None になります (ただし、NoteEventに対する'du'については
+              'L'と同じ値となります)。式の評価において TypeError 例外が
+              発生した場合は、式の値をFalseだとみなして処理を続けます。
             * bool値を返す関数 -- イベントを引数として呼び出され、その戻り値が
               条件の真偽になります。
 
@@ -1164,8 +1158,7 @@ class Modify(EventEffector):
         ev = env['ev']
         ev.t = env['t']
         ev.tk = env['tk']
-        if env['dt'] != 0:
-            ev.dt = env['dt']
+        ev.dt = env['dt']
         for attr in ('n', 'v', 'nv', 'ch', 'L', 'ctrlnum',
                      'mtype', 'xtype', 'value'):
             if hasattr(ev, attr):
@@ -1374,7 +1367,7 @@ class Product(Effector):
                 ev = next(stream)
                 if isinstance(ev, NoteEvent):
                     with newcontext(v=ev.v, nv=ev.nv, tk=ev.tk, ch=ev.ch,
-                                    L=ev.L, dt=ev.get_dt(),
+                                    L=ev.L, dt=ev.dt,
                                     dr=ev.get_du()/ev.L*100, o=4):
                         pscore = self._get_score(self.pattern)
                         taillen = 0
@@ -1396,7 +1389,7 @@ class Product(Effector):
                         readers.append(r)
                 elif isinstance(ev, NoteOnEvent):
                     with newcontext(v=ev.v, tk=ev.tk, ch=ev.ch,
-                                    L=math.inf, dt=ev.get_dt(), o=4):
+                                    L=math.inf, dt=ev.dt, o=4):
                         pscore = self._get_score(self.pattern)
                     pscore = self._conv_pitch(ev.n)(pscore)
                     r = _StreamReader(pscore.UnpairNoteEvents(), ev.t)
@@ -1526,8 +1519,7 @@ class Apply(Effector):
                 if ev.n is not None:
                     result = pev.copy()
                     result.n = ev.n
-                    if hasattr(ev, 'dt') or hasattr(pev, 'dt'):
-                        result.dt = ev.get_dt() + pev.get_dt()
+                    result.dt = ev.dt + pev.dt
                     result.v = ev.v - context().v + pev.v
                     outdict.setdefault(pev, []).append(result)
             yield from pchord_org.mapev(lambda pev: outdict.get(pev, [])
@@ -1583,10 +1575,9 @@ class ToTracks(Effector):
 
 class Render(Effector):
     """
-    dtやdu属性を持っているイベントに対し、楽譜上の時間を演奏上の時間
-    で更新します。具体的には、t属性に(あれば)dt属性の値を加え、L属性に
-    (あれば)du属性の値を設定します。デフォルトでは、dtやdu属性はその後削除
-    されます。
+    楽譜上の時間を演奏上の時間で更新します。具体的には、t属性にdt属性の値を
+    加え、L属性に(あれば)du属性の値を設定します。その後、swap指定がない限り、
+    dt属性は0に変更され、du属性は削除されます。
 
     スコアだけでなく、単独のイベントに対しても変換を適用することができます。
 
@@ -1598,14 +1589,13 @@ class Render(Effector):
         self.swap = swap
 
     def _render(self, ev):
-        if hasattr(ev, 'dt') or hasattr(ev, 'du'):
+        if ev.dt != 0 or hasattr(ev, 'du'):
             ev = ev.copy()
-            if hasattr(ev, 'dt'):
-                ev.t += ev.dt
-                if self.swap:
-                    ev.dt = -ev.dt
-                else:
-                    delattr(ev, 'dt')
+            ev.t += ev.dt
+            if self.swap:
+                ev.dt = -ev.dt
+            else:
+                ev.dt = 0
             if hasattr(ev, 'du'):
                 le = ev.L
                 ev.L = ev.du
@@ -1815,9 +1805,8 @@ class PairNoteEvents(Effector):
                         noteev.nv = ev.nv
                         if self.ref_links:
                             noteev.noteoffev = ev
-                        if abs(noteev.get_dt() - ev.get_dt()) > EPSILON:
-                            noteev.du = noteev.L - noteev.get_dt() \
-                                        + ev.get_dt()
+                        if abs(noteev.dt - ev.dt) > EPSILON:
+                            noteev.du = noteev.L - noteev.dt + ev.dt
                 else:
                     outqueue.append(ev)
         except StopIteration as e:
@@ -1866,7 +1855,7 @@ class UnpairNoteEvents(Effector):
                     offev = NoteOffEvent(ev.t + ev.L, ev.n, ev.nv,
                                          ev.tk, ev.ch, **dic)
                     if hasattr(ev, 'du'):
-                        offev.dt = offev.get_dt() + ev.du - ev.L
+                        offev.dt += ev.du - ev.L
                         _check_dt(offev)
                     heapq.heappush(noteoffbuf,
                                    (ev.t + ev.L, next(seqno), offev))
