@@ -925,6 +925,7 @@ def _event_dict(ev):
                 du=getattr(ev, 'du', ev.get_du()
                            if isinstance(ev, NoteEvent)
                            else None),
+                _has_du_=hasattr(ev, 'du'),
                 ctrlnum=getattr(ev, 'ctrlnum', None),
                 mtype=getattr(ev, 'mtype', None),
                 xtype=getattr(ev, 'xtype', None),
@@ -1149,8 +1150,14 @@ class Modify(EventEffector):
         self.locals = (takt.frameutils.outerlocals()
                        if locals is None else locals)
 
+    class _du_hooked_dict(dict):
+        def __setitem__(self, key, value):
+            if key == 'du':
+                super().__setitem__('_has_du_', True)
+            super().__setitem__(key, value)
+
     def _process_event(self, ev):
-        env = dict(self.locals, **_event_dict(ev.copy()))
+        env = self._du_hooked_dict(self.locals, **_event_dict(ev.copy()))
         try:
             exec(self.operation, self.globals, env)
         except TypeError:
@@ -1163,7 +1170,7 @@ class Modify(EventEffector):
                      'mtype', 'xtype', 'value'):
             if hasattr(ev, attr):
                 setattr(ev, attr, env[attr])
-        if isinstance(ev, NoteEvent) and env['du'] != env['L']:
+        if isinstance(ev, NoteEvent) and env['_has_du_']:
             ev.du = env['du']
         # コンテキストではないので dr=50 みたいのはできない (du*=0.5とする)。
         return ev

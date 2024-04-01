@@ -119,6 +119,10 @@ def test_effectors():
         == mml("$vol(7)C tk=2 v=88 DE")
     assert mml("$vol(7)CDE").Modify('ev.voice=2') \
         == mml("$vol(7)CDE").mapev(lambda ev: ev.update(voice=2))
+    assert mml("CD dr=80 E").Modify('L=240') \
+        == mml("CD dr=80 E").mapev(lambda ev: ev.update(L=240))
+    assert mml("CD dr=80 E").Modify('du*=0.5') \
+        == mml("dr=50 CD dr=40 E")
     assert mml("$prog(49) CDEF").Clip(480, 1440) == mml("$prog(49) DE")
     assert mml("CDEF").Clip(240, 1200) == mml("C/DE/")
     assert mml("CDEF").Clip(240, 1200, split_notes=False) == \
