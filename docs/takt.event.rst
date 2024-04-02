@@ -5,4 +5,4 @@ takt.event module
    :members: 
    :undoc-members: 
    :show-inheritance:
-   :exclude-members: MidiEventError, MidiEventWarning, t, tk, ch, L, v, nv, n, noteoff, ctrlnum, value, mtype, xtype
+   :exclude-members: MidiEventError, MidiEventWarning, t, tk, dt, ch, L, v, nv, n, noteoff, ctrlnum, value, mtype, xtype

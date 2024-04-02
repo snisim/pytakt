@@ -490,7 +490,7 @@ def readjson(filename) -> Score:
             else:
                 obj = evclass(**dic)
         elif '__event_list__' in dic:
-            if type(dic['events']) != list:
+            if type(dic['events']) is not list:
                 raise TypeError('__event_list__')
             del dic['__event_list__']
             return EventList(**dic)

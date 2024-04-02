@@ -941,7 +941,7 @@ class EventList(Score, list):
     #     return bool(self.duration != 0) or len(self) != 0
 
     def __eq__(self, other):
-        return type(self) == type(other) and \
+        return type(self) is type(other) and \
             self.duration == other.duration and \
             self.__dict__ == other.__dict__ and \
             list.__eq__(self, other)
@@ -1093,7 +1093,7 @@ class Tracks(Score, list):
                                    ''.join(attrs))
 
     def __eq__(self, other):
-        return type(self) == type(other) and \
+        return type(self) is type(other) and \
             self.__dict__ == other.__dict__ and \
             list.__eq__(self, other)
 

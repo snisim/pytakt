@@ -1137,7 +1137,7 @@ class ViewerMain(tkinter.Frame):
                 for c in self.get_auto_ctrlnums()[ctrlnum == 'verbose']:
                     if c not in result:
                         result.append(c)
-            elif type(ctrlnum) == int:
+            elif isinstance(ctrlnum, int):
                 if ctrlnum < 0:
                     try:
                         result.remove(-ctrlnum & 0xff)

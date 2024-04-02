@@ -4,9 +4,11 @@ event.py:144:5: E301 expected 1 blank line, found 0
 event.py:147:5: E301 expected 1 blank line, found 0
 event.py:150:5: E301 expected 1 blank line, found 0
 event.py:153:5: E301 expected 1 blank line, found 0
+event.py:156:5: E301 expected 1 blank line, found 0
 event.py:158:5: E301 expected 1 blank line, found 0
 event.py:161:5: E301 expected 1 blank line, found 0
 event.py:164:5: E301 expected 1 blank line, found 0
+event.py:167:5: E301 expected 1 blank line, found 0
 mml.py:41:1: E302 expected 2 blank lines, found 0
 mml.py:45:1: E302 expected 2 blank lines, found 0
 mml.py:48:1: E302 expected 2 blank lines, found 0

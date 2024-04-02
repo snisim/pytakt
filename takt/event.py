@@ -90,7 +90,7 @@ class Event(object):
     #     return self.t > other.t
 
     def __eq__(self, other):
-        return (type(self) == type(other) and
+        return (type(self) is type(other) and
                 all(all(getattr(self, key) == getattr(other, key)
                         for key in cls.__slots__)
                     for cls in self.__class__.__mro__ if cls is not object))

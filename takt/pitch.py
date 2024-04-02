@@ -531,7 +531,7 @@ class Interval(int):
             return NotImplemented
 
     def __mul__(self, other):
-        if type(other) == int:
+        if type(other) is int:
             return Interval(int(self) * other, self.ds * other)
         else:
             # NotImplemented だと Interval * Interval がエラーになる

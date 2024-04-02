@@ -145,8 +145,8 @@ class TaktToMusic21:
                         # Fingering以外は重複した指定を１つにする。Figeringの
                         # 場合コード構成音の順番に指定を並べる (その際、指定の
                         # ない音に対しては空の指定を挿入する）。
-                        cnt = sum(type(nobj) == type(cobj) for cobj in cobjs)
-                        if type(nobj) == music21.articulations.Fingering:
+                        cnt = sum(type(nobj) is type(cobj) for cobj in cobjs)
+                        if type(nobj) is music21.articulations.Fingering:
                             while cnt < i:
                                 cobjs.append(type(nobj)())
                                 cnt += 1
@@ -861,7 +861,7 @@ class Music21ToTakt:
 
             fingering_count = 0
             for mk in m21elm.articulations + m21elm.expressions:
-                if type(mk) == music21.articulations.Fingering:
+                if type(mk) is music21.articulations.Fingering:
                     fingering_count += 1
                     if fingering_count - 1 != note_idx:
                         continue
@@ -1090,7 +1090,7 @@ class Music21ToTakt:
                 music21.key.Key) else music21.key.KeySignature
             for m21elm in flattened:
                 if isinstance(m21elm, music21.note.Note) or \
-                   type(m21elm) == music21.chord.Chord:
+                   type(m21elm) is music21.chord.Chord:
                     evlist.extend(
                         self.conv_note(m21elm, m21elm.offset, tknum,
                                        voice_map.get(m21elm.id, None)))
