@@ -142,7 +142,7 @@ class Event(object):
             return NotImplemented
 
     def is_pitch_bend(self) -> bool:
-        """ピッチベントイベントのとき真を返します。"""
+        """ピッチベンドイベントのとき真を返します。"""
         return (isinstance(self, CtrlEvent) and self.ctrlnum == C_BEND)
     def is_key_pressure(self) -> bool:
         """キープレッシャーイベントのとき真を返します。"""
@@ -381,7 +381,7 @@ class NoteOffEvent(NoteEventClass):
 class CtrlEvent(Event):
     """
     コントローラ番号とコントロール値を持った制御イベントのクラスです。
-    これには、MIDIコントロールチェンジ、プログラムチェンジ、ピッチベント、
+    これには、MIDIコントロールチェンジ、プログラムチェンジ、ピッチベンド、
     チャネルプレッシャー、およびキープレッシャーが含まれます。
     キープレッシャーについては専用のサブクラスが用意されていますので、
     インスタンス生成の際にはそのコンストラクタを使用してください。
