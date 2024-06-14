@@ -250,6 +250,19 @@ def test_chord_iterator():
                                 cont_notes=False)) == s
 
 
+def test_scale():
+    scale = Scale(C4, 'major')
+    assert(scale[0] == C4 and scale[2] == E4 and scale[0.5] == Cs4)
+    scale = Scale(F4, ScaleLibrary.minor)
+    assert(str(scale.pitches()) == "[F4, G4, Ab4, Bb4, C5, Db5, Eb5]")
+    assert(scale.to_key() == Key('F minor'))
+    assert(scale.is_scale_tone(Ab5) and not scale.is_scale_tone(E4))
+    assert(scale.tonenum(G3) == -6 and scale.tonenum(Fs4) == 0.5 - 0.01)
+    assert(scale.get_near_scale_tone(G5) == G5 and
+           scale.get_near_scale_tone(Fs4) == F4 and
+           scale.get_near_scale_tone(Gb4) == G4)
+
+
 def test_chord():
     chords = ('C7b9', 'C(9)', 'C7(9)', 'C69', 'C13#11', 'CaugM7', 'C#11',
               'CdimM9', 'F#m7b5(11)', 'C7sus4b9', 'C7omit3add2',

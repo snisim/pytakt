@@ -192,7 +192,7 @@ Interval('P4'), Interval('P5'), Interval('M6'), Interval('M7')], 0))
             else:
                 return ni
         # スケールトーンの場合
-        n = self.tonic + iv + oct * 12
+        n = self.tonic + iv + oct * Interval('P8')
         if isinstance(self.tonic, Pitch) and isinstance(iv, Interval):
             return n
         else:
