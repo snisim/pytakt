@@ -123,8 +123,10 @@ class Context(object):
         Type:: int or float
 
     Args:
-        dt, L, v, nv, duoffset, durate, tk, ch, o, key, effectors:
+        dt, L, v, nv, duoffset, durate, tk, ch, o, key:
             同名の属性値を指定します。
+        effectors: effector属性の値を指定します。
+            属性にはリストのコピーが格納されます。
         kwargs: コンテキストに対する追加の属性を指定します。
     """
     __slots__ = ('dt', 'tk', 'ch', 'v', 'nv', 'L', 'duoffset', 'durate',
@@ -143,7 +145,7 @@ class Context(object):
         self.ch = ch
         self.o = o
         self.key = key
-        self.effectors = effectors
+        self.effectors = effectors.copy()
         self._outer_context = None
         self.__dict__.update(kwargs)
 
@@ -155,7 +157,7 @@ class Context(object):
         return self.__class__(self.dt, self.L, self.v, self.nv,
                               self.duoffset, self.durate, self.tk, self.ch,
                               self.o, self.key,
-                              self.effectors.copy(), **self.__dict__)
+                              self.effectors, **self.__dict__)
     __copy__ = copy
 
     def __getattr__(self, name):
