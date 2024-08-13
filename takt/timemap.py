@@ -296,7 +296,7 @@ class TimeSignatureMap(object):
                 if a[0].strip() != '':
                     measures = int(a[0])
                 if len(a) >= 2 and a[1].strip() != '':
-                    beats = int(a[1])
+                    beats = float(a[1])
                     beats_set_by_str = True
                 if len(b) >= 2 and b[1].strip() != '':
                     ticks = float(b[1])

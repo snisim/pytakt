@@ -12,8 +12,8 @@ import os
 from takt.score import EventList
 from takt.event import NoteEventClass, NoteEvent, NoteOnEvent, NoteOffEvent, \
     MetaEvent, CtrlEvent, TempoEvent, KeyPressureEvent, SysExEvent
-from takt.constants import M_TRACKNAME, M_INSTNAME, \
-    CONTROLLERS, C_BEND, C_PROG, C_KPR, C_CPR, C_TEMPO, TICKS_PER_QUARTER
+from takt.constants import M_TRACKNAME, M_INSTNAME, CONTROLLERS, C_BEND, \
+    C_PROG, C_KPR, C_CPR, C_TEMPO, TICKS_PER_QUARTER, EPSILON
 from takt.pitch import Pitch
 from takt.timemap import TimeSignatureMap, current_tempo
 from takt.utils import std_time_repr
@@ -101,6 +101,8 @@ class ViewPaneBase(tkinter.Frame):
         self.master = master
         self.pixels_per_tick = master.pixels_per_tick
         self.width = master.evlist.duration * master.pixels_per_tick
+        if self.width <= 0:
+            self.width = EPSILON
         self.height = height
         self.ymargin = ymargin
         self.yzoom = 1.0

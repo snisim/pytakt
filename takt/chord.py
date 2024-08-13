@@ -797,6 +797,8 @@ class Chord(object):
             >>> Chord.from_chroma_profile(cp, bass=C3).name()
             'Dm9/C'
         """
+        if len(chroma_profile) != 12:
+            raise Exception('Length of the chorma profile must be 12')
         bcp = sum(bool(v) << i for i, v in enumerate(chroma_profile))
         if not bcp:
             raise Exception('Empty chorma profile')
