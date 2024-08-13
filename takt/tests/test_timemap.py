@@ -7,20 +7,21 @@ import os
 random.seed(0)
 sample_score = readsmf(os.path.join(os.path.dirname(__file__), "grieg.mid"))
 
-def test_tempomap():
-    tm = TempoMap(sc.tempo([(0, 60), (480, 120, None)]))
+@pytest.mark.parametrize("MapClass", [TempoMap, TimeMap])
+def test_tempomap(MapClass):
+    tm = MapClass(sc.tempo([(0, 60), (480, 120, None)]))
     assert tm.ticks2sec(0) == 0 and tm.ticks2sec(240) == 0.5 and \
         tm.ticks2sec(480) == 1.0 and tm.ticks2sec(960) == 1.5
-    tm = TempoMap(sc.tempo([(0, 60), (480, 120, None)]))
+    tm = MapClass(sc.tempo([(0, 60), (480, 120, None)]))
     assert tm.sec2ticks(0) == 0 and tm.sec2ticks(0.5) == 240 and \
         tm.sec2ticks(1.0) == 480 and tm.sec2ticks(1.5) == 960
-    tm = TempoMap(rest(480) + sc.tempo(60) + note(C4) + sc.tempo(80) +
+    tm = MapClass(rest(480) + sc.tempo(60) + note(C4) + sc.tempo(80) +
                   genseq(note(C4) for i in itertools.count()))
     assert tm.tempo_at(1) == 125 and tm.ticks2sec(1440) == 2.23 \
         and tm.sec2ticks(2.23) == 1440
 
     for j in range(100):
-        tm = TempoMap(genseq(sc.tempo(random.random() * 1000 + 1,
+        tm = MapClass(genseq(sc.tempo(random.random() * 1000 + 1,
                                       duration=random.random() * 1000)
                              for i in itertools.count()))
         for k in range(10):
@@ -31,7 +32,7 @@ def test_tempomap():
                 x = random.random() * 100
                 assert abs(tm.ticks2sec(tm.sec2ticks(x)) - x) < 1e-6
 
-    tm = TempoMap(sample_score)
+    tm = MapClass(sample_score)
     total_seconds = tm.ticks2sec(sample_score.get_duration())
     assert round(total_seconds, 4) == 752.4923
     for k in range(100):
@@ -43,9 +44,10 @@ def test_tempomap():
         assert abs(tm.ticks2sec(tm.sec2ticks(x)) - x) < 1e-6
 
 
-def test_timesigmap():
-    tm = TimeSignatureMap(sc.timesig(3, 4) + rest(1440) + sc.timesig(5, 8) +
-                          rest(1920))
+@pytest.mark.parametrize("MapClass", [TimeSignatureMap, TimeMap])
+def test_timesigmap(MapClass):
+    tm = MapClass(sc.timesig(3, 4) + rest(1440) + sc.timesig(5, 8) +
+                  rest(1920))
     assert tm.timesig_at(0).num_den() == (3, 4)
     assert tm.timesig_at(100).num_den() == (3, 4)
     assert tm.timesig_at(1440).num_den() == (5, 8)
@@ -64,29 +66,29 @@ def test_timesigmap():
     assert tuple(round(x, 6) for x in tm.ticks2mbt(960 - 1e-10)) \
         == (1, 960, 2, 0)
     assert tm.num_measures() == 3
-    tm = TimeSignatureMap(rest(3840 + 1e-10) + sc.timesig(4, 4))
+    tm = MapClass(rest(3840 + 1e-10) + sc.timesig(4, 4))
     assert tm.num_measures() == 2 and tm.ticks2mbt(3850)[0] == 3
-    tm = TimeSignatureMap(rest(3840 - 1e-10) + sc.timesig(4, 4))
+    tm = MapClass(rest(3840 - 1e-10) + sc.timesig(4, 4))
     assert tm.num_measures() == 2 and tm.ticks2mbt(3850)[0] == 3
-    tm = TimeSignatureMap(rest(100) + sc.timesig(2, 4))
+    tm = MapClass(rest(100) + sc.timesig(2, 4))
     assert tm.mbt2ticks(3, 1, 100) == 100 + 960 + 960 + 480 + 100
     assert tm.ticks2mbt(100 + 960 + 960 + 480 + 100) == (3, 580, 1, 100)
-    tm = TimeSignatureMap(rest(1000) + sc.timesig(2, 4), bar0len=1000)
+    tm = MapClass(rest(1000) + sc.timesig(2, 4), bar0len=1000)
     assert tm.ticks2mbt(980) == (0, 980, 2, 20)
     assert tm.ticks2mbt(1000) == (1, 0, 0, 0)
     assert tm.mbt2ticks(0) == 0 and tm.mbt2ticks(1) == 1000
-    tm = TimeSignatureMap(rest(1000) + sc.timesig(2, 4), bar0len=960)
+    tm = MapClass(rest(1000) + sc.timesig(2, 4), bar0len=960)
     assert tm.ticks2mbt(0) == (0, 0, 0, 0)
     assert tm.ticks2mbt(960) == (1, 0, 0, 0)
     assert tm.ticks2mbt(1020) == (2, 20, 0, 20)
     assert tm.mbt2ticks(1) == 960 and tm.mbt2ticks(2) == 1000
-    tm = TimeSignatureMap(rest(1000) + sc.timesig(2, 4), bar0len=1020)
+    tm = MapClass(rest(1000) + sc.timesig(2, 4), bar0len=1020)
     assert tm.ticks2mbt(0) == (0, 0, 0, 0)
     assert tm.ticks2mbt(1000) == (0, 1000, 2, 40)
     assert tm.ticks2mbt(1020) == (1, 0, 0, 0)
     assert tm.mbt2ticks(1) == 1020 and tm.mbt2ticks(2) == 1980
     assert tm.timesig_at(1020).num_den() == (2, 4)
-    tm = TimeSignatureMap(rest(1000) + sc.timesig(2, 4), bar0len=0)
+    tm = MapClass(rest(1000) + sc.timesig(2, 4), bar0len=0)
     assert tm.ticks2mbt(0) == (1, 0, 0, 0)
     assert tm.ticks2mbt(1000) == (2, 0, 0, 0)
     assert tm.ticks2mbt(1020) == (2, 20, 0, 20)
@@ -94,7 +96,7 @@ def test_timesigmap():
     assert tm.timesig_at(1000).num_den() == (2, 4)
 
     for j in range(50):
-        tm = TimeSignatureMap(
+        tm = MapClass(
             genseq(sc.timesig(random.randrange(50) + 1,
                               1 << random.randrange(8),
                               duration=random.random() * 1000)
@@ -108,7 +110,7 @@ def test_timesigmap():
                 x = random.randrange(100)
                 assert tm.ticks2mbt(tm.mbt2ticks(x))[0] == x
 
-    tm = TimeSignatureMap(sample_score)
+    tm = MapClass(sample_score)
     num_measures = tm.num_measures()
     assert num_measures == 231
     for k in range(100):

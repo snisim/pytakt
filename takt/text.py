@@ -12,7 +12,7 @@ import json
 from fractions import Fraction
 from typing import Optional
 from takt.score import EventList, Tracks, Score, DEFAULT_LIMIT
-from takt.timemap import TempoMap, TimeSignatureMap, current_tempo
+from takt.timemap import TempoMap, TimeSignatureMap, TimeMap, current_tempo
 import takt.event
 from takt.event import Event, NoteEvent, NoteOnEvent, NoteOffEvent, \
     CtrlEvent, MetaEvent, SysExEvent, TempoEvent, TimeSignatureEvent, \
@@ -544,8 +544,7 @@ def showsummary(score, default_tempo=125.0) -> None:
             存在する場合、その区間のテンポはこの値であると仮定されます。
     """
     evlist = EventList(score).ConnectTies()
-    tempomap = TempoMap(evlist, default_tempo)
-    tsigmap = TimeSignatureMap(evlist)
+    timemap = TimeMap(evlist, default_tempo)
     bycategory = [[] for cat in range(0, 14)]
     bytrack = {}
     bychannel = {}
@@ -581,8 +580,8 @@ def showsummary(score, default_tempo=125.0) -> None:
 
     print("Total duration: %r ticks, %r seconds   Measures: %r" %
           (round(evlist.duration, S_ROUND),
-           round(tempomap.ticks2sec(evlist.duration), S_ROUND),
-           tsigmap.num_measures()))
+           round(timemap.ticks2sec(evlist.duration), S_ROUND),
+           timemap.num_measures()))
 
     print("Event time (ticks): %r-%r" % statis(ev.t for ev in evlist)[:2],
           end='')

@@ -17,7 +17,7 @@ from takt.utils import int_preferred, Ticks
 
 
 __all__ = ['current_tempo', 'set_tempo',
-           'TempoMap', 'TimeSignatureMap', 'KeySignatureMap']
+           'TempoMap', 'TimeSignatureMap', 'TimeMap', 'KeySignatureMap']
 
 
 # takt.midiio モジュールをインポートしないでもテンポ値の設定・取得を
@@ -66,11 +66,18 @@ class TempoMap(object):
     def __init__(self, score, default_tempo=125.0):
         self.event_iterator = score.tee().stream()
         self.tempo_list = [default_tempo]
-        self.ticks_list = [0]
+        self.tempo_ticks_list = [0]
         self.seconds_list = [0]
         self.last_event_time = 0
         if not isinstance(score, EventStream):
             self._fill_list_until(math.inf)
+
+    def _register_tempo_event(self, ev):
+        self.seconds_list.append(self.seconds_list[-1] +
+                                 ((ev.t - self.tempo_ticks_list[-1]) * 60 /
+                                  (self.tempo_list[-1] * TICKS_PER_QUARTER)))
+        self.tempo_list.append(ev.value)
+        self.tempo_ticks_list.append(ev.t)
 
     def _fill_list_until(self, ticks):
         try:
@@ -78,12 +85,7 @@ class TempoMap(object):
                    self.last_event_time <= ticks):
                 ev = next(self.event_iterator)
                 if isinstance(ev, TempoEvent):
-                    self.seconds_list.append(
-                        self.seconds_list[-1] +
-                        ((ev.t - self.ticks_list[-1]) * 60 /
-                         (self.tempo_list[-1] * TICKS_PER_QUARTER)))
-                    self.tempo_list.append(ev.value)
-                    self.ticks_list.append(ev.t)
+                    self._register_tempo_event(ev)
                 self.last_event_time = ev.t
         except StopIteration:
             self.last_event_time = math.inf
@@ -99,7 +101,7 @@ class TempoMap(object):
             テンポ値 (BPM)
         """
         self._fill_list_until(ticks)
-        i = max(0, bisect_right(self.ticks_list, ticks) - 1)
+        i = max(0, bisect_right(self.tempo_ticks_list, ticks) - 1)
         return self.tempo_list[i]
 
     def ticks2sec(self, ticks) -> float:
@@ -113,9 +115,9 @@ class TempoMap(object):
             スコア先頭からの秒数
         """
         self._fill_list_until(ticks)
-        i = max(0, bisect_right(self.ticks_list, ticks) - 1)
+        i = max(0, bisect_right(self.tempo_ticks_list, ticks) - 1)
         return self.seconds_list[i] + \
-            ((ticks - self.ticks_list[i]) * 60 /
+            ((ticks - self.tempo_ticks_list[i]) * 60 /
              (self.tempo_list[i] * TICKS_PER_QUARTER))
 
     def sec2ticks(self, seconds) -> Ticks:
@@ -130,7 +132,7 @@ class TempoMap(object):
         """
         while True:
             i = max(0, bisect_right(self.seconds_list, seconds) - 1)
-            ticks = self.ticks_list[i] + \
+            ticks = self.tempo_ticks_list[i] + \
                 ((seconds - self.seconds_list[i]) *
                  self.tempo_list[i] * TICKS_PER_QUARTER / 60)
             if ticks <= self.last_event_time:
@@ -159,8 +161,8 @@ class TimeSignatureMap(object):
     def __init__(self, score, bar0len=None):
         self.score = score
         self.event_iterator = score.tee().stream()
-        self.event_list = [TimeSignatureEvent(0, 4, 4, default=True)]
-        self.ticks_list = [0]
+        self.tsig_event_list = [TimeSignatureEvent(0, 4, 4, default=True)]
+        self.tsig_ticks_list = [0]
         self.measures_list = [0]
         self.last_event_time = 0
         self.score_duration = None
@@ -168,9 +170,9 @@ class TimeSignatureMap(object):
         if bar0len == 0:
             self.measures_list[0] = 1
         elif bar0len is not None:
-            self.event_list.append(TimeSignatureEvent(bar0len, 4, 4,
-                                                      default=True))
-            self.ticks_list.append(bar0len)
+            self.tsig_event_list.append(TimeSignatureEvent(bar0len, 4, 4,
+                                                           default=True))
+            self.tsig_ticks_list.append(bar0len)
             self.measures_list.append(1)
         else:
             # bar0lenがNoneの場合、最初の3小節のうち2番目と3番目の長さが同じで
@@ -183,29 +185,31 @@ class TimeSignatureMap(object):
         if not isinstance(score, EventStream):
             self._fill_list_until(math.inf)
 
+    def _register_tsig_event(self, ev):
+        if ev.t >= self.tsig_ticks_list[-1]:
+            self.measures_list.append(
+                self.measures_list[-1] +
+                int(math.ceil((ev.t - self.tsig_ticks_list[-1] - EPSILON) /
+                              self.tsig_event_list[-1].measure_length())))
+            self.tsig_event_list.append(ev.copy())
+            self.tsig_ticks_list.append(ev.t)
+        else:  # bar0len のイベントより前の場合
+            self.tsig_event_list[-1].value = ev.value
+            try:
+                del self.tsig_event_list[-1].default
+            except AttributeError:
+                pass
+            self.tsig_event_list.insert(-1, ev.copy())
+            self.measures_list.insert(-1, 0)
+            self.tsig_ticks_list.insert(-1, 0)
+
     def _fill_list_until(self, ticks):
         try:
             while (self.last_event_time != math.inf and
                    self.last_event_time <= ticks):
                 ev = next(self.event_iterator)
                 if isinstance(ev, TimeSignatureEvent):
-                    if ev.t >= self.ticks_list[-1]:
-                        self.measures_list.append(
-                            self.measures_list[-1] +
-                            int(math.ceil(
-                                (ev.t - self.ticks_list[-1] - EPSILON) /
-                                self.event_list[-1].measure_length())))
-                        self.event_list.append(ev.copy())
-                        self.ticks_list.append(ev.t)
-                    else:  # bar0len のイベントより前の場合
-                        self.event_list[-1].value = ev.value
-                        try:
-                            del self.event_list[-1].default
-                        except AttributeError:
-                            pass
-                        self.event_list.insert(-1, ev.copy())
-                        self.measures_list.insert(-1, 0)
-                        self.ticks_list.insert(-1, 0)
+                    self._register_tsig_event(ev)
                 self.last_event_time = ev.t
         except StopIteration as e:
             self.score_duration = max(self.last_event_time, e.value)
@@ -223,8 +227,8 @@ class TimeSignatureMap(object):
             イベントについては 'default' という属性が追加されています。
         """
         self._fill_list_until(ticks)
-        i = max(0, bisect_right(self.ticks_list, ticks) - 1)
-        return self.event_list[i]
+        i = max(0, bisect_right(self.tsig_ticks_list, ticks) - 1)
+        return self.tsig_event_list[i]
 
     def num_measures(self) -> int:
         """
@@ -250,17 +254,17 @@ class TimeSignatureMap(object):
             長さ (=240ティック) になります)。
         """
         self._fill_list_until(ticks)
-        i = max(0, bisect_right(self.ticks_list, ticks) - 1)
-        mlen = self.event_list[i].measure_length()
+        i = max(0, bisect_right(self.tsig_ticks_list, ticks) - 1)
+        mlen = self.tsig_event_list[i].measure_length()
         if self.bar0len is not None and ticks < self.bar0len:
             mlen = self.bar0len
-        dur = ticks - self.ticks_list[i]
+        dur = ticks - self.tsig_ticks_list[i]
         m, mticks = int(self.measures_list[i] + dur // mlen), dur % mlen
         # 計算誤差によって微小時間の小節ができてしまうのを避ける。
         if mlen - mticks < EPSILON:
             m += 1
             mticks -= mlen
-        blen = self.event_list[i].beat_length()
+        blen = self.tsig_event_list[i].beat_length()
         b, bticks = int(mticks // blen), mticks % blen
         if blen - bticks < EPSILON:
             b += 1
@@ -304,15 +308,15 @@ class TimeSignatureMap(object):
                 raise ValueError("Invalid time representation") from None
         while True:
             i = max(0, bisect_right(self.measures_list, measures) - 1)
-            mlen = self.event_list[i].measure_length()
-            blen = self.event_list[i].beat_length()
-            base_ticks = self.ticks_list[i] + \
+            mlen = self.tsig_event_list[i].measure_length()
+            blen = self.tsig_event_list[i].beat_length()
+            base_ticks = self.tsig_ticks_list[i] + \
                 (measures - self.measures_list[i]) * mlen
             if base_ticks <= self.last_event_time:
                 break
             self._fill_list_until(base_ticks)
         if beats_set_by_str and \
-           (beats < 0 or beats >= self.event_list[i].numerator()):
+           (beats < 0 or beats >= self.tsig_event_list[i].numerator()):
             raise ValueError("Beat %d does not exist in Measure %d" %
                              (beats, measures)) from None
         return int_preferred(base_ticks + blen * beats + ticks)
@@ -344,6 +348,41 @@ class TimeSignatureMap(object):
                 return self.score_duration
             yield ticks
             ticks = next_ticks
+
+
+class TimeMap(TempoMap, TimeSignatureMap):
+    """
+    TempoMap と TimeSignatureMap を統合したクラスです。両方のクラスの機能を
+    併せ持っています。1つのスコアに対して両方の機能を必要とする場合は、
+    このマップを使ったほうが、スコア走査が1回で済むため効率的です。
+
+    Args:
+        score(Score): 対象となるスコア (無限長スコア可)
+        default_tempo(float): スコア冒頭部分にテンポイベントがない区間が
+            存在する場合、その区間のテンポはこの値であると仮定されます。
+        bar0len(ticks, optional): 小節番号 0 の小節の長さを指定します。0を
+            指定したときは、小節番号 0 の小節は無いとみなされます。指定の無い
+            場合は、拍子イベントの位置から推測されます。
+    """
+    def __init__(self, score, default_tempo=125.0, bar0len=None):
+        self.tempo_list = [default_tempo]
+        self.tempo_ticks_list = [0]
+        self.seconds_list = [0]
+        TimeSignatureMap.__init__(self, score, bar0len)
+
+    def _fill_list_until(self, ticks):
+        try:
+            while (self.last_event_time != math.inf and
+                   self.last_event_time <= ticks):
+                ev = next(self.event_iterator)
+                if isinstance(ev, TempoEvent):
+                    self._register_tempo_event(ev)
+                elif isinstance(ev, TimeSignatureEvent):
+                    self._register_tsig_event(ev)
+                self.last_event_time = ev.t
+        except StopIteration as e:
+            self.score_duration = max(self.last_event_time, e.value)
+            self.last_event_time = math.inf
 
 
 class KeySignatureMap(object):

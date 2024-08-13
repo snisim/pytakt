@@ -530,7 +530,7 @@ isinstance(ev, (NoteEvent, NoteOnEvent))])
 
             下のプログラムは、小節ごとにイベントリストを表示します::
 
-                tm = TimeSignatureMap(s)
+                tm = TimeMap(s)
                 for m, evlist in enumerate(s.chord_iterator(tm.iterator())):
                     print(f'Measure {m + tm.ticks2mbt(0)[0]}:', evlist)
         """
