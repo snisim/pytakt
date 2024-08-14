@@ -11,7 +11,7 @@ import heapq
 import warnings
 import math
 from fractions import Fraction
-from takt.score import Score, EventList, Tracks
+from takt.score import Score, EventList, EventStream, Tracks
 from takt.event import NoteEvent, CtrlEvent, MetaEvent, TimeSignatureEvent, \
     KeySignatureEvent, TempoEvent, XmlEvent
 from takt.pitch import Pitch, Key
@@ -654,6 +654,9 @@ class TaktToMusic21:
 
     def convert_to_music21(self, score, min_note, bar0len, allow_tuplet,
                            limit) -> music21.stream.Score:
+        if isinstance(score, EventStream) and score.is_consumed():
+            raise Exception(
+                'convert_to_music21: Input stream has already been consumed')
         self.min_note = min_note
         # 音価がGRACS_NOTE_THRES未満のものは原則として装飾音にする
         self.GRACE_NOTE_THRES = min_note / 4

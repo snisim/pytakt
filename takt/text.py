@@ -9,9 +9,10 @@ import math
 import itertools
 import sys
 import json
+import warnings
 from fractions import Fraction
 from typing import Optional
-from takt.score import EventList, Tracks, Score, DEFAULT_LIMIT
+from takt.score import EventList, EventStream, Tracks, Score, DEFAULT_LIMIT
 from takt.timemap import TempoMap, TimeSignatureMap, TimeMap, current_tempo
 import takt.event
 from takt.event import Event, NoteEvent, NoteOnEvent, NoteOffEvent, \
@@ -150,6 +151,8 @@ def showtext(score, rawmode=False, time='measures',
             デフォルトでは、rawモードならばrepr関数、そうでないなら
             :func:`.frac_time_repr` に設定されます。
     """
+    if isinstance(score, EventStream) and score.is_consumed():
+        warnings.warn('showtext: Input stream has already been consumed')
     if timereprfunc is None:
         timereprfunc = repr if rawmode else frac_time_repr
     tracks = score.ConnectTies().ToTracks(limit=limit)
@@ -543,6 +546,9 @@ def showsummary(score, default_tempo=125.0) -> None:
         default_tempo(float): スコア冒頭部分にテンポイベントがない区間が
             存在する場合、その区間のテンポはこの値であると仮定されます。
     """
+    if isinstance(score, EventStream) and score.is_consumed():
+        raise Exception('showsummary: Input stream has already been consumed')
+
     evlist = EventList(score).ConnectTies()
     timemap = TimeMap(evlist, default_tempo)
     bycategory = [[] for cat in range(0, 14)]

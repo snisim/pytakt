@@ -9,7 +9,7 @@ import tkinter.simpledialog
 import math
 import sys
 import os
-from takt.score import EventList
+from takt.score import EventList, EventStream
 from takt.event import NoteEventClass, NoteEvent, NoteOnEvent, NoteOffEvent, \
     MetaEvent, CtrlEvent, TempoEvent, KeyPressureEvent, SysExEvent
 from takt.constants import M_TRACKNAME, M_INSTNAME, CONTROLLERS, C_BEND, \
@@ -1588,6 +1588,8 @@ def show(score, velocity='auto', ctrlnums='auto', limit=SHOW_LIMIT,
         - CTRL+w, CTRL+q, ESC: 終了
 
     """
+    if isinstance(score, EventStream) and score.is_consumed():
+        raise Exception('show: Input stream has already been consumed')
     setup_globals(magnify)
     root = tkinter.Tk()
     if geometry is not None:

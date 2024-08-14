@@ -1150,17 +1150,27 @@ class EventStream(Score):
     """
 
     # EventStream(score) で、イベントのコピーはしない。
-    __slots__ = 'iterator', '__iter__', '__next__', '__dict__'
+    __slots__ = 'iterator', '__dict__', '_is_consumed'
 
     def __init__(self, iterator, **kwargs):
         if isinstance(iterator, collections.abc.Iterator):
             self.iterator = iterator
         else:
             raise TypeError("argument must be an iterator object")
-        self.__iter__ = self.iterator.__iter__
-
-        self.__next__ = self.iterator.__next__
         self.__dict__.update(kwargs)
+        self._is_consumed = False
+
+    def __iter__(self):
+        return self
+
+    def __next__(self):
+        self._is_consumed = True
+        return next(self.iterator)
+
+    def is_consumed(self):
+        """ このストリームに対して過去にnextを実行したことがあればTrue、
+        そうでなければFalseを返します。"""
+        return self._is_consumed
 
     def tostr(self, timereprfunc=std_time_repr) -> str:
         attrs = [", %s=%r" % (k, v) for k, v in self.__dict__.items()]
@@ -1193,9 +1203,9 @@ class EventStream(Score):
 
         (i1, i2) = itertools.tee(save_duration(self.iterator))
         self.iterator = restore_duration(i1)
-        self.__iter__ = self.iterator.__iter__
-        self.__next__ = self.iterator.__next__
-        return self.__class__(restore_duration(i2), **self.__dict__)
+        rtn = self.__class__(restore_duration(i2), **self.__dict__)
+        rtn._is_consumed = self._is_consumed
+        return rtn
 
     def merged(self, other, time=0) -> 'EventStream':
         """

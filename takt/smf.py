@@ -9,7 +9,7 @@ from struct import unpack, pack
 import warnings
 import math
 import sys
-from takt.score import EventList, Tracks, DEFAULT_LIMIT
+from takt.score import EventList, EventStream, Tracks, DEFAULT_LIMIT
 from takt.event import NoteEventClass, CtrlEvent, KeyPressureEvent, \
     MetaEvent, SysExEvent, TempoEvent, KeySignatureEvent, \
     midimsg_size, message_to_event
@@ -305,6 +305,8 @@ def writesmf(score, filename, format=1, resolution=480, ntrks=None,
             制限の詳細については、:meth:`.Score.stream` の同名の引数
             の項目を見てください。
     """
+    if isinstance(score, EventStream) and score.is_consumed():
+        warnings.warn('writesmf: Input stream has already been consumed')
 
     inp = score.stream(limit=limit).ConnectTies()
     if render:

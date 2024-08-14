@@ -503,7 +503,10 @@ def _play_rec(score, rec=False, outdev=None, indev=None, metro=None,
         indevnum = _input_devnum if indev is None else find_input_device(indev)
     open_output_device(devnum)  # may take some seconds
     open_input_device(indevnum)
-    if not isinstance(score, EventStream):
+    isstream = isinstance(score, EventStream)
+    if isstream and score.is_consumed():
+        raise Exception('play: Input stream has already been consumed')
+    if not isstream:
         score = Tracks(
             [score, EventList([LoopBackEvent(score.get_duration(), 'done')],
                               0)])
@@ -537,7 +540,9 @@ def _play_rec(score, rec=False, outdev=None, indev=None, metro=None,
                 ev = next(event_stream)
                 # qt はキューに入れるべきシステム時刻
                 qt = ev.t - _QUEUE_LOOK_AHEAD + toffset
-            except StopIteration:
+            except StopIteration as e:
+                if isstream:
+                    queue_event(LoopBackEvent(e.value + toffset, 'done'))
                 ev = None
             if isinstance(score, RealTimeStream):
                 if ev is None:
