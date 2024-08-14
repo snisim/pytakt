@@ -2,13 +2,14 @@
 import math
 import random
 import os
+import re
 from fractions import Fraction
 from typing import Union
 
 # Copyright (C) 2023  Satoshi Nishimura
 
 __all__ = ['takt_round', 'takt_roundx', 'int_preferred', 'std_time_repr',
-           'frac_time_repr', 'TaktWarning', 'NoteDict', 'get_file_ext',
+           'frac_time_repr', 'TaktWarning', 'NoteDict', 'get_file_type',
            'Ticks', 'Fraction']
 
 
@@ -220,15 +221,18 @@ class NoteDict:
                 return k, lst.pop(0)
 
 
-def get_file_ext(path, types=('smf', 'json', 'mxl')) -> str:
+def get_file_type(path, types=('smf', 'json', 'mxl'), guess=True) -> str:
     """
     `path` で与えられたパス名に含まれる拡張子を調べて、
     標準MIDIファイル、jsonファイル、MusicXMLファイルのうちのどれであるかを
-    判別します。どれにも該当しなければ例外を送出します。
+    判別します。パス名から判別できない場合は、ファイル内容から推測し
+    ます (guess=Trueの場合)。それでも判別できなければ例外を送出します。
 
     Args:
         path(str): ファイルのパス名
-        types(tuple of str): 受け入れ可能なファイル形式
+        types(tuple of str, optional): 受け入れ可能なファイル形式
+        guess(bool, optional): Trueなら、拡張子からに加えて、ファイル内容から
+            推測します。
 
     Returns:
         str: 標準MIDIファイルなら 'smf', jsonファイルなら 'json',
@@ -247,5 +251,19 @@ def get_file_ext(path, types=('smf', 'json', 'mxl')) -> str:
     try:
         return extdict[ext]
     except KeyError:
-        raise Exception("Only the following file types supported: "
-                        + ' '.join(extdict))
+        pass
+
+    if guess:
+        with open(path, 'rb') as fp:
+            header = fp.read(256)
+        if 'smf' in types and header[0:4] == b'MThd':
+            return 'smf'
+        if 'json' in types and \
+           re.match(rb'\s*\{\s*"(__event_list__|__tracks__)"', header):
+            return 'json'
+        if 'mxl' in types and re.match(rb'(?s)<\?xml.*DTD MusicXML', header):
+            return 'mxl'
+        # Compressed MusicXML is not recongnized.
+
+    raise Exception("Only the following file types supported: "
+                    + ' '.join(extdict))

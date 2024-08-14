@@ -22,7 +22,7 @@ from takt.pitch import Pitch, Interval, Key
 from takt.chord import Chord
 from takt.constants import CONTROLLERS, META_EVENT_TYPES, TICKS_PER_QUARTER, \
     M_TIMESIG
-from takt.utils import frac_time_repr, get_file_ext
+from takt.utils import frac_time_repr, get_file_type
 
 __all__ = ['showtext', 'writepyfile', 'evalpyfile', 'end_score',
            'writejson', 'readjson', 'showsummary']
@@ -330,7 +330,7 @@ def end_score(score, default_tempo=125.0, format=1, resolution=480) -> None:
             print("'write' requires a filename")
             return
         try:
-            ext = get_file_ext(sys.argv[2], ('smf', 'json'))
+            ext = get_file_type(sys.argv[2], ('smf', 'json'), guess=False)
         except Exception as e:
             print(e)
             return

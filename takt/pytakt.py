@@ -247,7 +247,7 @@ When invoked with no arguments, it enters interactive mode.""",
     # read INFILE, eval PYTHON_EXPR, or read PYTHONFILE
     if args.INFILE is not None:
         try:
-            ext = takt.get_file_ext(args.INFILE, ('smf', 'json'))
+            ext = takt.get_file_type(args.INFILE, ('smf', 'json'))
             if ext == 'smf':
                 org_score = takt.readsmf(
                     args.INFILE, supply_tempo=False, encoding=args.encoding,
@@ -322,7 +322,7 @@ When invoked with no arguments, it enters interactive mode.""",
             sys.stdout = os.fdopen(0)
     elif args.mode == 'o':
         try:
-            ext = takt.get_file_ext(args.outfile, ('smf', 'json'))
+            ext = takt.get_file_type(args.outfile, ('smf', 'json'), False)
         except Exception as e:
             error_exit(e)
         if ext == 'smf':
