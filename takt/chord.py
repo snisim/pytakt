@@ -671,7 +671,7 @@ class Chord(object):
         result.sort()
         return result
 
-    def pitches_above(self, pitch, stop=None,
+    def pitches_above(self, pitch, num=None,
                       maxinterval=None) -> Iterator[Pitch]:
         """
         `pitch` より上にあるコード構成音 (bass音およびオクターブが異なる音を
@@ -680,7 +680,7 @@ class Chord(object):
         Args:
             pitch(Pitch or int):
                 基準となるピッチ
-            stop(int, optional):
+            num(int, optional):
                 指定すると、その個数だけに限定して出力します。
             maxinterval(Interval or int, optional): :meth:`degrees` の
                 同名の引数と同じ意味を持ちます。
@@ -697,9 +697,9 @@ class Chord(object):
             for k in itertools.count():
                 for p in pitches:
                     yield p + k * Interval('P8')
-        return itertools.islice(_gen(), 0, stop)
+        return itertools.islice(_gen(), 0, num)
 
-    def pitches_below(self, pitch, stop=None,
+    def pitches_below(self, pitch, num=None,
                       maxinterval=None) -> Iterator[Pitch]:
         """
         `pitch` より下にあるコード構成音 (bass音およびオクターブが異なる音を
@@ -708,19 +708,20 @@ class Chord(object):
         Args:
             pitch(Pitch or int):
                 基準となるピッチ
-            stop(int, optional):
+            num(int, optional):
                 指定すると、その個数だけに限定して出力します。
             maxinterval(Interval or int, optional): :meth:`degrees` の
                 同名の引数と同じ意味を持ちます。
         """
         pitches = sorted({-(math.floor((p - pitch) / 12) + 1) * Interval('P8')
-                          + p for p in self.pitches(maxinterval)}, reverse=True)
+                          + p for p in self.pitches(maxinterval)},
+                         reverse=True)
 
         def _gen():
             for k in itertools.count():
                 for p in pitches:
                     yield p - k * Interval('P8')
-        return itertools.islice(_gen(), 0, stop)
+        return itertools.islice(_gen(), 0, num)
 
     # Now, use chroma_profile(c.pitches())
     # def chroma_profile(self, maxinterval=None) -> List[int]:

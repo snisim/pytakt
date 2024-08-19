@@ -40,20 +40,26 @@ def octave(note_number) -> int:
 
 def chroma_profile(pitches) -> List[int]:
     """
-    `pitches` で与えられたピッチの列に対して、クロマ値(ピッチクラス) ごとに
-    出現頻度を計上した12要素のリストを返します。
+    `pitches` で与えられたピッチの列もしくはスコアに対して、クロマ値
+    (ピッチクラス) ごとに出現頻度を計上した12要素のリストを返します。
 
     Args:
-        pitches(iterable of Pitch or int):
-            Pitch オブジェクトまたはMIDIノート番号を表す整数のイテラブル。
+        pitches(iterable of Pitch or int, or Score):
+            Pitch オブジェクトまたはMIDIノート番号を表す整数のイテラブル、
+            もしくはスコアオブジェクト。
 
     Examples:
         >>> chroma_profile([C4, Bb5])
         [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0]
-        >>> chroma_profile(ev.n for ev in readsmf('menuet.mid').Filter(\
-NoteEvent).stream())
+        >>> chroma_profile(readsmf('menuet.mid'))
         [20, 5, 33, 0, 14, 0, 19, 48, 0, 30, 0, 35]
     """
+    from takt.score import Score
+    from takt.event import NoteEvent, NoteOnEvent
+    from takt.effector import Filter
+    if isinstance(pitches, Score):
+        pitches = (ev.n for ev in
+                   pitches.Filter(NoteEvent, NoteOnEvent).stream())
     result = [0 for _ in range(12)]
     for p in pitches:
         result[chroma(p)] += 1

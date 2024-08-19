@@ -23,7 +23,7 @@ mml.py:82:1: E302 expected 2 blank lines, found 0
 mml.py:88:1: E302 expected 2 blank lines, found 1
 mml.py:91:1: E302 expected 2 blank lines, found 0
 mml.py:94:1: E302 expected 2 blank lines, found 0
-pitch.py:66:6: E201 whitespace after '('
-pitch.py:67:6: E201 whitespace after '('
-pitch.py:68:6: E201 whitespace after '('
-pitch.py:69:6: E201 whitespace after '('
+pitch.py:72:6: E201 whitespace after '('
+pitch.py:73:6: E201 whitespace after '('
+pitch.py:74:6: E201 whitespace after '('
+pitch.py:75:6: E201 whitespace after '('
