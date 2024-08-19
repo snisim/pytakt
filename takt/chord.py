@@ -664,7 +664,7 @@ class Chord(object):
                     if chroma(p) == chroma(self.bass):
                         continue
                     while p < self.bass:
-                        p += 12
+                        p += Interval('P8')
                 result.append(p)
         if self.bass is not None:
             result.append(self.bass)
@@ -690,13 +690,13 @@ class Chord(object):
             [E4, G4, Bb4, C5, E5]
         """
         # 下の式は p を pitch+1 から始まる1オクターブ内に補正している。
-        pitches = sorted({(math.floor((pitch - p) / 12) + 1) * 12 + p
-                          for p in self.pitches(maxinterval)})
+        pitches = sorted({(math.floor((pitch - p) / 12) + 1) * Interval('P8')
+                          + p for p in self.pitches(maxinterval)})
 
         def _gen():
             for k in itertools.count():
                 for p in pitches:
-                    yield p + k * 12
+                    yield p + k * Interval('P8')
         return itertools.islice(_gen(), 0, stop)
 
     def pitches_below(self, pitch, stop=None,
@@ -713,13 +713,13 @@ class Chord(object):
             maxinterval(Interval or int, optional): :meth:`degrees` の
                 同名の引数と同じ意味を持ちます。
         """
-        pitches = sorted({-(math.floor((p - pitch) / 12) + 1) * 12 + p
-                          for p in self.pitches(maxinterval)}, reverse=True)
+        pitches = sorted({-(math.floor((p - pitch) / 12) + 1) * Interval('P8')
+                          + p for p in self.pitches(maxinterval)}, reverse=True)
 
         def _gen():
             for k in itertools.count():
                 for p in pitches:
-                    yield p - k * 12
+                    yield p - k * Interval('P8')
         return itertools.islice(_gen(), 0, stop)
 
     # Now, use chroma_profile(c.pitches())
