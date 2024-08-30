@@ -1,5 +1,41 @@
 # coding:utf-8
 """
+This module defines percussion instrument names assigned to each note number
+as defined by General MIDI.
+
+The following two constants define the relationship between percussion
+instrument names and note numbers.
+
+    - ``DRUMS``: A map (dict) from note numbers (int) to percussion names (str)
+    - ``ALIASES``: A list of 2-tuples consisting of an alias (str) and
+      the original percussion name (str).
+
+In addition, for each percussion instrument, a function is defined that can
+be used in place of the :func:`.note` function, with the percussion name
+as its name.
+Such a function calls :func:`.note` with the note number of the corresponding
+percussion instrument as the first argument, and the calling arguments (if any)
+as the second and further arguments.
+Moreover, a constant whose name is 'N_percussion_name' and whose value
+is its note number is defined for each percussion instrument (also for
+aliases).
+
+Examples:
+    >>> gm.drums.DRUMS[36]
+    'BassDrum1'
+    >>> gm.drums.BassDrum1()
+    EventList(duration=480, events=[
+        NoteOnEvent(t=0, n=36, v=80, tk=1, ch=1, noteoff=(+480)),
+        NoteOffEvent(t=480, n=36, nv=None, tk=1, ch=1)])
+    >>> gm.drums.BD(v=50)
+    EventList(duration=480, events=[
+        NoteOnEvent(t=0, n=36, v=50, tk=1, ch=1, noteoff=(+480)),
+        NoteOffEvent(t=480, n=36, nv=None, tk=1, ch=1)])
+    >>> mml("ch=10 $BD() r $SD() r").play()
+    >>> gm.drums.N_BD
+    36
+"""
+"""
 このモジュールには、General MIDI で定められている各ノート番号に
 割り当てられて打楽器名が定義されています。
 
@@ -11,7 +47,8 @@
 さらに、各打楽器名をその名前とした、:func:`.note` 関数のかわりに使用できる
 関数が定義されています。これらの関数は、該当する打楽器のノート番号を第1引数、
 呼んだ際の引数を（もしあれば）第2引数以降として :func:`.note` を呼び出します。
-また、'N_打楽器名' という名前でノート番号を値とした定数も定義されています。
+また、'N_打楽器名' という名前でノート番号を値とした定数も定義されて
+います (別名についても同様)。
 
 Examples:
     >>> gm.drums.DRUMS[36]

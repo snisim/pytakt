@@ -1,5 +1,9 @@
 # coding:utf-8
 """
+This module defines the Pitch class, the Interval class, the Key class,
+and utility functions for note numbers.
+"""
+"""
 このモジュールには、Pitchクラス, Intervalクラス、Keyクラス、
 及びノート番号についてのユーティリティ関数が定義されています。
 """
@@ -16,6 +20,16 @@ __all__ = ['chroma', 'octave', 'chroma_profile', 'Pitch', 'Interval', 'Key']
 
 def chroma(note_number) -> int:
     """
+    Given a MIDI note number, this function returns the chroma value
+    (aka pitch class), which is an integer between 0 and 11 where C is 0,
+    C# is 1, D is 2, ..., and B is 11.
+
+    Args:
+        note_number(int or float):
+            MIDI note number; if it is a float, it is first rounded to
+            an integer before calculation.
+    """
+    """
     MIDIノート番号からクロマ値(ピッチクラスとも言い、Cを0, C#を1,
     Dを2, ..., Bを11とした0〜11の整数)を計算して返します。
 
@@ -28,6 +42,15 @@ def chroma(note_number) -> int:
 
 def octave(note_number) -> int:
     """
+    Given a MIDI note number, this function returns the octave number
+    (an integer where 4 represents the octave starting from the middle C).
+
+    Args:
+        note_number(int or float):
+            MIDI note number; if it is a float, it is first rounded to
+            an integer before calculation.
+    """
+    """
     MIDIノート番号からオクターブ番号（中央ハから始まるオクターブを4とした整数）
     を計算して返します。
 
@@ -39,6 +62,22 @@ def octave(note_number) -> int:
 
 
 def chroma_profile(pitches) -> List[int]:
+    """
+    Given a list of MIDI note numbers or a score by `pitches`, it returns
+    a list of 12 integers, with the frequency of occurrence recorded for each
+    chroma value (pitch class).
+
+    Args:
+        pitches(iterable of Pitch or int, or Score):
+            Either an iterable of integers representing MIDI note numbers
+            or a acore object.
+
+    Examples:
+        >>> chroma_profile([C4, Bb5])
+        [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0]
+        >>> chroma_profile(readsmf('menuet.mid'))
+        [20, 5, 33, 0, 14, 0, 19, 48, 0, 30, 0, 35]
+    """
     """
     `pitches` で与えられたピッチの列もしくはスコアに対して、クロマ値
     (ピッチクラス) ごとに出現頻度を計上した12要素のリストを返します。
@@ -89,6 +128,94 @@ _ENH_HEURISTIC_F = (0, 1, 0, 1, 1, 0, 1, 0, 1, 1, 1, 1)
 
 class Pitch(int):
     """
+    A class for objects that represent note pitches.
+    It is inherited from the 'int' class, and therefore the objects can
+    behave as integers representing MIDI note numbers, but
+    differ in that they have the 'sf' attribute, which is additional
+    information about enharmonics.
+
+    Attributes:
+        sf (int): Enharmonics information (sharp-flat), indicating the number
+            of sharps/flats, including those due to key signatures in
+            the score. It is one of 2, -1, 0, 1, and 2, where a positive value
+            indicates the number of sharps and a negative value indicates the
+            number of flats. For example, if the object has 61 as an integer
+            value (i.e., the MIDI note number is 61), it represents the C#4
+            note pitch if sf is 1, and represents Db4 if sf is -1.
+
+    Args:
+        value(int, str, or Pitch): Either an integer, a Pitch object, or
+            a string representing the pitch. If it is an integer, its value is
+            the MIDI note number; if it is a Pitch, its integer value is
+            the MIDI note number. The pitch can also be specified by a string
+            consisting of the following characters.
+
+            * 'A' to 'G' for pitch name (lowercase letters are also acceptable;
+              ``B`` represents an 11 semitones higher pitch than ``C``)
+            * '#', 's', or '+' for sharps (two at most, to be placed after the
+              pitch name)
+            * 'b', 'f', or '-' for flats (two at most, after the ptich name)
+            * '%' or 'n' for natural (after the pitch name)
+            * '0' to '9' for octave number (optional, after the note name;
+              '4' for the octave starting from the middle C)
+            * '^' or a single quote for octave up
+            * '_' or ',' for octave down
+
+            The value of the `key` argument is taken into account when
+            converting strings to note numbers.
+        sf(int, optional): The value of the sf attribute. If specified,
+            the value becomes the sf attribute value. If not specified, it is
+            determined by the following rules.
+
+            * If `value` is a Pitch, its sf information is copied.
+            * If `value` is int, it is guessed considering the value of the
+              `key` argument.
+            * If `value` is str, it is determined from the accidental symbols
+              in the string and the value of the `key` argument.
+        key(Key, int, or str, optional): Information about the key referred to
+            when `value` is int or str. It should be a Key object or the first
+            argument of the Key() constructor. Default is C major.
+        octave(int, optional): Octave value when `value` is str and
+            the string does not contain an octave number.
+
+    Examples:
+        >>> Pitch(61)   # MIDI note number 61
+        Cs4             # Equivalent to Pitch(61, 1)
+        >>> Pitch(61, -1)
+        Db4
+        >>> Pitch(61, key='Db major')
+        Db4
+        >>> Pitch(C4, 1)
+        Bs3
+        >>> Pitch('C#4')
+        Cs4
+        >>> Pitch('_C', key='e major')
+        Cs3
+        >>> Pitch('Cn', key=3, octave=5)
+        C5
+        >>> Db4 + 2
+        63
+
+    .. rubric:: Pitch Constants
+
+    Constants with Pitch object values are predefined from 'C0' to 'B9',
+    each optionaly with s (sharp), ss (double sharp), b (flat), and bb (double
+    flat) (e.g., Ds5, Bbb6).
+    These values are equal to those where the constant names are passed as
+    strings to the Pitch() constructor.
+
+    .. rubric:: Arithmetic Rules
+
+    * Comparison between Pitch objects (equality and order comparison) is
+      performed only by the note number. The value of sf has no effect on the
+      result of the comparison. For example, Cs4 == Db4 is true.
+    * The result of (Pitch - Pitch) will be an Interval.
+    * The result of (Pitch + Interval), (Interval + Pitch), or
+      (Pitch - Interval) will be a Pitch, and sf will be calculated
+      correctly as long as it is within the range +-2.
+    * All other operations will be performed as 'int' type.
+    """
+    """
     音高を表すオブジェクトのクラスです。intクラスを継承していて、
     MIDIノート番号を表す整数と同じように振る舞うことができます。
     ただし、sf属性という異名同音に関する付加情報を持つ点において、
@@ -103,9 +230,9 @@ class Pitch(int):
              C#4音を表し、sfが-1であればDb4音を表します。
 
     Args:
-        value(int, str, or Pitch): MIDIノート番号、および省略時のsf属性値を
-            決める値。
-            intならその値、Pitchならその整数値がMIDIノート番号となります。
+        value(int, str, or Pitch): 整数、Pitchオブジェクト、もしくは音高を
+            表す文字列。整数ならその値、Pitchならその整数値がMIDIノート番号
+            となります。
             また、以下の文字から構成された文字列によって音高を指定できます。
 
             * 音名を表す 'A' から 'G' (小文字でも可。
@@ -247,12 +374,38 @@ class Pitch(int):
         return Pitch(self)
 
     def natural(self) -> 'Pitch':
+        """ Returns a Pitch object of the natural note (note where sharps and
+        flats are removed).
+        """
         """ 幹音（シャープ、フラットのない音）の Pitchオブジェクトを返します。
         """
         return Pitch(self - _SFTBL[self.sf + 2][chroma(self)], 0)
 
     def tostr(self, *, lossless=False, octave=True,
               pitch_strings='CDEFGAB', sfn='sbn') -> str:
+        """ Returns a string representing the pitch (‘C4’, ‘Gbb6’, etc.).
+
+        Args:
+            lossless(bool): If False (default), a string created with
+                `pitch_strings` and `sfn` is always returned.
+                When True, it returns a string in the form of a constructor
+                call like 'Pitch(Cs4, 0)' if necessary, so that when the eval
+                function is applied, it reproduces the original Pitch
+                object exactly.
+            octave(bool, optional): If False, returns a string without an
+                octave number. Available only when lossless is False.
+            pitch_strings(sequence of str): A collection of strings indexable
+                from 0 to 6 used for pitch names. pitch_strings[0], ...,
+                pitch_strings[6] correspond to the strings for the C, ..., B,
+                respectively.
+            sfn(sequence of str): A collection of strings indexable from
+                0 to 2 (or 1) that are used for accidentals.
+                sfn[0] is the string for a sharp, sfn[1] is the string for
+                a flat, and sfn[2] is currently unused.
+
+        Returns:
+            Result string
+        """
         """ 音高を表す文字列('C4', 'Gbb6' など)に変換します。
 
         Args:
@@ -292,6 +445,32 @@ class Pitch(int):
 
     def fixsf(self, key, set_sf_for_naturals=False,
               enh='heuristic') -> 'Pitch':
+        """
+        Returns a new Pitch object with the value of the sf attribute modified
+        as appropriate for the key `key`.
+        The original sf value behaves as a hint if it is non-zero.
+
+        Args:
+            key(Key, int, or str): a key (an object of the Key class, or the
+                first argument of the Key() constructor)
+            set_sf_for_naturals(bool): If true, sets sf to 1 or -1 (opposite
+                to signs in the key signature) for cases that need a natural
+                sign when notated (e.g., D for the Db major key).
+            enh(str): undocumented
+
+        Returns:
+            a new Pitch object
+
+        Examples:
+            >>> Dbb4.fixsf('C major')
+            C4
+            >>> Ds4.fixsf('Eb major')
+            Eb4
+            >>> Pitch(Fs4, 0).fixsf('C major')
+            Fs4
+            >>> Pitch(D4, -1).fixsf('Db major')  # -1 is a hint
+            Ebb4
+        """
         """sf属性の値を調`key` にふさわしいように修正した新しいPitch
         オブジェクトを返します。
         元のsfの値は、それが0以外の整数だった場合、ヒントとして働きます。
@@ -373,12 +552,25 @@ class Pitch(int):
             raise ValueError("Invalid 'enh' value")
 
     def freq(self) -> float:
-        """ A=440Hzおよび平均律を仮定したときの周波数を返します。 """
+        """ Returns the frequency assuming A4=440Hz and equal temperament. """
+        """ A4=440Hzおよび平均律を仮定したときの周波数を返します。 """
         return 440.0 * (2 ** ((self - 69) / 12))
 
     @staticmethod
     def from_freq(freq, sf=None, key=0) -> 'Pitch':
-        """ A=440Hzおよび平均律を仮定したときの周波数から、それに最も
+        """ Constructs a Pitch object that is closest to the frequency `freq`
+        assuming A4=440Hz and equal temperament.
+
+        Args:
+            freq(float): frequency
+            sf(int, optional):
+                Has the same meaning as the sf argument of the Pitch()
+                constructor.
+            key(Key, int, or str, optional):
+                Has the same meaning as the key argument of the Pitch()
+                constructor.
+        """
+        """ A4=440Hzおよび平均律を仮定したときの周波数から、それに最も
         周波数の近いPitchオブジェクトを構築します。
 
         Args:
@@ -408,8 +600,77 @@ _SEMITONES_TO_DS = (0, 1, 1, 2, 2, 3, 3, 4, 5, 5, 6, 6)
 
 class Interval(int):
     """
-    音程を表すオブジェクトのクラスです。intクラスを継承していて、
-    半音数を表す整数と同じように使用することができます。符号つきであり、
+    A class for objects representing intervals (difference between two
+    pitches). It is inherited from the 'int' class and therefore the objects
+    can behave as integers representing semitones. It is signed, i.e., it also
+    represents negative intervals.
+
+    Attributes:
+        ds(int): Signed distance on the staff.
+            This is one less than the number of degrees, e.g., 2 for
+            third intervals. Negative for negative intervals.
+
+    Args:
+        value(str or int): When it is a string, it specifies the interval like
+            the following:
+
+                * 'P1' -- perfect 1st degree, 'm2' -- minor 2nd degree,
+                  'M2' -- major 2nd degree, 'm3' -- minor 3rd degree,
+                  'M3' -- major 3rd degree, 'P4' -- perfect 4th degree,
+                  'P5' -- perfect 5th degree, ...
+                * 'A1' -- augmented 1st degree, 'A2' -- augmented 2nd degree,
+                  'A3' -- augmented 3rd degree, ...
+                * 'd2' -- diminished 2nd degree,
+                  'd3' -- diminished 3rd degree, ...
+                * 'AA1' -- double-argmented 1st degree, ...
+                * 'dd3' -- double-diminished 3rd degree, ...
+                * 'A' and 'd' can be further increased.
+
+            When it is an integer, it specifies the interval by semitones.
+        ds(int, optional): When `value` is an integer, the value of the ds
+            attribute must be specified by this argument.
+
+    .. rubric:: Arithmetic Rules
+
+    * Comparison between Interval objects (equality and order comparisons) is
+      performed only be semitones. The value of the ds attribute has no effect
+      on the result of the comparison. For example,
+      Interval('A4') == Interval('d5') is true.
+    * Sign inversion of an Interval inverts the signs of both the semitone and
+      ds values.
+    * The result of adding two Interval objects will be an Interval where
+      the two intervals are stacked together (the semitones and ds values are
+      added to each).
+    * The subtraction (x-y) between Interval objects is equivalent to x+(-y).
+    * Multiplication of an Interval and an integer results in an Interval
+      where each of the semitone and ds values is multiplied by the integer.
+    * The result of a remainder operation (x % y) between Interval objects is
+      an Interval, which is equivalent to x - (int(x) // int(y)) * y.
+    * For operations between Interval and Pitch, see the operation rules of
+      the Pitch class.
+    * All other operations will be performed as 'int' type.
+
+    Examples:
+        >>> B4 - F4
+        Interval('A4')
+        >>> C4 + Interval('d5')
+        Gb4
+        >> Interval('A4') + Interval('d5')
+        Interval('P8')
+        >> Interval('P8') - Interval('M3')
+        Interval('m6')
+        >>> G5 - C4
+        Interval('P12')
+        >>> Interval('P12') % Interval('P8')
+        Interval('P5')
+        >>> int(Interval('A4'))
+        6
+        >>> Interval('A4') + 1
+        7
+    """
+    """
+    音程(2つの音高の差)を表すオブジェクトのクラスです。intクラスを継承して
+    いて、半音数を表す整数と同じように使用することができます。符号つきであり、
     負の音程も表現します。
 
     Attributes:
@@ -612,6 +873,35 @@ _KEYSIG_TAB = (0, -5, 2, -3, 4, -1, 6, 1, -4, 3, -2, 5)
 
 class Key(object):
     """
+    A class for objects that represent keys.
+
+    Attributes:
+        signs(int): Its absolute value represents the number of signs in
+            the key signature (usually 0-7, up to 11 when extended), and
+            it is positive for sharps and negative for flats.
+        minor(int): 0 for major keys, 1 for minor keys
+
+    Args:
+        keydesc(int, str, or Key): If it is an integer, it directly specifies
+            the value of the signs attribute.
+            If it is a string, the key is specified by a string
+            matched by the regular expression below. It is case-insensitive.
+
+            ``[A-G][#bsf]?[- ]*(major|minor)``
+
+            If it is a Key object, the constructor acts as a copy constructor.
+        minor(int, optional):
+            If `keydesc` is an integer, it specifies the value of the 'minor'
+            attribute.
+            Ignored if `keydesc` is any other type.
+        extended(bool, optional):
+            If True, then uncommon keys such as 'G# major' are allowed.
+
+    Examples:
+        ``Key('C major')  Key('Eb-minor')  Key(-3)  Key(3,1)``
+
+    """
+    """
     調を表すオブジェクトのクラスです。
 
     Attributes:
@@ -678,6 +968,23 @@ class Key(object):
 
     def getsf(self, note_number) -> int:
         """
+        Given a note number, returns the number of sharps/flats implied
+        by the key signature.
+
+        Args:
+            note_number(int): MIDI note number
+
+        Returns:
+            An integer that, if it is positive, means the number of sharps, and
+            if it is negative, its absolute value means the number of flats.
+
+        Examples:
+            >>> Key('G-major').getsf(F4)
+            1
+            >>> Key('G-major').getsf(Fs4)
+            0
+        """
+        """
         ノート番号が与えられたとき、その音に対して調号によって付く
         sharp/flatの数を返します。
 
@@ -700,6 +1007,17 @@ class Key(object):
 
     def is_scale_tone(self, note_number) -> bool:
         """
+        Given a note number, checks whether the note is on the scale implied
+        by the key (major scale for major keys, natural minor scale for minor
+        keys).
+
+        Args:
+            note_number(int): MIDI note number
+
+        Returns:
+            True if the note is on the scale, or False otherwise.
+        """
+        """
         ノート番号が与えられたとき、調の基準となっている音階(長調の場合は
         長音階、短調の場合は自然短音階)に含まれる音かどうかを調べます。
 
@@ -712,7 +1030,13 @@ class Key(object):
         return ((_KEY_TAB[self.signs % 24][1] >> chroma(note_number)) & 1) == 1
 
     def gettonic(self, octave=4) -> Pitch:
-        """調の主音を返します。
+        """
+        Returns the tonic (principal pitch) of the key.
+
+        Args:
+            octave(int): Octave number of the tonic to be returned.
+        """
+        """ 調の主音を返します。
 
         Args:
             octave(int): 返される主音のオクターブ番号
@@ -722,10 +1046,19 @@ class Key(object):
 
     @staticmethod
     def from_tonic(tonic, minor=0, extended=False) -> 'Key':
+        """
+        Creates a Key object from the pitch of its tonic.
+
+        Args:
+            tonic(Pitch or int): Pitch of the tonic
+            minor(int, optional): 0 for major, 1 for minor
+            extended(bool, optional):
+                If True, uncommon keys are allowed.
+        """
         """主音を与えて、Keyオブジェクトを生成します。
 
         Args:
-            tonic(Pitch or int): 主音
+            tonic(Pitch or int): 主音の音高
             minor(int, optional): 長調のとき0、短調のとき1
             extended(bool, optional):
                 Trueなら一般的に使用されない調も許容します。

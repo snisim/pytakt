@@ -1,5 +1,8 @@
 # coding:utf-8
 """
+This module defines the classes related to chord symbols.
+"""
+"""
 このモジュールには、コードシンボルに関連するクラスが定義されています。
 """
 # Copyright (C) 2023  Satoshi Nishimura
@@ -36,9 +39,9 @@ _CHORD_KIND_DICT = {
     'minor-sixth': {1: (0,), 3: (-1,), 5: (0,), 6: (0,)},
     'major-minor': {1: (0,), 3: (-1,), 5: (0,), 7: (1,)},
     'major-ninth': {1: (0,), 3: (0,), 5: (0,), 7: (1,), 9: (0,)},
-    'major-11th':  {1: (0,), 3: (0,), 5: (0,), 7: (1,), 9: (0,), 11: (0,)},
-    'major-13th':  {1: (0,), 3: (0,), 5: (0,), 7: (1,), 9: (0,), 11: (0,),
-                    13: (0,)},
+    'major-11th': {1: (0,), 3: (0,), 5: (0,), 7: (1,), 9: (0,), 11: (0,)},
+    'major-13th': {1: (0,), 3: (0,), 5: (0,), 7: (1,), 9: (0,), 11: (0,),
+                   13: (0,)},
     'minor-ninth': {1: (0,), 3: (-1,), 5: (0,), 7: (0,), 9: (0,)},
     'minor-11th': {1: (0,), 3: (-1,), 5: (0,), 7: (0,), 9: (0,), 11: (0,)},
     'minor-13th': {1: (0,), 3: (-1,), 5: (0,), 7: (0,), 9: (0,), 11: (0,),
@@ -97,7 +100,7 @@ _ALIAS_DICT = {
     'mM13': ('mM7', (9, 11, 13)),
     'aug9': ('aug7', (9,)),
     'aug11': ('aug7', (9, 11)),
-    'aug13':  ('aug7', (9, 11, 13)),
+    'aug13': ('aug7', (9, 11, 13)),
     'dim9': ('dim7', (9,)),
     'dim11': ('dim7', (9, 11)),
     'm9b5': ('m7b5', (9,)),
@@ -155,6 +158,159 @@ _CHORD_BCP = [sum(1 << chroma(_deg2semitones(num) + sf[0])
 
 class Chord(object):
     """
+    This is a class for objects representing chord symbols used in jazz,
+    popular music, etc. It is based on the MusicXML representation of chords
+    in the <harmony> element, although some chord types and information
+    such as fretboard display are omitted.
+
+    Attributes:
+        kind(str): One of the following strings indicating the type of the
+            chord. For the meaning of each, see **Description of Chord Names**
+            below and also the documents on the 'kind' entry in MusicXML's
+            <harmony> element <https://www.w3.org/2021/06/musicxml40/\
+musicxml-reference/data-types/kind-value/>`.
+
+            'major', 'major-sixth', 'major-seventh', 'major-ninth',
+            'major-11th', 'major-13th', 'major-minor',
+            'minor', 'minor-sixth', 'minor-seventh', 'minor-ninth',
+            'minor-11th', 'minor-13th',
+            'dominant', 'dominant-ninth', 'dominant-11th', 'dominant-13th',
+            'augmented', 'augmented-seventh',
+            'diminished', 'diminished-seventh', 'half-diminished',
+            'suspended-fourth', 'suspended-second', 'power'
+        root(Pitch or int): Pitch of the chord root note.
+            Its octave is also meaningful.
+        bass(Pitch, int, or None): Pitch of the bass note of the chord.
+            If None, it is assumed to be the same as `root`.
+        modifications(list of (str, int, int)):
+            Represents the additions, alternations, and omissions of notes,
+            corresponding to the <degree> element in MusicXML.
+            Each element of the list is a tuple of length 3. The first item
+            in each tuple is a string that is one of 'add', 'alter', and
+            'subtract'. The second item is an integer representing the
+            degrees from the root note. The third item is an integer
+            representing the change in semitones from the base pitch.
+            The base pitch means the pitch on the Mixolydian scale in the case
+            of an added note, or the pitch of the component note of the chord
+            specified by the `kind` element in the case of an altered note.
+
+            Example: The C7b9 chord has kind='dominant', root=C4, and
+            modifications=[('add', 9, -1)].
+
+    Args:
+        name(str, optional):
+            Specifies a chord by the chord name defined below. If this
+            argument is None, the `kind` and `root` arguments must be
+            specified.
+        kind(str, optional): Specifies the 'kind' attribute.
+            If already specified by the chord name, it will be overridden.
+        root(pitch or int, optional): Specifies the 'root' attribute.
+            If already specified by the chord name, it will be overridden.
+        bass(Pitch or int, optional): Specifies the 'bass' attribute.
+            If already specified by the chord name, it will be overridden.
+        modifications(iterable of (str, int, int))
+            Specifies the 'modifications' attribute.
+            If it is already given by the chord name, tuple(s) specified
+            by this argument are appended to the attribute value.
+
+    .. rubric:: Description of Chord Names
+
+    This class uses the following string for describing a chord name.
+    Spaces, commas, and parentheses can be freely inserted between
+    each substring after <type>.
+
+        <root> <type> <modification>* [/<bass>]
+
+    <root> represents the pitch of the root note, consisting of the letters
+    'A' through 'G' (lowercase letters are also acceptable) followed by
+    at most two sharps '#' or flats 'b'.
+    When using chord names, the octave number is always 3. If you want to
+    specify a different octave, use the `root` argument.
+
+    <type> indicates the type of the chord (value of the 'kind' attribute)
+    shown in the following table (case-sensitive).
+
+        ==================  =====================  =======================
+        kind                <type>                 Component notes
+        ==================  =====================  =======================
+        major               ''                     1, 3, 5
+        major-sixth         '6'                    1, 3, 5, 6
+        major-seventh       'M7' 'maj7' 'Maj7'     1, 3, 5, 7
+        major-ninth         'M9' 'maj9' 'Maj9'     1, 3, 5, 7, 9
+        major-11th          'M11' 'maj11' 'Maj11'  1, 3, 5, 7, 9, 11
+        major-13th          'M13' 'maj13' 'Maj13'  1, 3, 5, 7, 9, 11, 13
+        major-minor         'mM7'                  1, b3, 5, 7
+        minor               'm'                    1, b3, 5
+        minor-sixth         'm6'                   1, b3, 5, 6
+        minor-seventh       'm7'                   1, b3, 5, b7
+        minor-ninth         'm9'                   1, b3, 5, b7, 9
+        minor-11th          'm11'                  1, b3, 5, b7, 9, 11
+        minor-13th          'm13'                  1, b3, 5, b7, 9, 11, 13
+        dominant            '7'                    1, 3, 5, b7
+        dominant-ninth      '9'                    1, 3, 5, b7, 9
+        dominant-11th       '11'                   1, 3, 5, b7, 9, 11
+        dominant-13th       '13'                   1, 3, 5, b7, 9, 11, 13
+        augmented           'aug'                  1, 3, #5
+        augmented-seventh   'aug7'                 1, 3, #5, b7
+        diminished          'dim'                  1, b3, b5
+        diminished-seventh  'dim7'                 1, b3, b5, 6
+        half-diminished     'm7b5'                 1, b3, b5, b7
+        suspended-fourth    'sus4'                 1, 4, 5
+        suspended-second    'sus2'                 1, 2, 5
+        power               '5', 'power'           1, 5
+        ==================  =====================  =======================
+
+    In addition to these, the following strings (aliases) can be specified
+    for <type>. Each of these has the same meaning as the chord shown to the
+    right of the equal sign.
+
+        '7sus4' = 'sus4add7', '9sus4' = 'sus4(9)add7',
+        '7sus2' = 'sus2add7', 'mM11' = 'mM7(9,11)',
+        'mM13' = 'mM7(9,11,13)', 'aug9' = 'aug7(9)',
+        'aug11' = 'aug7(9,11)', 'aug13' = 'aug7(9,11,13)',
+        'dim9' = 'dim7(9)', 'dim11' = 'dim7(9,11)',
+        'm9b5' = 'm7b5(9)', 'm11b5' = 'm7b5(9,11)', 'm13b5' = 'm7b5(9,11,13)',
+        '7alt' = '7(b9,#9,#11,b13)'
+
+    <modification> specifies an added, altered, or omitted note by one of
+    the followings. Multiple modifications are allowed.
+
+        'add<arbitrary number of #/b's><integer>',
+        'alter<arbitrary number of #/b's><integer>', 'omit<integer>',
+        'b5', '#5', 'M7', 'M9', 'M11', 'M13', 'b9', '9', '#9', '11', '#11',
+        '13', 'b13'
+
+    'add' specifies addition of a note, 'alter' specifies alternation of
+    a note, and 'omit' specifies omission of a note. Other modifications
+    are treated as alternations if the designated degree is included in the
+    base chord defined by <type>, and as additions otherwise.
+    'M9', 'M11', and 'M13' are equivalent to 'M7,9', 'M7,9,11', and
+    'M7,9,11,13', respectively.
+
+    /<bass> specifies the bass note (may be omitted). It is to be specified in
+    the same way as <root>.
+
+    If there is ambiguity in the decomposition of the string into <root>,
+    <type>, and each <modification>, the first (left) element is assigned the
+    longest string possible (so-called the greedy rule).
+    For example, 'Ab9' is interpreted as a dominant-ninth chord with the root
+    'Ab'. If you want a major chord with the root note 'A' plus the tension
+    of 'b9', put a separator between the two, e.g. 'A(b9)' or 'A b9'.
+    Similarly, 'Ab5' is interpreted as a power chord with the root note 'Ab',
+    and 'A(b5)' as an A major chord with the fifth note lowered by a semitone.
+
+    Examples of chord names: 'C7b9', 'C(9)', 'C69', 'C13#11', 'CaugM7', 'C#11',
+        'CdimM9', 'F#m7b5(11)', 'C7sus4b9', 'C7omit3add2', 'C7(alter#5,addb9)',
+        'C/E', 'FM7/G'
+
+    .. rubric:: Arithmetic Rules
+
+    * Equivalence comparison ('==') between Chord objects results in true
+      only when all the attribute values are equivalent.
+    * When ``c`` is a Chord object and ``p`` is a pitch, ``p in c`` is
+      equivalent to ``c.is_chord_tone(p)``.
+    """
+    """
     ジャズやポピュラー音楽などで使われるコードシンボルを表すオブジェクトの
     クラスです。これは、MusicXMLの <harmony> 要素におけるコードの表現法を
     ベースにしています。ただし、一部のコード種別や、フレットボード表示に
@@ -164,7 +320,7 @@ class Chord(object):
         kind(str): 下のいずれかの文字列によってコードの種別を表します。
             それぞれの意味については、下の **コード名の記述** の項、および
             MusicXMLの <harmony> 要素の `kind の項目 <https://www.w3.org/\
-2021/06/musicxml40/musicxml-reference/data-types/kind-value/>`_ を
+2021/06/musicxml40/musicxml-reference/data-types/kind-value/>` を
             参照して下さい。
 
             'major', 'major-sixth', 'major-seventh', 'major-ninth',
@@ -182,7 +338,7 @@ class Chord(object):
             されます。
         modifications(list of (str, int, int)): MusicXMLの <degree>
             要素に相当し、コードの追加音、変化音、および省略音を表します。
-            集合の各要素は、長さ3のタプルです。各タプルの第1項目は
+            リストの各要素は、長さ3のタプルです。各タプルの第1項目は
             'add' (追加音)、'alter' (変化音)、'subtract' (省略音) のいずれかの
             文字列です。第2項目は、根音からの度数を表す整数です。
             第3項目は、基準となるピッチからの半音単位の変化分を表す整数です。
@@ -277,7 +433,7 @@ class Chord(object):
     'add' は追加音、'alter' は変化音、'omit' は省略音の指定です。それ以外
     の <modification> は、指定された度数が <type> で定まるベースコードに
     含まれていれば変化音、そうでなければ追加音として扱われます。
-    'M9', 'M11' 'M13' はそれぞれ、'M7,9 ', 'M7,9,11', 'M7,9,11,13' と等価です。
+    'M9', 'M11' 'M13' はそれぞれ、'M7,9', 'M7,9,11', 'M7,9,11,13' と等価です。
 
     /<bass> ばバス音を指定します（省略可）。指定方法は <root> と同じです。
 
@@ -286,7 +442,7 @@ class Chord(object):
     いわゆる greedy ルール）。
     例えば、'Ab9' は、根音が 'Ab' の dominant-ninth コードと解釈されます。
     根音が 'A' の major コードに 'b9' のテンションを付加したものとしたい
-    場合は、'A(b9)' のように間に区切りの文字を入れてください。
+    場合は、'A(b9)' や 'A b9' のように間に区切りの文字を入れてください。
     同様に、'Ab5' は根音が 'Ab' のパワーコード、'A(b5)' は A majorコードの
     5度音を半音下げたコードと解釈されます。
 
@@ -339,6 +495,10 @@ class Chord(object):
         return self.is_chord_tone(pitch)
 
     def copy(self) -> 'Chord':
+        """
+        Returns a duplicated Chord object. The 'modifications' attribute
+        value is duplicated as a list.
+        """
         """
         複製されたChordオブジェクトを返します。modifications属性はリスト
         としての複製が行われます。
@@ -444,6 +604,10 @@ class Chord(object):
                             (name[:pos], name[pos:]))
 
     def name(self) -> str:
+        """ Returns the chord name. Passing this chord name to the constructor
+        creates an equivalent Chord object except for the octave numbers of
+        the root note and bass note.
+        """
         """ コード名を返します。このコード名をコンストラクタへ渡すと、
         根音やバス音のオクターブ番号を除いて等価な Chordオブジェクトが
         生成されます。
@@ -496,6 +660,29 @@ class Chord(object):
     #     指定された度数の音をすべて削除する。
 
     def degrees(self, maxinterval=None) -> Dict[int, Tuple[int]]:
+        """
+        Returns a dictionary (a dict object) representing the component tones
+        categorized by degrees.
+        The keys of the dictionary are integers representing degrees, and
+        the values of the dictionary are tuples of integers, each representing
+        the deviation (in semitones) from the pitch on the Mixolydian scale.
+        Bass notes are not taken into account. The keys in the dictionary and
+        the values in each tuple are not necessarily sorted.
+
+        Args:
+            maxinterval(Interval or int, optional): When an Interval object or
+                an integer representing the number of semitones is specified,
+                only the tones whose intervals from the root note are within
+                this value will be output. By default, all notes are output.
+
+        Examples:
+            >>> Chord('CM7').degrees()
+            {1: (0,), 3: (0,), 5: (0,), 7: (1,)}
+            >>> Chord('G7(b13,#9,b9)').degrees()
+            {1: (0,), 3: (0,), 5: (0,), 7: (0,), 13: (-1,), 9: (1, -1)}
+            >>> Chord('CM13').degrees(maxinterval=Interval('M7'))
+            {1: (0,), 3: (0,), 5: (0,), 7: (1,)}
+        """
         """
         度数ごとの構成音を表した辞書(dict)オブジェクトを返します。
         辞書のキーは度数を表す整数であり、辞書の値は整数のタプルで各整数は
@@ -552,6 +739,30 @@ class Chord(object):
         return result
 
     def simplify(self, use_extended_chords=True) -> 'Chord':
+        """
+        Returns a new Chord object, modified to minimize the number of
+        elements in the 'modifications' attribute, without changing the chord
+        component tones. The root note and bass note remain unchanged. In the
+        returned chord, the modifications attribute is sorted with the keys
+        of type, degrees, and amount of alternations in this order.
+
+        Args:
+            use_extended_chords(bool, optional):
+                If False, chords containing 9th, 11th, and 13th are not used
+                as the base chord (the chord specified by the 'kind'
+                attribute).
+
+        Examples:
+            >>> Chord('C7add9')
+            Chord(kind='dominant', root=C3, bass=None, modifications=[('add', \
+9, 0)])
+            >>> Chord('C7add9').simplify()
+            Chord(kind='dominant-ninth', root=C3, bass=None, modifications=[])
+            >>> Chord('C7add9').simplify().name()
+            'C9'
+            >>> Chord("C13(#11)").simplify(False).name()
+            'C7(9,#11,13)'
+        """
         """
         コード構成音を変えずに、modifications属性の要素数が最小になる
         ように修正した新しい Chord オブジェクトを返します。ルート音、
@@ -633,6 +844,25 @@ class Chord(object):
 
     def pitches(self, maxinterval=None) -> List[Pitch]:
         """
+        Returns a list of pitches for the chord component notes. When a bass
+        note is specified, it is included (In this case, other notes of the
+        same pitch class as the bass note are removed, and for other notes
+        lower than the bass note, their octaves are raised so that they are
+        higher than the bass note).
+
+        Args:
+            maxinterval(Interval or int, optional): Has the same meaning
+                as the argument of the same name in :meth:`degrees`.
+
+        Examples:
+            >>> Chord('Cdim7').pitches()
+            [C3, Eb3, Gb3, A3]
+            >>> Chord('G7/F').pitches()
+            [F3, G3, B3, D4]
+            >>> Chord('F/G').pitches()
+            [G3, A3, C4, F4]
+        """
+        """
         コード構成音のピッチのリストを返します。バス音が指定されている場合、
         それも含められます（このときバス音と同じピッチクラスの他の音は取り
         除かれ、また、バス音より低い他の音は、バス音より高くなるように
@@ -674,6 +904,22 @@ class Chord(object):
     def pitches_above(self, pitch, num=None,
                       maxinterval=None) -> Iterator[Pitch]:
         """
+        A generator function that yields the pitches of the chord component
+        tones above `pitch` (including the bass note and notes with
+        different octaves) in sequence.
+
+        Args:
+            pitch(Pitch or int): Base pitch
+            stop(int, optional): If specified, the output is limited to that
+                number of pitches.
+            maxinterval(Interval or int, optional): Has the same meaning
+                as the same name argument of :meth:`degrees`.
+
+        Examples:
+            >>> list(Chord('C7').pitches_above(C4, 5))
+            [E4, G4, Bb4, C5, E5]
+        """
+        """
         `pitch` より上にあるコード構成音 (bass音およびオクターブが異なる音を
         含む) のピッチを順に yield するジェネレータ関数です。
 
@@ -686,7 +932,7 @@ class Chord(object):
                 同名の引数と同じ意味を持ちます。
 
         Examples:
-            >>> list(Chord('C7').pitches_above(D4, 5))
+            >>> list(Chord('C7').pitches_above(C4, 5))
             [E4, G4, Bb4, C5, E5]
         """
         # 下の式は p を pitch+1 から始まる1オクターブ内に補正している。
@@ -701,6 +947,18 @@ class Chord(object):
 
     def pitches_below(self, pitch, num=None,
                       maxinterval=None) -> Iterator[Pitch]:
+        """
+        A generator function that yields the pitches of the chord component
+        tones below `pitch` (including the bass note and notes with
+        different octaves) in sequence.
+
+        Args:
+            pitch(Pitch or int): Base pitch
+            stop(int, optional): If specified, the output is limited to that
+                number of pitches.
+            maxinterval(Interval or int, optional): Has the same meaning
+                as the same name argument of :meth:`degrees`.
+        """
         """
         `pitch` より下にあるコード構成音 (bass音およびオクターブが異なる音を
         含む) のピッチを順に yield するジェネレータ関数です。
@@ -748,9 +1006,17 @@ class Chord(object):
 
     def is_chord_tone(self, pitch, maxinterval=None) -> bool:
         """
-        コード構成音に `pitch` と同じピッチクラスの音が含まれていれば
-        真を返し、そうでなければ偽を返します。
-        なお、pitch ``in`` self は self.is_chord_tone(pitch) と等価です。
+        Returns True if the chord component notes (including the bass note)
+        contains a note of the same pitch class as `pitch`, or False
+        otherwise.
+
+        Args:
+            maxinterval(Interval or int, optional): Has the same meaning
+                as the same name argument of :meth:`degrees`.
+        """
+        """
+        コード構成音 (バス音を含む) に `pitch` と同じピッチクラスの音が含ま
+        れていれば真を返し、そうでなければ偽を返します。
 
         Args:
             maxinterval(Interval or int, optional): :meth:`degrees` の
@@ -766,6 +1032,11 @@ class Chord(object):
         return False
 
     def demo(self, **kwargs) -> 'Score':
+        """ Returns a score of the demo performance for the chord.
+
+        Args:
+            kwargs: Additional arguments passed to the :func:`note` function
+        """
         """ コードについてのデモ演奏のスコアを返します。
 
         Args:
@@ -779,10 +1050,30 @@ class Chord(object):
     @staticmethod
     def from_chroma_profile(chroma_profile, bass=None) -> 'Chord':
         """
+        Returns a chord inferred from the chroma profile (see
+        :func:`.chroma_profile`). Only the truth value of each element
+        in the chroma profile is significant. If all the elements are false
+        in the chroma profile, an exception is raised. [Experimental]
+
+        Args:
+            bass(Pitch or int, optional): Specifies the bass note of the chord.
+                This is not only set as the bass note in the output chord,
+                but also acts as a hint for the root note when guessing.
+
+        Examples:
+            >>> cp = [1, 0, 1, 0, 1, 1, 0, 0, 0, 1, 0, 0]
+            >>> Chord.from_chroma_profile(cp).name()
+            'Dm9'
+            >>> Chord.from_chroma_profile(cp, bass=F3).name()
+            'FM7(13)'
+            >>> Chord.from_chroma_profile(cp, bass=C3).name()
+            'Dm9/C'
+        """
+        """
         クロマプロファイル (:func:`.chroma_profile` を参照) から推測した
         コードをを返します。クロマプロファイルの各要素はその真偽値のみが
         推測に利用されます。全要素が偽のクロマプロファイルを与えたときは
-        例外を送出します。
+        例外を送出します。[Experimental]
 
         Args:
             bass(Pitch or int, optional): コードのバス音を指定します。

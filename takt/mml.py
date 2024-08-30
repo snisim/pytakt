@@ -1,6 +1,10 @@
 # coding:utf-8
 """
-このモジュールには、カスタマイズ可能な MML (Music Macro Language) に
+This module defines functions related to the customizable extended
+MML (Music Macro Language).
+"""
+"""
+このモジュールには、カスタマイズ可能な拡張 MML (Music Macro Language) に
 関連した関数が定義されています。
 """
 # Copyright (C) 2023  Satoshi Nishimura
@@ -510,8 +514,220 @@ parser = None
 
 def mml(text, globals=None, locals=None) -> Score:
     """
-    引数 `text` の MML (Music Macro Language) 記述に従ったスコアを返します。
-    MML は文字列によって音楽フレーズを簡潔に表現します。
+    Returns a score described in `text` with an extended MML (Music Macro
+    Language).
+    MML allows concise representation of musical phrases by strings.
+
+    Args:
+        text(str): MML string
+        globals(dict, optional):
+            Global dictionary for Python variable and function names
+            contained in the MML string.
+            By default, this is the value of globals() at the time when
+            the mml() function is called.
+        locals(dict, optional):
+            Local dictionary for Python variable and function names
+            contained in the MML string.
+            By default, this is the value of locals() at the time when
+            the mml() function is called.
+
+    Examples:
+        >>> mml('eefg gfed ccde e.d/d*').play()
+        >>> mml('L8 G~rD G~rD GDGB ^D~rr ^C~rA ^C~rA ^CAF#A D~rr').play()
+        >>> mml("L8 o=5 key=-3 $tempo(60) _B G~~~ F G F~~ E~  _B G~ \
+{C Db C _B% C}/5 ^C~").play()
+        >>> mml("L8 {dr=30 E(L16) E(L=L8+L16) E(v+=5) E(dr=50 dt=10)} G/`> \
+G/!? G/ G/!? G3*").show(True)
+        >>> mml('[ceg]@@').play()  # Press Ctrl-C to stop
+        >>> rh = newcontext(tk=1)
+        >>> lh = newcontext(tk=2)
+        >>> mml(\"""
+        ... $tempo(160)
+        ... $prog(gm.Harpsichord)
+        ... [
+        ...    $rh: { ^D {G A B ^C}/  ^D G G }
+        ...    $lh: { [{_G* _A} _B*. D*.] _B*. }
+        ... ]
+        ... [
+        ...    $rh: { ^E ^{C D E F#}/  ^G G G }
+        ...    $lh: { C*. _B*. }
+        ... ]
+        ... \""").play()
+        >>> mml('ch=10 [{$BD() r $SD() r} $HH()@4]').play()
+
+    .. rubric:: Language Specification of This MML
+
+    The entire score described in this MML consists of a sequence of
+    **commands**. Each command contains one **primary command**, preceded by
+    optional **premodifiers** and followed by optional **postmodifiers**.
+    For example, ``CD#4^E`` consists of three commands, where ``C``, ``D``,
+    and ``E`` are the primary commands, ``#`` and ``4`` are postmodifiers
+    for ``D``, and ``^`` is a premodifier for ``E``.
+
+    Whitespaces (spaces, tabs, and newlines) may be inserted freely except
+    in the middle of identifiers, numbers, and multi-character operators or
+    before `b` meaning a flat.
+    From a semicolon (';') to the end of the line is considered as a comment
+    and may be inserted freely between commands.
+
+    .. rubric:: List of Primary Commands
+
+    The primary commands available in the default configuration are as follows.
+
+    ``A`` to ``G``, or ``a`` to ``g``
+        Generates a note with the note name, using the :func:`.note` function.
+        ``B`` represents an 11 semitones higher pitch than ``C``.
+        Lowercase letters can also be used, and have the same meaning as
+        uppercase letters. However, ``b`` means a flat when placed immediately
+        after an uppercase letter (or a double-flat when placed twice).
+        For example, the ``b`` in ``gab`` is a single B note, but the ``b`` in
+        ``G Ab`` means a flat.
+        The octave number is taken from the 'o' attribute of the context.
+    ``r`` or ``R``
+        A rest is inserted using the :func:`.rest` function.
+    ``L``\\ <integer>, ``L``\\ <integer>\\ ``DOT``, \
+``L``\\ <integer>\\ ``DOTDOT``
+        Sets the note value (note length). <integer> can be 1, 2, 4, 8, 16,
+        32, 64, or 128.
+        Execution of this command will set the L attribute value in the context
+        to the value of the constant of the same name defined in the
+        :mod:`takt.constants` module. For example, ``L8`` makes
+        subsequent notes and rests eighth-note length.
+    <context attribute name> ``=`` <simple expression>
+        Changes the value of a context attribute (e.g. ``v=100``).
+        Only dt, tk, ch, v, nv, L, duoffset, du,durate, dr, o, and key are
+        available as context attribute names. See below for simple expressions.
+    <context attribute name> op\\ ``=`` <simple expression>
+        Equivalent to <context attribute name> ``=`` <context attribute name>
+        op <simple expression>, where op is one of the operators that can be
+        used in simple expressions.
+    ``{`` a sequence of zero or more commands ``}``
+        Executes the commands in the braces using another context copied,
+        and sequentially concatenates the results of scores.
+        This can be used to temporarily change the context attribute values,
+        e.g., in ``L4 C {L8 D E} F``, the D and E notes will be eighth notes,
+        but the F note will return to a quarter note.
+    ``[``A sequence of zero or more commands ``]``
+        Executes the commands in the brackets using another context copied,
+        and merges the results of scores to be played simultaneously.
+        For example, it can be used to represent chords, as in ``[CEG]``,
+        or multiple voices, as in ``[C* {FE}]``.
+    ``$``\\ <Python variable name>\\ ``:{`` a sequence of zero or more \
+commands ``}``
+        <Python variable name> is a variable whose value is a context,
+        The commands in the braces are executed using a copy of that context,
+        and the results of scores are concatenated sequentially.
+        <Python variable name> is a dot ('.') may contain.
+    ``$(``\\ <Python expression>\\ ``)`` and \
+``$``\\ <Python function name>\\ ``(``\\ <Python argument>\\ ``,`` ... ``)``
+        Both evaluate the string following ``$`` as Python code and insert
+        its value as a score (not inserted if it is None).
+        The <Python function name> may contain dots ('.').
+        Note that the names defined in the following modules can be used in
+        the MML string without specifying the package or module name:
+        takt.pitch, takt.sc, takt.constants, takt.gm.drums.
+
+    .. rubric:: Simple Expressions
+
+    <simple expression> is either an integer, a floating-point number,
+    a note-value constant (such as L4), a context attribute name, a simple
+    expression enclosed in parentheses, a Python expression enclosed in ``$(``
+    and ``)``, a Python function call following ``$``, or an expression that
+    combines these with the following operators: ``+``, ``-``, ``*``, ``/``,
+    ``//``, and ``%``.
+
+    .. rubric:: Premodifiers
+
+    The following premodifiers are available in the default configuration.
+    They can be used in commands other than note-value specification (e.g. L4)
+    and assignment commands.
+    Modification of context attribute values by modifiers is only valid for
+    the command being qualified, and does not affect the execution of
+    subsequent commands.
+
+    ``^``
+        Octave Up. Increases the value of the 'o' attribute of the context
+        by 1.
+    ``_``
+        Octave down. Decrease the value of the 'o' attribute of the context
+        by 1.
+
+    .. rubric:: Postmodifiers
+
+    The following postmodifiers are available by default.
+    They can be used in commands other than note-value specification (e.g. L4)
+    and assignment commands.
+    Modification of context attribute values by modifiers is only valid for
+    the command being qualified, and does not affect the execution of
+    subsequent commands.
+
+    <Integer>
+        Specifies the octave by number (4 being the octave containing the
+        middle C).
+    ``+`` or ``#``
+        A sharp. Raises the pitch by a semitone.
+    ``-``
+        A flat. Lowers the pitch by a semitone.
+    ``%`` natural.
+        Natural. Valid only if the value of the 'key' context attribute is
+        non-zero. It changes the pitch to the one with no sharps or flats.
+    ``'``
+        Octave up. Equivalent to ``^``.
+    ``,``
+        Octave down. Equivalent to ``_``.
+    ``*``
+        Doubles the note value.
+    ``/``
+        Multiplies the note value by 0.5.
+    ``/``\\ <integer>
+        Divides the note value by <integer>. Can be used to represent tuplets.
+    ``.``
+        Represents a dot in music notation; one multiples the note value by
+        a factor of 1.5, and two multiplies it by a factor of 1.75.
+    ``~``
+        Sums up multiple (possibly empty) note-value specifications.
+        For example, ``*~/`` multiplies the note value by 2.5, ``~`` by 2,
+        ``~~`` by 3, and ``~..`` means 2.75x.
+    :code:`\\``
+        Increases velocity by 10. Equivalent to ``(v+=10)``.
+    ``?``
+        Decreases velocity by 10. Equivalent to ``(v-=10)``.
+    ``!``
+        Multiplies the value of the 'dr' context attribute by 0.5,
+        meaning a so-called staccato. Equivalent to ``(dr*=0.5)``.
+    ``>``
+        Increases the value of the 'dt' context attribute by 30 ticks
+        (equivalent to 64th note), slightly delaying the timing in the
+        performance. Equivalent to ``(dt+=30)``.
+    ``<``
+        Decreases the value of the dt context attribute by 30 ticks
+        (equivalent to 64th notes), making the timing in the
+        performance slightly earlier. Equivalent to ``(dt-=30)``.
+    ``&``
+        Sets the duration of the score to 0 to make the performance overlapped
+        with subsequent performances.
+    ``@``\\ <integer>
+        Repeats the performance <integer> times. Equivalent to
+        ``|Repeat(``\\ <integer>\\ ``)``.
+    ``@@``
+        Repeats the performance infinitely. Equivalent to ``|Repeat()``.
+    ``(`` a sequence of zero or more commands ``)``.
+        In the context created by the target primary command of this modifier,
+        the commands in the sequence are executed before executing the
+        primary command.
+        Primarily used for the purpose of temporarily changing the context.
+        Example: ``C(v=30 dt+=10)``
+    ``:(``\\ <Python identifier>\\ ``=``\\ <Python expression>\\ ``,`` \
+... ``)``.
+        Temporarily changes an arbitrary context attribute.
+        Example: ``{CDE}:(user_attr=1)``
+    ``|``\\ <Python identifier>\\ ``(``\\ <Python arguments>\\ ``,`` ... ``)``
+        Apply effectors.
+        Example: ``{CDE}|Transpose('M2')``
+    """
+    """
+    引数 `text` の拡張 MML (Music Macro Language) 記述に従ったスコアを
+    返します。MML は文字列によって音楽フレーズを簡潔に表現します。
 
     Args:
         text(str): MML文字列
@@ -557,7 +773,7 @@ G/!? G/ G/!? G3*").show(True)
     ``4`` は ``D`` に対する後置修飾子、``^`` は ``E`` に対する前置修飾子です。
 
     空白文字(スペース、タブ、改行)は、識別子、数値、2文字以上からなる
-    演算子、およびフラットを表す `b` の前を除き、自由に挿入できます。
+    演算子の途中、およびフラットを表す `b` の前を除き、自由に挿入できます。
     セミコロン (';') から行の終わりまではコメントとみなされ、コマンドと
     コマンドの間に自由に挿入できます。
 
@@ -566,7 +782,7 @@ G/!? G/ G/!? G3*").show(True)
     デフォルト設定で使用可能な基本コマンドは以下の通りです。
 
     ``A`` ～ ``G`` または ``a`` ～ ``g``
-        :func:`.note` 関数によって指定された音名の音符を生成します。
+        :func:`.note` 関数によって、指定された音名の音符を生成します。
         ``B`` は ``C`` の長七度上の音を表します。
         小文字も使用でき、大文字と意味は同じです。ただし、``b`` は
         英大文字の直後に置かれた場合はフラット (2個置かれた場合はダブル
@@ -609,10 +825,9 @@ G/!? G/ G/!? G3*").show(True)
         ともに ``$`` に続く文字列を Pythonのコードとみなして評価し、その値を
         スコアとして挿入します (ただし、Noneの場合は挿入されません)。
         <Python関数名> はドット('.')を含んでいても構いません。
-        なお、次のモジュールで定義されている名前、および takt.gm モジュールを
-        表す 'gm' は、たとえ mml関数の外では直接参照できない場合でも、
-        MML文字列の中ではパッケージ名やモジュール名を指定せずに使えます:
-        takt.pitch, takt.sc, takt.constants, takt.gm.drums。
+        なお、次のモジュールで定義されている名前は、MML文字列の中では
+        パッケージ名やモジュール名を指定せずに使えます: takt.pitch, takt.sc,
+        takt.constants, takt.gm.drums。
 
     .. rubric:: 単純式
 
@@ -685,7 +900,8 @@ G/!? G/ G/!? G3*").show(True)
     ``@@``
         無限回演奏を繰り返します。``|Repeat()`` と等価です。
     ``(`` 0個以上のコマンドの列 ``)``
-        各コマンドを実行してから、修飾の対象となるコマンドを実行します。
+        修飾される基本コマンドが作成するコンテキストにおいて、
+        その基本コマンドを実行する前に、列に含まれる各コマンドを実行します。
         主に、一時的にコンテキストを変更する目的に使われます。
         例: ``C(v=30 dt+=10)``
     ``:(``\\ <Python識別子>\\ ``=``\\ <Python式>\\ ``,`` ... ``)``
@@ -745,6 +961,102 @@ def mmlconfig(translate=("", ""), *,
               accent_amount=None,
               timeshift_amount=None,
               staccato_amount=None) -> None:
+    """
+    Modifies the settings about the MML. When called without arguments,
+    the current settings are displayed.
+
+    The following settings can be changed with this function.
+
+    * Change of the character class
+        Each character (unicode character) belongs to one of the following
+        classes:
+
+        1. Reserved
+            The following characters are reserved and their class and function
+            cannot be changed.
+
+            L n ( ) [ ] { } = $ | & / \\\\ : ; @ digits whitespace-characters
+        2. Prefix character
+            A character that serves as a premodifier.
+        3. Suffix character
+            A character that serves as a postmodifier.
+        4. Other characters
+            Characters that can be used as primary commands.
+
+        Except for the reserved characters, the class of each character can
+        be changed.
+
+    * Change of the function assigned to a character
+        Any character that is not reserved can change its meaning.
+
+    * Change the meaning of the "<integer>" postmodifier
+        See the octave_number_suffix entry below.
+    * Change the amount of parameter change
+        See the entries for accent_amount, timeshift_amount, and
+        staccato_amount below.
+
+    Args:
+        translate((str, str), optional):
+            Given a tuple of two strings of equal length, to each
+            character in the first string, it assigns the function of the
+            corresponding character in the second string (a "no operation"
+            function if the character in the second string is ' ').
+            To disable a character (i.e., to raise an exception when the
+            character is used), specify some undefined character in the
+            second string.
+        add_prefixes(str, optional):
+            Changes the class of each character in the argument to
+            "prefix character".
+        add_suffixes(str, optional):
+            Changes the class of each character in the argument to
+            "suffix character".
+        del_prefixes(str, optional):
+            Changes the class of each character in the argument
+            from "prefix character" to "other character".
+        del_suffixes(str, optional):
+            Changes the class of each character in the argument
+            from "suffix character" to "other character".
+        actions(dict, optional):
+            Specify an action function for each character by giving a dict
+            object whose key is a character (single-string) and whose value
+            is a function (callable object). Please refer to the MMLAction
+            class in the "mml.py" source code for how to write action
+            functions.
+        octave_number_suffix(bool, optional):
+            Specifies the meaning of the <integer> postmodifier.
+            If True (default), it means the octave number.
+            If False, it means to set the note value to
+            that of the whole note divided by <integer>.
+        accent_amount(int or float, optional):
+            Sets the amount of velocity change in the velocity
+            increment/decrement modifiers (:code:`\\`` and ``?``
+            in standard configuration). (default value: 10)
+        timeshift_amount(ticks, optional):
+            Sets the amount of the change of the 'dt' context attribute value
+            in the time-shift modifiers (``<`` and ``>``
+            in standard configuration). (default value: 30)
+        staccato_amount(float or int, optional):
+            Sets the factor by which the 'dr' context attribute value is
+            multiplied in the staccato modifier (``!`` in standard
+            configuration). (default value: 0.5)
+
+    Examples:
+        The setting below allows the description of notes, rests, and
+        note-stretching operations with Japanese katakana and hiragana
+        characters (such notation is known as Sutoton notation)::
+
+            mmlconfig(translate=("ドレミファソラシッどれみふぁそらしっー",
+                      "CDEF GABrCDEF GABr~"),
+                      add_suffixes="ァぁー")
+
+        The configuration below redefines the ``^`` and ``_`` characters
+        as primary commands of octave up and down for subsequent notes::
+
+            mmlconfig(del_prefixes="^_",
+                      actions={'^': MMLAction.cmd_octaveup,
+                               '_': MMLAction.cmd_octavedown})
+
+    """
     """
     MMLに関する設定を行います。引数無しで呼ぶと、現在の設定を表示します。
 

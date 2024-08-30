@@ -4,7 +4,8 @@ pianoroll.py pitch.py pytakt.py sc.py scale.py score.py smf.py text.py \
 timemap.py utils.py gm/__init__.py gm/drums.py
 
 pycodestyle:
-	pycodestyle $(PYFILES) | fgrep -v -x -f pycodestyle.expect || true
+	pycodestyle $(PYFILES) | grep -v 'E402 module level' | \
+fgrep -v -x -f pycodestyle.expect || true
 	python3 tests/len79.py $(PYFILES)
 
 test:

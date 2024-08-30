@@ -1,5 +1,59 @@
 # coding:utf-8
 """
+This module defines functions for real-time MIDI input/output and timers.
+
+.. rubric:: Devices
+
+In Pytakt, devices to send MIDI messages (MIDI interface or application port)
+are called output devices, and devices to receive MIDI messages are called
+input devices. A list of available devices can be found with the
+:func:`show_devices` function. Each device is assigned an integer device
+number.
+
+There is a special device called the loopback device (not shown in
+:func:`show_devices`). The loopback device is an output device and moreover
+an input device, and can receive messages sent to them by itself.
+It is normally used for sending and receiving LoopBackEvent's, but can also be
+used for other events.
+
+To use a device, it must be opened in advance. However, the loopback device is
+always available and does not need to be opened.
+
+For input and output each, there is a currently selected device.
+The initial choice of this is platform specific. However, by setting the
+environment variables PYTAKT_OUTPUT_DEVICE and PYTAKT_INPUT_DEVICE to a string
+recognized by :func:`find_output_device` or :func:`find_input_device`, the
+initial choice can be changed.
+
+.. rubric:: Input and Output Queues
+
+Inside the module, there is a queue for storing messages, which are byte
+sequences converted from events with :meth:`.Event.to_message`, for input
+and output each. Each message is given a timestamp and a track number.
+When an event is sent to an output device via the :func:`queue_event` function,
+the event is converted to a message, placed in the output queue, and then
+kept until the sending time before it is actually sent to the device.
+Messages from input devices are first placed in the input queue, where they
+are kept until retrieved by the :func:`recv_event` function. There is no limit
+on the size of the queues.
+
+.. rubric:: Timer
+
+The module has a timer that indicates the time since the module was imported.
+The unit of time is the tick (a floating-point value equal to 1/480th of a
+quarter note), and the relationship between seconds and ticks is determined
+by two values: tempo (beats per minute, BPM) and tempo scale, with the
+following formula:
+
+    ticks = seconds * tempo * tempo_scale / 60 * 480
+
+By default, the tempo is set to 125 BPM and the tempo scale is set to 1,
+thus establishing the relationship 1 tick = 1 msec.
+Tempo can be changed dynamically by sending a :class:`.TempoEvent` to any of
+the output devices, and the tempo scale can be changed by calling the
+:func:`set_tempo_scale` function.
+"""
+"""
 このモジュールにはリアルタイムMIDI入出力、およびタイマのための関数が
 定義されています。
 
@@ -14,8 +68,8 @@ PytaktではMIDIメッセージの送信の対象となるもの（MIDIインタ
 (:func:`show_devices` では表示されません)。
 ループバックデバイスは出力デバイスかつ入力デバイスであり、
 送られたメッセージを自分自身で受け取ることができます。
-LoopBackEvent以外のイベントについても、そのメッセージ送受に
-ループバックデバイスを利用することができます。
+通常はLoopBackEventの送受に利用されますが、
+それ以外のイベントについて利用することも可能です。
 
 デバイスを使用するには予めオープンする必要があります。
 ただし、ループバックデバイスは常に使用可能で、オープンの必要はありません。
@@ -28,9 +82,9 @@ LoopBackEvent以外のイベントについても、そのメッセージ送受�
 
 .. rubric:: 入出力キュー
 
-モジュール内部には、入力と出力のそれぞれに、メッセージ (イベントを to_message
-メソッドで変換したバイト列) を蓄えるためのキューがあります。
-各メッセージにはタイムスタンプとトラック番号が付与されています。
+モジュール内部には、入力と出力のそれぞれに、メッセージ (イベントを
+:meth:`.Event.to_message` メソッドで変換したバイト列) を蓄えるためのキューが
+あります。各メッセージにはタイムスタンプとトラック番号が付与されています。
 :func:`queue_event` 関数によってイベントを出力デバイスへ送ると、イベントは
 メッセージに変換されたのちにまず出力キューへ置かれ、送出時刻に
 なるまで待ってから実際にデバイスへ送出されます。入力デバイスからのメッセージ
@@ -100,11 +154,13 @@ _loopback_count = itertools.count()
 
 
 def current_output_device() -> int:
+    """ Returns the device number of the currently selected output device. """
     """ 現在選択されている出力デバイスの番号を返します。 """
     return _output_devnum
 
 
 def current_input_device() -> int:
+    """ Returns the device number of the currently selected input device. """
     """ 現在選択されている入力デバイスの番号を返します。 """
     return _input_devnum
 
@@ -138,6 +194,35 @@ def _find_device(dev, devices):
 
 def find_output_device(dev) -> int:
     """
+    Get the output device number based on a device description.
+
+    Args:
+        dev(int, str, list, tuple): Device description. If it is an integer,
+            it is recognized as the device number. If it is a string
+            representing an integer, it is converted to an integer, which is
+            then recognized as the device number. For other forms of a string,
+            it means a device where the string matches all or part of its
+            device name (and whichever has the smallest device number if there
+            are multiple matched devices).
+            The string may be multiple device descriptions separated by
+            semicolons, in which case the first one whose existence is
+            confirmed is valid.
+            If the argument is a list or tuple where each element is an
+            integer or a string without a semicolon, it is examined starting
+            from the first element in the same manner as a single element,
+            and the first device whose existence is confirmed becomes valid.
+            If no device is found, an exception is raised.
+
+    Returns:
+        Output device number
+
+    Examples:
+        - ``find_output_device(1)``
+        - ``find_output_device('1')``
+        - ``find_output_device('TiMidity; MIDI Mapper')``
+        - ``find_output_device([2, 0])``
+    """
+    """
     デバイスの記述をもとに、出力デバイス番号を取得します。
 
     Args:
@@ -145,12 +230,12 @@ def find_output_device(dev) -> int:
             そのままデバイス番号になります。整数を表す文字列の場合は、それが
             整数に変換されてデバイス番号となります。それ以外の文字列の場合は、
             デバイス名の全部または一部がそれと一致するデバイス(複数ある場合は
-            デバイス番号の小さい方)のデバイス番号となります。文字列は
-            セミコロンで区切った複数のデバイス記述でも良く、その場合最初に
-            存在を確認できたものが有効になります。リストまたはタプルの場合、
-            各要素は整数またはセミコロンを含まない文字列であり、先頭から順番に
-            単独の場合と同じように調べられ、最初にデバイスの存在を確認できた
-            ものが有効になります。
+            デバイス番号の小さい方)を意味します。文字列はセミコロンで区切った
+            複数のデバイス記述でも良く、その場合最初に存在を確認できたものが
+            有効になります。リストまたはタプルの場合、各要素は整数または
+            セミコロンを含まない文字列であり、先頭から順番に単独の場合と同じ
+            ように調べられ、最初にデバイスの存在を確認できたものが有効になり
+            ます。
             存在を確認できるデバイスがなかった場合には、例外が送出されます。
 
     Returns:
@@ -166,11 +251,17 @@ def find_output_device(dev) -> int:
 
 
 def output_devices() -> List[str]:
+    """ Get a list of the device names of all the output devices. """
     """ すべての出力デバイスの名前のリストを取得します。 """
     return _cmidiio.output_devices()
 
 
 def set_output_device(dev) -> None:
+    """ Specifies `dev` as the currently selected output device.
+
+    Args:
+        dev: Device description recognized by :func:`find_output_device`.
+    """
     """ `dev` を　"現在選択されている出力デバイス" として指定します。
 
     Args:
@@ -181,6 +272,15 @@ def set_output_device(dev) -> None:
 
 
 def open_output_device(dev=None) -> None:
+    """
+    Open the output device `dev`.
+    This may take a little time depending on the device.
+
+    Args:
+        dev: Target output device. If None, the currently selected output
+            device is used; otherwise, the target device is the result of
+            calling :func:`find_output_device` with this as an argument.
+    """
     """ 出力デバイス `dev` をオープンします。
 
     デバイスによっては少し時間がかかる場合があります。
@@ -196,6 +296,13 @@ def open_output_device(dev=None) -> None:
 
 
 def close_output_device(dev=None) -> None:
+    """ Close the output device `dev`.
+
+    Args:
+        dev: Target output device. If None, the currently selected output
+            device is used; otherwise, the target device is the result of
+            calling :func:`find_output_device` with this as argument.
+    """
     """ 出力デバイス `dev` をクローズします。
 
     Args:
@@ -209,6 +316,12 @@ def close_output_device(dev=None) -> None:
 
 
 def is_opened_output_device(dev) -> bool:
+    """ Returns true if the output device `dev` is opened, or false otherwise.
+
+    Args:
+        dev: Device description that can be recognized by
+            :func:`find_output_device`.
+    """
     """ 出力デバイス `dev` がオープンされていれば True、そうでなければ
     False を返します。
 
@@ -220,6 +333,13 @@ def is_opened_output_device(dev) -> bool:
 
 def find_input_device(dev) -> int:
     """
+    Get the input device number based on a device description.
+
+    Args:
+        dev(int, str, list, tuple): Device description in the same format as
+            :func:`find_output_device`.
+    """
+    """
     デバイスの記述をもとに、入力デバイス番号を取得します。
 
     Args:
@@ -230,11 +350,17 @@ def find_input_device(dev) -> int:
 
 
 def input_devices() -> List[str]:
+    """ Get a list of the device names of all the input devices. """
     """ すべての入力デバイスの名前のリストを取得します。 """
     return _cmidiio.input_devices()
 
 
 def set_input_device(dev) -> None:
+    """ Specifies `dev` as currently selected input device.
+
+    Args:
+        dev: Device description recognized by :func:`find_intput_device`.
+    """
     """ `dev` を　"現在選択されている入力デバイス" として指定します。
 
     Args:
@@ -245,6 +371,18 @@ def set_input_device(dev) -> None:
 
 
 def open_input_device(dev=None) -> None:
+    """ Open the input device `dev`.
+
+    The input device inserts received messages into the input queue only while
+    it is open, and discards messages while it is closed. To avoid unintended
+    message accumulation in the input queue, openings should be limited to the
+    necessary period of time.
+
+    Args:
+        dev: Target input device. If None, the currently selected input device
+            is used; otherwise, the target device is the result of calling
+            :func:`find_input_device` with this as an argument.
+    """
     """ 入力デバイス `dev` をオープンします。
 
     入力デバイスはオープンしている期間のみ受信したメッセージを入力キューに
@@ -263,6 +401,13 @@ def open_input_device(dev=None) -> None:
 
 
 def close_input_device(dev=None) -> None:
+    """ Close the input device `dev`.
+
+    Args:
+        dev: Target input device. If None, the currently selected input device
+            is used; otherwise, the target device is the result of calling
+            :func:`find_input_device` with this as argument.
+    """
     """ 入力デバイス `dev` をクローズします。
 
     Args:
@@ -277,6 +422,12 @@ def close_input_device(dev=None) -> None:
 
 
 def is_opened_input_device(dev) -> bool:
+    """ Returns true if the input device `dev` is opened, or false otherwise.
+
+    Args:
+        dev: Device description that can be recognized by
+            :func:`find_input_device`.
+    """
     """ 入力デバイス `dev` がオープンされていれば True、そうでなければ
     False を返します。
 
@@ -287,7 +438,8 @@ def is_opened_input_device(dev) -> bool:
 
 
 def show_devices() -> None:
-    """ デバイスの一覧を表示します。 """
+    """ Show the list of all the available devices. """
+    """ 利用可能なデバイスの一覧を表示します。 """
     odev = output_devices()
     for i, devname in enumerate(odev):
         print(" %c %c[%d] %s" % ('>' if i == _output_devnum else ' ',
@@ -307,6 +459,11 @@ def show_devices() -> None:
 
 
 def current_time() -> float:
+    """ Returns the current time.
+
+    Returns:
+        Time in ticks, being 0 when the module was imported.
+    """
     """ 現在の時刻を返します。
 
     Returns:
@@ -316,6 +473,11 @@ def current_time() -> float:
 
 
 def _current_tempo() -> float:
+    """ Returns the current tempo.
+
+    Returns:
+        Tempo value (beats per minute).
+    """
     """ 現在のテンポを返します。
 
     Returns:
@@ -325,6 +487,11 @@ def _current_tempo() -> float:
 
 
 def _set_tempo(bpm) -> None:
+    """ Changes the current tempo.
+
+    Args:
+        bpm(float): Tempo value (beats per minute)
+    """
     """ 現在のテンポを変更します。
 
     Args:
@@ -335,6 +502,11 @@ def _set_tempo(bpm) -> None:
 
 
 def current_tempo_scale() -> float:
+    """ Returns the current tempo scale value.
+
+    Returns:
+        Tempo scale value
+    """
     """ 現在のテンポスケールを返します。
 
     Returns:
@@ -344,6 +516,11 @@ def current_tempo_scale() -> float:
 
 
 def set_tempo_scale(tempo_scale) -> None:
+    """ Changes the tempo scale value.
+
+    Args:
+        tempo_scale(float): tempo scale value (non-negative)
+    """
     """ テンポスケールを変更します。
 
     Args:
@@ -354,6 +531,33 @@ def set_tempo_scale(tempo_scale) -> None:
 
 def queue_event(ev, time=None, devnum=None) -> None:
     """
+    Converts an event to a message (a sequence of bytes) and places the message
+    with its sending time and track number on the output queue. The message is
+    sent to the output device when the sending time is reached.
+    There is no blocking (waiting for output) in this function.
+
+    Note: When queuing a TempoEvent for a tempo change, the sending time must
+    not be earlier than the current time.
+
+    Args:
+        ev(Event): The event to queue. This is converted to a message by the
+            :meth:`.Event.to_message` method and placed on the output queue.
+            If `ev` is a NoteEvent, two messages, one for note-on and the other
+            for note-off, are placed (the sending time of note-off is that of
+            note-on plus the value of the 'du' attribute if it exists or
+            the L attribute otherwise).
+            Even if the event is updated after calling this function, the
+            queued message is not affected.
+        time(ticks, optional): Specifies the time (in ticks) at which the
+            message is sent. If not specified, the value of the 't' attribute
+            of `ev` is used.
+        devnum(int, optional): Specifies the output device number to which
+            the message will be sent. If not specified, the currently selected
+            output device is used.
+            If `ev` is a LoopBackEvent, the message is always sent to the
+            loopback device regardless of this value.
+    """
+    """
     イベントをメッセージ (バイト列) に変換した上で、そのメッセージを送出時刻と
     トラック番号とともに出力キューへ置きます。置かれたメッセージは
     その送出時刻に達すると出力デバイスへ送られます。
@@ -363,8 +567,8 @@ def queue_event(ev, time=None, devnum=None) -> None:
     より過去であってはなりません。
 
     Args:
-        ev(Event): キューするイベント。これは、to_message メソッドにより
-            メッセージに変換されて、出力キューに置かれます。
+        ev(Event): キューするイベント。これは、:meth:`.Event.to_message`
+            メソッドによりメッセージに変換されて、出力キューに置かれます。
             `ev` が NoteEvent の場合は、ノートオンとノートオフの2つの
             メッセージが置かれます（このとき、ノートオフの送出時刻は
             ノートオンの送出時刻に対して、`ev` がdu属性を持つならその値、
@@ -399,6 +603,11 @@ def queue_event(ev, time=None, devnum=None) -> None:
 
 def recv_ready() -> bool:
     """
+    Returns true if there is a message on the input queue, or false otherwise.
+    If this value is true, it is guaranteed that the next call to
+    :func:`recv_event` will not be blocked.
+    """
+    """
     入力キューにメッセージがあれば True, そうでなければ False を返します。
     この値が True であれば、次に :func:`recv_event` を呼んだときにブロック
     状態にならないことが保証されます。
@@ -408,6 +617,26 @@ def recv_ready() -> bool:
 
 def recv_event() -> Optional[Event]:
     """
+    Receives a message from an input device and returns it as an event.
+    All the opened input devices are subject for receiving.
+    If there is no message in the input queue, it enters a blocking state
+    and waits for the input.
+    Execution is resumed whtn a message arrives or a keyboard interrupt
+    is received.
+
+    If a message from the loopback device and a message from a normal input
+    device arrive almost at the same time, the order of receiving may be
+    different from the order of event times.
+
+    System messages other than exclusive messages are ignored and cannot be
+    received.
+
+    Returns:
+        The event converted from the received message. Its 't' attribute value
+        is the time the message was received. Returns None when a keyboard
+        interrupt is received.
+    """
+    """
     入力デバイスからのメッセージを受け取りイベントとして返します。
     すべてのオープンされている入力デバイスが対象となります。
     入力キューにメッセージが無いときはブロック(入力待ち)状態になります。
@@ -415,7 +644,8 @@ def recv_event() -> Optional[Event]:
     解除されます。
 
     ループバックデバイスからのメッセージと通常の入力デバイスからのメッセージが
-    ほぼ同時刻に到着した場合、その受け取り順序が前後することがあります。
+    ほぼ同時刻に到着した場合、その受け取り順序がイベントの時刻順にならないこと
+    があります。
 
     エクスクルーシブ・メッセージ以外のシステム・メッセージは無視され、
     受け取ることができません。
@@ -444,6 +674,22 @@ def recv_event() -> Optional[Event]:
 
 def cancel_events(tk=-1, devnum=None) -> None:
     """
+    Performs the following two operations on the specified track of the
+    specified device.
+
+        1. Delete all messages in the output queue.
+        2. Sends messages to turn off the notes being played and the sustain
+           pedal in use.
+
+    Args:
+        tk(int, optional):
+            Specifies the target track number. A value of -1 means all tracks.
+        devnum(int, optional):
+            Specifies the target output device number. If not specified,
+            the currently selected output device is used.
+            The loopback device cannot be specified.
+    """
+    """
     指定されたデバイスの指定されたトラックに対して、以下の2つの
     操作を行います。
 
@@ -468,6 +714,20 @@ def cancel_events(tk=-1, devnum=None) -> None:
 
 
 def stop() -> None:
+    """
+    Deletes all messages in the input and output queues, as well as sends
+    messages to turn off the notes being played and the sustain pedal in use.
+    In addition, it will send the MIDI message below to all channels of all
+    opened output devices, attempting to completely stop all sound from the
+    synthesizers.
+
+        - All notes off (control change #123)
+        - Sustain pedal control with value 0 (control change #64)
+        - All sounds off (control change #120)
+
+    This function is automatically called when a keyboard interrupt is
+    received with this module imported.
+    """
     """
     入出力キューに入っているすべてのメッセージを削除するとともに、
     発音中のノートおよび使用中のサスティンペダルに対してそれらをオフにする
@@ -589,6 +849,20 @@ def _play_rec(score, rec=False, outdev=None, indev=None, metro=None,
 
 def play(score, dev=None) -> None:
     """
+    Plays a score. Messages are sent to the output device in sequence
+    according to the events contained in the score. This function does not
+    return until the time corresponding to the duration of the score has
+    elapsed, or until a keyboard interrupt is received.
+
+    Args:
+        score(Score): Score to be played. It may be an infinite-length score.
+        dev: Target output device. If None, the currently selected output
+            device is used; otherwise, the target device is the result of
+            calling :func:`find_output_device` with this as argument.
+            If the specified device is not opened, it will be opened
+            automatically.
+    """
+    """
     スコアを再生します。スコアに含まれるイベントに従って順にメッセージを出力
     デバイスへ送ります。この関数は、スコアの演奏長に相当する時間が経過するか、
     あるいはキーボード・インタラプトを受けるまでリターンしません。
@@ -609,6 +883,41 @@ def play(score, dev=None) -> None:
 
 def record(indev=None, play=None, outdev=None,
            metro=None, monitor=False) -> EventList:
+    """
+    Records a performance from an input device and returns an event list.
+    It is also possible to record with a score being played back.
+    This function does not return until the time corresponding to the duration
+    of the playback score has elapsed, or until a keyboard interrupt is
+    received.
+
+    Args:
+        indev: Target input device. If None, the currently selected input
+            device is used; otherwise, the target device is the result of
+            calling :func:`find_input_device` with this as the argument.
+            If the specified device is not opened, it will be opened
+            automatically. Also, it will be closed when returning from this
+            function.
+            If another input device other than this device is already open,
+            events from that device will be recorded as well.
+        play(Score, optional): The score to be played back simultaneously.
+            It may be an infinite-length score.
+        outdev: The output device for playback. If None, the currently selected
+            output device is used; otherwise, the target device is the result
+            of calling :func:`find_output_device` with this as the argument.
+        metro(str, bool or Score, optional):
+            If specified, a metronome will be sounded. The standard metronome
+            assumes that a GM standard rhythm instrument is assigned to
+            MIDI channel 10.
+            This argument can be a string representing a time signature,
+            such as "3/4", True (equivalent to "4/4"), or a score to play
+            the metronome sound
+            (e.g., ``record(metro=mml("ch=10 {A5 {Ab5* Ab5}/3 }@@"))``).
+        monitor(bool, optional):
+            If True, sends messages from the input device to the output device.
+
+    Returns:
+        Recorded score
+    """
     """
     入力デバイスからの演奏を録音してイベントリストを返します。
     スコアを再生しながら録音することもできます。
@@ -687,6 +996,18 @@ def listen(dev=None) -> RealTimeStream:
 
 
 def monitor(dev=None) -> None:
+    """
+    Displays the sequence of events from the input device.
+    This function does not return until it receives a keyboard interrupt.
+
+    Args:
+        dev: Target input device. If None, the currently selected input
+            device is used; otherwise, the target device is the result of
+            calling :func:`find_input_device` with this as the argument.
+            If the specified device is not opened, it will be opened
+            automatically. Also, it will be closed when returning from this
+            function.
+    """
     """
     入力デバイスからのイベント列を表示します。
     この関数はキーボード・インタラプトを受けるまでリターンしません。

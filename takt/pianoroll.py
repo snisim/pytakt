@@ -1,5 +1,8 @@
 # coding:utf-8
 """
+This module defines functions for the piano roll viewer.
+"""
+"""
 このモジュールにはピアノロールビューアのための関数が定義されています。
 """
 # Copyright (C) 2023  Satoshi Nishimura
@@ -1502,6 +1505,102 @@ def show(score, velocity='auto', ctrlnums='auto', limit=SHOW_LIMIT,
          render=True, bar0len=None, magnify=MAGNIFY, geometry=GEOMETRY,
          title="Pytakt") -> None:
     """
+    Displays a piano roll for `score`.
+
+    Args:
+        score(Score): Score to display.
+        velocity(bool or str, optional): If True, display the velocity Pane;
+            If False, do not display. If 'auto', display only when there are
+            changes in velocity .
+        ctrlnums(iterable of int or str, or str, optional):
+            Specifies the type of controller panes to display (e.g.
+            ``show(s, ctrlnums=[C_VOL])``).
+            If 'auto' is specified, all such controllers that contain two or
+            more events with different values in a channel of a track will
+            be displayed.
+            If 'verbose' is specified, it will show all controllers where
+            events are present. 'auto' or 'verbose' can be included in an
+            iterable, which can then be further added, or can be removed by
+            specifying a sign-inverted controller number (e.g.,
+            ``ctrlnums=('auto', C_PROG, -C_DATA)``).
+            To delete controller number 0 (C_BANK), specify -256.
+        limit(ticks, optional):
+            Limit the length of the score. For details on limits, see the
+            same name entry of :meth:`.Score.stream`.
+        render(bool, optional):
+            If True (default), renders events according to the played time.
+            If False, display events according to the notated time.
+        bar0len(ticks, optional):
+            Specifies the length of Bar 0. See :class:`.TimeSignatureMap` for
+            details.
+        magnify(float, optional):
+            Specifies the overall display magnification.
+        geometry(str, optional):
+            Specifies the window size and position (e.g., "800x600+0+0")
+        title(str, optional): Specifies the title string of the window.
+
+    Default values for the magnification and geoemtry arguments can be
+    specified by the environment variables PYTAKT_MAGNIFY and PYTAKT_GEOMETRY,
+    respectively.
+
+    .. rubric:: Operations in the Window
+
+    - **Track Buttons**: The ALL and number buttons at the top change the
+      selection status of individual tracks.
+      Pressing the number button means 'solo' operation (deselect all
+      tracks except the one). Press it again to return to the last state
+      when the two or more tracks were selected.
+      Pressing the ALL button selects all tracks. Press it again to return
+      to the previous state.
+      Pressing the number button with SHIFT or CTRL will toggle the
+      selection status of that track.
+    - **Tempo Scale**: The tempo scale can be changed by the number box at
+      the upper right.
+    - **Play Button** (\\|▶): Starts playing from the position of the red
+      cursor. The red cursor can be moved by clicking on the bar number ruler
+      at the top.
+    - **Pause/Continue Button** (⏸, ▶): Alternates between stopping and
+      playing from the previously stopped position (green cursor position).
+    - **Right Button Menu**: The right mouse button opens a menu from which
+      you can add/delete controller panes, zoom, switch output devices, etc.
+    - **Note Pane**:
+      Clicking on each note brings it to the front with playing the note's
+      sound. Clicking it with SHIFT sends it to the back.
+      Clicking it with CTRL does the same action as pressing the track button.
+      Dragging in the empty area scrolls the score horizontally (+SHIFT
+      scrolls it vertically and horizontally).
+      Mouse wheel and SHIFT+mouse wheel scrolls the score (direction is
+      platform-dependent); CTRL+mouse wheel zooms, horizontally if done in
+      the bar number ruler area, vertically in the keyboard area, and
+      both in other area.
+    - **Controller Panes**: They can be turn on/off from the right-button menu.
+      Mouse wheel works the same as in the Note Pane.
+    - **Status Display**:
+      The line at the bottom of the screen shows information about events.
+      The left part shows the event content, the center part shows the pitch,
+      and the right part shows the track number and track name (if any).
+      If there are multiple overlapping notes, the track number will be
+      displayed as "+ 2 3".
+    - **Shortcut Keys**:
+        - p: Same as Play button
+        - space: Same as Pause/Continue button
+        - r: Reset cursor potitions
+        - a: Same as ALL button
+        - c: Display all controller panes with value changes (equivalent
+          to ctrlnums='auto')
+        - x: Hide all controller panes
+        - v: Show/hide the velocity pane
+        - 0-9: Same as track number buttons (+ALT for tracks 10-19)
+        - Arrow keys: Scroll (+SHIFT for pages)
+        - Home/End: Move to the beginning/end of the score
+        - PageUp/PageDown: Increase/decrease tempo scale
+        - CTRL+'+', CTRL+'-': Zoom Up/Down
+        - CTRL+'=': Reset Zoom
+        - CTRL+d: Close the Controller Pane at the mouse cursor
+        - CTRL+w, CTRL+q, ESC: Exit
+
+    """
+    """
     スコア `score` についてのピアノロールを表示します。
 
     Args:
@@ -1528,7 +1627,8 @@ def show(score, velocity='auto', ctrlnums='auto', limit=SHOW_LIMIT,
             デフォルト(True)の場合、演奏上の時間に従ってイベントを表示します。
             Falseの場合は、楽譜上の時間で表示します。
         bar0len(ticks, optional):
-            指定すると、小節番号 0 の小節の長さをこのティック数に修正します。
+            小節番号 0 の小節の長さを指定します。
+            詳しくは :class:`.TimeSignatureMap` を見てください。
         magnify(float, optional):
             全体の拡大率を指定します。
         geometry(str, optional):
@@ -1564,11 +1664,12 @@ def show(score, velocity='auto', ctrlnums='auto', limit=SHOW_LIMIT,
       依存) を行います。CTRL+マウスホイールはズームを行い、小節番号ルーラー部分
       で行うと水平のみズーム、鍵盤表示部分で行うと垂直のみズームになります。
     - **コントローラPane**:
-      右メニューでon/offできます。マウスホイールの動作はノートPaneと同じです。
+      右ボタンメニューでon/offできます。マウスホイールの動作はノートPaneと
+      同じです。
     - **ステータス表示**:
-      画面下の左部はイベント内容の表示、中央部はピッチの表示、右部は
-      トラック番号と(あれば)トラック名の表示です。複数のノートが重なっている
-      場合、トラック番号は "+ 2 3" のような表示になります。
+      画面下に表示されている行の左部はイベント内容の表示、中央部はピッチの
+      表示、右部はトラック番号と(あれば)トラック名の表示です。複数のノートが
+      重なっている場合、トラック番号は "+ 2 3" のような表示になります。
     - **ショートカットキー**:
         - p: Playボタンと同じ
         - space: Pause/Continueボタンと同じ
@@ -1584,7 +1685,7 @@ def show(score, velocity='auto', ctrlnums='auto', limit=SHOW_LIMIT,
         - PageUp/PageDown: テンポスケールの増減
         - CTRL+'+', CTRL+'-': ズームUp/Down
         - CTRL+'=': ズームリセット
-        - CTRL+d: コントローラPaneのクローズ
+        - CTRL+d: マウスカーソル位置にあるコントローラPaneの消去
         - CTRL+w, CTRL+q, ESC: 終了
 
     """

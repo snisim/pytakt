@@ -1,5 +1,8 @@
 # coding:utf-8
 """
+This module defines the Score class and its subclasses.
+"""
+"""
 このモジュールには、Scoreおよびその派生クラスが定義されています。
 """
 # Copyright (C) 2023  Satoshi Nishimura
@@ -28,12 +31,73 @@ DEFAULT_LIMIT = 2e6
 
 
 class Score(object):
+    """
+    This class is an abstract class for scores.
+    A score is either an event list (an instance of the EventList class),
+    an event stream (an instance of the EventStream class),
+    or a Tracks container.
+    An event list is a list of zero or more events, with an attribute
+    called duration (see below) added.
+    An event stream is an object that uses Python's generator mechanism
+    to generate events in sequence, allowing for the representation of
+    infinite-length scores.
+    A Tracks container is a list of zero or more event lists or other Tracks
+    containers as elements, representing a structure in which all elements
+    are played concurrently.
+
+    .. rubric:: Duration
+
+    Scores have the concept of duration, which represents the length of
+    the performance in ticks. In sequential concatenation of scores,
+    the start time of the performance of a score is set to the start time
+    of its previous score plus the duration of the score.
+    The duration of an EventList is equal to the value of its duration
+    attribute. The duration of a Tracks is the maximum duration among
+    its components. The duration of an EventStream is the value attribute of
+    the StopIteration exception raised when the end of the stream is reached.
+    The duration is non-negative and is not necessarily equal to the maximum
+    time of the events in the score; it may be greater or even less.
+
+    .. rubric:: Arithmetic Rules
+
+    * The '+' operator: If `s1` and `s2` are Score objects, then `s1 + s2`
+      implies a sequential concatenation and returns a new score that plays
+      the two scores in sequence. The result is an EventStream if `s2` is
+      an EventStream, otherwise an EventList. `s1` must not be an EventStream.
+      Each event in `s2` is copied and its time is shifted by the duraion
+      of `s1`. The resulting score's duration is the sum of the durations
+      of the two scores.
+    * The '+=' operator: In `s1 += s2`, if `s1` is an EventList and `s2` is
+      a score other than an EventStream, then the copied events of `s2` are
+      added in-place to `s1`.
+      Otherwise, it is equivalent to `s1 = s1 + s2`.
+    * The '&' operator: If `s1` and `s2` are Score objects, then `s1 & s2`
+      implies parallel merging and returns a new score that plays the two
+      scores simultaneously. The result is an EventStream if one or both of
+      `s1` and `s2` are EventStream, otherwise an EventList. No copying of
+      events is performed. The duration of the resulting score will be
+      either the durations of the two scores, whichever is greater.
+    * The '&=' operator: In `s1 &= s2`, if `s1` is an EventList and `s2` is
+      a score other than an EventStream, then the events in `s2` are added
+      in-place to `s1`. Otherwise, it is equivalent to `s1 = s1 & s2`.
+    * The '*' operator:
+      The product of a Score object and an integer is a score that repeats
+      the original score by the integer value. `s1` must not be an
+      EventStream. The result will always be an EventList.
+
+    Examples:
+        ``(note(C4) + note(D4) + note(E4)).play()``
+
+        ``(note(C4) & note(E4) & note(G4)).play()``
+
+        ``(note(C4) * 16).play()``
+    """
     """ Scoreクラスはスコアの抽象クラスです。
     スコアはイベントリスト (EventListクラスのオブジェクト) か、
     イベントストリーム (EventStreamクラスのオブジェクト) か、
     Tracks コンテナのいずれかです。
-    イベントリストは、0個以上のイベントを要素とするリストに、durationと
-    呼ばれる演奏長の情報を付加したものです。
+    イベントリストは、0個以上のイベントを要素とするリストに、後述する演奏長
+    についての属性を付加したものです。
     イベントストリームは、ジェネレータの仕組みを利用してイベントを順に生成する
     オブジェクトで、無限長スコアの表現を可能にします。
     Tracks コンテナは 0個以上のイベントリストまたは他の Tracks コンテナを要素
@@ -41,13 +105,14 @@ class Score(object):
 
     .. rubric:: 演奏長
 
-    スコアには演奏長という概念があります。逐次結合において、あるスコアの演奏
-    開始時刻は、１つ前のスコアの演奏開始時刻にこの値を加えたものとなります。
+    スコアには演奏長という概念があり、これはティック単位でのスコアの長さを
+    表します。逐次結合において、あるスコアの演奏開始時刻は、
+    １つ前のスコアの演奏開始時刻にこの値を加えたものとなります。
     スコアが EventList の場合はそのduration属性の値、Tracks の場合は
     その構成要素の演奏長の最大値、EventStream の場合は StopIteration例外が持つ
     value属性の値が演奏長となります。
-    演奏長は非負で、スコアに含まれるイベントの時刻の最大値と等しいとは限らず、
-    それより大きい場合も小さい場合もあります。
+    演奏長は非負の値で、スコアに含まれるイベントの時刻の最大値と等しいとは
+    限らず、それより大きくても、また小さくても構いません。
 
     .. rubric:: 演算規則
 
@@ -181,6 +246,13 @@ class Score(object):
         return self.tostr(repr)
 
     def tostr(self, timereprfunc=std_time_repr) -> str:
+        """ Returns a string representation of the score.
+
+        Args:
+            timereprfunc(function): Function to convert a value of time to
+                a string. By default, it assumes a function that returns
+                a representation rounded to 5 decimal places.
+        """
         """ 文字列に変換したものを返します。
 
         Args:
@@ -197,10 +269,16 @@ class Score(object):
     __ge__ = object.__ge__
 
     def get_duration(self) -> Ticks:
+        """ Returns the duration of the score.
+        Not available for EventStream. """
         """ スコアの演奏長を返します。EventStream に対しては使えません。"""
         raise Exception("Score.get_duration() is an abstract method.")
 
     def tee(self) -> 'Score':
+        """ If the score is an EventStream, returns a new equivalent generator
+        that can be read independently without changing the read state of the
+        original generator. For scores of any other type, returns `self` as is.
+        """
         """ スコアが EventStream である場合、元のジェネレータの読み取り状態を
         変えることなく独立に読み出しできるような、新たな等価ジェネレータを
         返します。それ以外の型のスコアの場合は、`self` をそのまま返します。
@@ -208,11 +286,57 @@ class Score(object):
         raise Exception("Score.tee() is an abstract method.")
 
     def count(self) -> int:
+        """ Returns the number of events in the score.
+        Not available for EventStream. """
         """ スコア中のイベント数を返します。EventStream に対しては使えません。
         """
         raise Exception("Score.count() is an abstract method.")
 
     def mapev(self, func, durfunc=None) -> 'Score':
+        """ Calls the function `func` for each event in the score and
+        returns a new score where each event is replaced by the return value
+        of `func`. The type of the score and the order of events in the score
+        remain the same.
+
+        The function `func` is called in the order of appearance of events in
+        the score, not necessarily in chronological order.
+
+        The function `func` can return not only a single event, but also None
+        or a list of events, which allows insertion or deletion of events.
+
+        Remark: For an EventStream, `func` must not change the value of
+        the t attribute in such a way that the time order of the events is
+        changed.
+
+        Args:
+            func(function): For each event `ev`, this function is called in
+                the form `func(ev)`. The return value of this function must be
+                of type Event, None, or an iterable of Event.
+            durfunc(function, optional): Specifies the function to convert the
+                duration. The function is called in the form `durfunc(d)` for
+                the duration `d` of the original score, and the return value
+                will be the duration of the new score. By default, the original
+                score's duration is used in the new score.
+
+        Examples:
+            ``score.mapev(lambda ev: ev.update(tk=0))``
+                Returns a score of all events with the track number set to 0.
+                The original events are overwritten.
+
+            ``score.mapev(lambda ev: ev.copy().update(ch=3)) \
+if hasattr(ev, 'ch') else ev)``
+                Returns a score with the channel number changed to 3.
+                (This is equivalent to ``Modify('ch=3')`` using
+                :class:`.Modify`.)
+
+            ``score.mapev(lambda ev: None if hasattr(ev, 'ch') and ev.ch==2 \
+else ev)``
+                Returns a score where events with channel number 2 are removed.
+
+            ``score.mapev(lambda ev: ev.copy().update(t=ev.t * 2), \
+durfunc=lambda d: d*2)``
+                Returns a score with time stretched by a factor of 2.
+        """
         """ スコア中の各イベントに対して関数 `func` を呼び、その戻り値で
         置き換えた新しいスコアを返します。スコアの型、およびスコア内の
         イベントの順序は変わりません。
@@ -223,7 +347,7 @@ class Score(object):
         関数 `func` は単一のイベントだけなく、Noneやイベントのリストを返すこと
         ができ、これによりイベントの挿入や削除が可能です。
 
-        注意： EventStreamに対して、このメソッドでイベントの時刻順が入れ替わる
+        注意： EventStreamに対して、`func` でイベントの時刻順が入れ替わる
         ような t属性値の変更をしてはいけません。
 
         Args:
@@ -246,7 +370,8 @@ if hasattr(ev, 'ch') else ev)``
                  (これは、:class:`.Modify` を用いた ``Modify('ch=3')`` と
                  等価の変換です。)
 
-            ``score.mapev(lambda ev: None if hasattr(ev, 'ch') and ev.ch==2)``
+            ``score.mapev(lambda ev: None if hasattr(ev, 'ch') and ev.ch==2 \
+else ev)``
                  チャネル番号が2のイベントを削除したスコアを返します。
 
             ``score.mapev(lambda ev: ev.copy().update(t=ev.t * 2), \
@@ -291,6 +416,41 @@ durfunc=lambda d: d*2)``
 
     def chord_mapev(self, func, time_tolerance=None) -> Union[
             'EventList', 'EventStream']:
+        """
+        For each event in the score, it calls the function `func` with
+        additional information about the number of notes being played
+        simultaneously and pitch position within those, and returns
+        a new score where each event is replaced by the return value of `func`.
+        If the original score is Tracks, the result is an EventList.
+        For other types of scores, the type remains the same.
+
+        The function `func` is called in the order of time of the events
+        (i.e., ascending order of the t attribute values). If they occur
+        at the same time, they are called in the order of their appearance
+        in the score.
+
+        The function `func` can return not only a single event, but also None
+        or a list of events, which allows insertion or deletion of events.
+
+        Args:
+            func(function): For each event `ev`, this function is called in
+                the form `func(i, m, ev)`, where `i` is the ranking number in
+                terms of pitch among the notes being played at the same time
+                (0 <= `i` < `m` and 0 representing the lowest note) and `m` is
+                the number of notes being played at the same time.
+                Events not belonging to NoteEventClass will have both `i`
+                and `m` equal to 0.
+                The return value of this function must be of type Event,
+                None, or an iterable of Event.
+            time_tolerance(float, optional):
+                See :meth:`chord_iterator` argument of the same name.
+
+        Examples:
+            ``score.chord_mapev(lambda i, m, ev: ev.copy().update(v=ev.v + \
+(i==m-1)*10) if hasattr(ev, 'v') else ev)``
+                Returns a score with the velocity of the highest note of
+                each chord increased by 10.
+        """
         """ スコア中の各イベントに対して、同時に発音されている音の数や、その
         中で何番目に低い音かの情報とともに関数 `func` を呼び、その戻り値で
         置き換えた新しいスコアを返します。元のスコアが Tracks である場合、
@@ -305,9 +465,10 @@ durfunc=lambda d: d*2)``
         Args:
             func(function): 各イベント `ev` に対して `func(i, m, ev)` の
                 形式で、この関数が呼ばれます。`i` は、同時に発音されている
-                音の中での音高の順番(0が最低音)、`m` は同時に発音されて
-                いる音の数を表します。:class:`.NoteEventClass` に属さない
-                イベントでは `i` も `m` も 0 になります。
+                音の中での音高の順番(0 <= `i` < `m`で、0が最低音)、`m` は
+                同時に発音されている音の数を表します。
+                :class:`.NoteEventClass` に属さないイベントでは `i` も `m`
+                も 0 になります。
                 この関数の戻り値は Event型、None、もしくはEventのイテラブル
                 でなければなりません。
             time_tolerance(float, optional):
@@ -366,22 +527,48 @@ durfunc=lambda d: d*2)``
         return cls(gen(), **self.__dict__)
 
     def mapstream(self, func) -> 'Score':
-        """ イベントストリームに対する変換関数を与えることにより、
-        スコア中のイベントリストやイベントストリームを置き換えて、
-        スコア変換を行います。スコアの型は変わりません。
+        """
+        For each event list or event stream in the score, it calls the
+        transforming function `func` on the stream, and returns a new score
+        replaced by the event stream that the function generates.
+        The type of the score does not change (an event list is converted to
+        an event stream, `func` is applied, and then it is converted back to
+        an event list again).
+        Each event is not copied unless explicitly done within the
+        transforming function.
+
+        Args:
+            func(function): A generator function to transform an event
+                sequence. The function is called on the input stream `stream`
+                in the form `func(stream)`. The `stream` is the one converted
+                by :meth:`stream` in the case of an event list, or itself
+                in the case of an event stream.
+                The 'value' attribute of the StopIteration raised at the end
+                of `stream` contains the duration of the score.
+                The generator function `func` should return an iterator of
+                events such that StopIteratoin has the converted duration
+                (such a function can be implemented by outputting converted
+                events with 'yield' and returning the converted duration
+                with 'return').
+        """
+        """ スコア中のイベントリストやイベントストリームに対して、
+        ストリームに対する変換関数 `func` を呼び、それが生成するストリーム
+        で置き換えた新しいスコアを返します。
+        スコアの型は変わりません（イベントリストはストリームに変換されて
+        `func` を適用した後、再びイベントリストに戻されます）。
         各イベントは、変換関数内で明示的に行わない限りコピーされません。
 
         Args:
             func(function): イベント列を変換するジェネレータ関数。入力
                 ストリーム `stream` に対して `func(stream)` の形式でこの関数
-                が呼ばれます。`stream` はイベントリストの場合そのイテレータ、
-                イベントストリームの場合はそれ自身になります。入力ストリーム
-                が発する StopIteration の value 属性には、スコアの演奏長が
-                格納されます。ジェネレータ関数 `func` は、StopIteratoinに
+                が呼ばれます。`stream` はイベントリストの場合 :meth:`stream`
+                で変換されたもの、イベントストリームの場合はそれ自身に
+                なります。入力ストリームが発する StopIteration の value 属性
+                には、スコアの演奏長が格納されます。
+                ジェネレータ関数 `func` は、StopIteratoinに
                 変換後の演奏長を持つようなイベントのイテレータを返す必要
                 があります (関数内で、変換後のイベントを順に yield し、変換後
-                の演奏長を return すれば、そのようなイテレータを返すことに
-                なります）。
+                の演奏長を return すれば、そのような関数になります）。
         """
         if isinstance(self, EventList):
             return self.__class__(func(self.stream()), **self.__dict__)
@@ -394,6 +581,26 @@ durfunc=lambda d: d*2)``
             raise Exception("%r is not a score" % self.__class__.__name__)
 
     def stream(self, copy=False, *, limit=None) -> 'EventStream':
+        """
+        Converts a score to an event stream. The returned EventStream object
+        yields the events in the score in chronological order (ascending order
+        of the t attribute values).
+        Events that occur at the same time are yielded in the order of their
+        appearance in the score.
+        The returned EventStream will raise a StopIteration exception
+        when the end of the score is reached, and the 'value' attribute of
+        this exception object will contain the duration of the score (or
+        the value of `limit` if the `limit` is reached).
+
+        Args:
+            copy(bool, optional): If True, copied events are yielded.
+            limit(ticks, optional):
+                If given, limits the length of the score if `self` is
+                an EventStream, and will warn and raise a StopIteration
+                exception when it sees an event with a time greater than
+                this value (the observed event will not be yielded).
+                It has no effect on scores other than EventStream.
+        """
         """
         スコアをイベントストリームへ変換します。返される EventStream
         オブジェクトは、スコアに含まれるイベントを時刻順 (t属性値の昇順) に
@@ -453,6 +660,98 @@ durfunc=lambda d: d*2)``
                        copy=False, time_tolerance=None,
                        limit=None) -> Generator['EventList', None, Ticks]:
         """
+        This ia a generator function that yields the information for each time
+        span of the score in chronological order.
+        Each yielded object is an EventList that contains the events that
+        exist in the span and, optionally, the events for notes that have been
+        continued since the previous span.
+        The EventList has an additional attribute named 'start', which
+        contains the start time of the span. The end time of the span is
+        stored in the duration attribute.
+        The order of events in the EventList follows that of :meth:`stream`.
+
+        Args:
+            time_sequence(None, ticks, or iterable of ticks, optional):
+                Specifies how to delimit the spans;
+                if None (default), the span boundaries are time positions
+                where one or more note-ons or note-offs (including
+                note-off implied by NoteEvent, that is, the time at
+                the sum of its t and L attributes) exist.
+                If it is an int or a float, spans are formed with a constant
+                interval of that value.
+                If it is an int or float iterable, each element of the
+                iterable is the time of the span boundary.
+                Each span is defined to be greater than or equal to the time
+                of a boundary and less than or equal to the time of the next
+                boundary.
+            cont_notes(bool, optional):
+                If True, an additional reference to the NoteEvent or
+                NoteOnEvent is inserted into EventList for notes that have
+                been continued since the previous span.
+                Note that whether or not events are such additional
+                references can be determined by comparing the time of the event
+                and the start time of the span: an event `ev` is an
+                additional reference if `ev.t < evlist.start` where
+                `evlist` is the event list yielded.
+            copy(bool, optional): If True, the event list to be yielded will
+                contain the copied events. If `cont_notes` is True, additional
+                references are to the copy.
+            time_tolerance(float, optional):
+                This is meaningful only when `time_sequence` is None.
+                Note-ons and note-offs within this value of time difference
+                are considered to be the same time and have a single span
+                boundary.
+                If omitted, it is set to 50 ticks if `self` is a
+                RealTimeStream; otherwise it is set to 10\\ :sup:`-6`.
+            limit(ticks, optional):
+                Has the same meaning as the 'limit' argument of :meth:`stream`.
+
+        Yields:
+            EventList:
+
+        Raises:
+            StopIteration: Raised when the end of the score is reached.
+                The 'value' attribute of this exception object contains
+                the duration of the score. It is also raised when the `limit`
+                is reached, in which case the value attribute will contain
+                the value of the `limit`.
+
+        Tip:
+            From the output sequence of chord_iterator(), you can get the
+            score of the same performance as the original (but the duration
+            may be different) by the following::
+
+                par(EventList((ev for ev in evlist if ev.t >= evlist.start),
+                              evlist.duration)
+                    for evlist in score.chord_iterator())
+
+            or ::
+
+                par(score.chord_iterator(cont_notes=False))
+
+        Examples:
+            The program below calculates the maximum number of simultaneous
+            played notes for a non-empty score s::
+
+                max(sum(isinstance(ev, (NoteEvent, NoteOnEvent)) for ev in \
+evlist)
+                    for evlist in s.chord_iterator())
+
+            The program below displays a list of sounding pitches for each
+            sixteenth-note span::
+
+                for evlist in s.chord_iterator(L16):
+                    print(evlist.start,
+                          [ev.n for ev in evlist if \
+isinstance(ev, (NoteEvent, NoteOnEvent))])
+
+            The program below prints an event list for each measure::
+
+                tm = TimeMap(s)
+                for m, evlist in enumerate(s.chord_iterator(tm.iterator())):
+                    print(f'Measure {m + tm.ticks2mbt(0)[0]}:', evlist)
+        """
+        """
         スコアを時間区間ごとに区切って各区間の情報を時刻順に yield する
         ジェネレータ関数です。
         yield されるのは EventList で、当該区間内に存在するイベント、および
@@ -467,8 +766,9 @@ durfunc=lambda d: d*2)``
             time_sequence(None, ticks, or iterable of ticks, optional):
                 区間の区切り方を指定します。None(デフォルト)の場合、
                 ノートオンまたはノートオフの存在する時刻（これは NoteEvent
-                時刻にその L属性の値を加算した時刻も含みます）が区切り位置と
-                なります。intまたはfloatの場合は、その値を周期として一定間隔に
+                のノートオフ時刻、つまりt属性とL属性の和の時刻も含みます）
+                が区切り位置となります。
+                intまたはfloatの場合は、その値を周期として一定間隔に
                 区切られます。intまたはfloatのiterableならば、その各要素
                 が区切り位置の時刻になります。各区間は、ある区切り位置の時刻
                 以上、次の区切り位置の時刻未満で定義されます。
@@ -630,6 +930,43 @@ isinstance(ev, (NoteEvent, NoteOnEvent))])
             return e.value
 
     def active_events_at(score, time, event_type=Event) -> List['Event']:
+        """ Returns a list of events that are active (or effective) at `time`.
+        Active events are specifically the following events.
+
+        * NoteEvent or NoteOnEvent for the note sounding at `time`,
+          not including a note that has just ended at `time`. NoteEvent or
+          NoteOnEvent events for notes that start sounding at `time` are
+          included, unless they have zero duration (NoteEvent with the L
+          attribute of 0, or NoteOnEvent with a note-off at the same time).
+        * KeySignatureEvent representing the key at `time`, including those
+          present at exactly `time`.
+        * TimeSignatureEvent representing the time signature at `time`,
+          including those that exist at exactly `time`.
+        * TempoEvent representing the tempo at `time`, including those
+          that exist at exactly `time`.
+        * The last CtrlEvent before `time` for each controller number,
+          each track number, and each MIDI channel number, excluding RPCs
+          and mode changes (controller numbers 6, 38, 96-101, and 124-127).
+        * The last KeyPressureEvent before `time` for each track number,
+          each MIDI channel number, and each MIDI note number.
+
+        The active events are computed based on notated time (i.e., without
+        regard to the dt and du attributes).
+        If you want to use the played time as a reference, apply the
+        :class:`.Render` effector before calling.
+
+        Args:
+            time(ticks): Time of interest
+            event_type(class or tuple of classes): If specified, limits the
+                type of events examined to events of this class or its
+                subclasses (or any of them in the case of tuples).
+
+        Returns:
+            list of Event: List of active events, which are references to
+            events in the score.
+            The events are ordered by time. For events present at the same
+            time, they are ordered by their appearance in the socre.
+        """
         """ 時刻 `time` においてアクティブな（効いている）イベントのリストを
         返します。アクティブなイベントとは具体的には次のようなイベントを
         意味します。
@@ -665,8 +1002,7 @@ isinstance(ev, (NoteEvent, NoteOnEvent))])
 
         Returns:
             list of Event: アクティブなイベント(スコア中のイベントへの参照)の
-            リスト。イベントの順序はスコア先頭からの時刻での順序 (同時刻の場合
-            は出現順）になります。
+            リスト。イベントの順序は時刻順 (同時刻の場合は出現順）になります。
 
         Tip:
             計算量は少なくとも `time` に達するまでのイベント数のオーダーと
@@ -701,12 +1037,17 @@ isinstance(ev, (NoteEvent, NoteOnEvent))])
         return list(event_dict.values())
 
     def show(self, *args, **kwargs) -> None:
+        """ Call :func:`.pianoroll.show` with the given arguments to
+        display a pianoroll window."""
         """ :func:`.pianoroll.show` を与えられた引数と
 　　　　ともに呼び、ピアノロールウィンドウを表示します。"""
         from takt.pianoroll import show
         show(self, *args, **kwargs)
 
     def showtext(self, *args, **kwargs) -> None:
+        """ :func:`.text.showtext` is called with the given arguments
+        to convert this score into a descriptive text that can be evaluated
+        by Python and output it. """
         """ :func:`.text.showtext` を与えられた引数と
         ともに呼び、このスコアをpythonで評価可能なテキストに変換して
         出力します。"""
@@ -714,39 +1055,100 @@ isinstance(ev, (NoteEvent, NoteOnEvent))])
         showtext(self, *args, **kwargs)
 
     def summary(self, *args, **kwargs) -> None:
+        """ Call :func:`.text.showsummary` with the given arguments
+        to output statistics of the score. """
         """ :func:`.text.showsummary` を与えられた引数と
 　　　　ともに呼び、統計情報を出力します。"""
         from takt.text import showsummary
         showsummary(self, *args, **kwargs)
 
     def play(self, *args, **kwargs) -> None:
+        """ :func:`.midiio.play` is called with the given arguments
+        to play this score. """
         """ :func:`.midiio.play` を与えられた引数と
 　　　　ともに呼び、このスコアを演奏します。"""
         from takt.midiio import play
         play(self, *args, **kwargs)
 
     def writesmf(self, *args, **kwargs) -> None:
+        """ Call :func:`.smf.writesmf` with the given arguments to
+        write this score to a standard MIDI file. """
         """ :func:`.smf.writesmf` を与えられた引数と
 　　　　ともに呼び、このスコアを標準MIDIファイルに書き出します。"""
         from takt.smf import writesmf
         writesmf(self, *args, **kwargs)
 
     def writepyfile(self, *args, **kwargs) -> None:
+        """ Call :func:`.text.writepyfile` with the given arguments
+        to convert this score to a descriptive text that can be evaluated
+        by Python and output it to a file. """
         """ :func:`.text.writepyfile` を与えられた引数と
 　　　　ともに呼び、このスコアをpythonで評価可能なテキストに変換して
 　　　　ファイルに出力します。"""
         from takt.text import writepyfile
         writepyfile(self, *args, **kwargs)
 
-    def writejson(self, *args, **kwargs) -> Optional[str]:
+    def writejson(self, *args, **kwargs) -> None:
+        """ Call :func:`.text.writejson` with the given arguments
+        to convert this score to JSON format and output it to a file. """
         """ :func:`.text.writejson` を与えられた引数と
-        ともに呼び、このスコアをJSON形式に変換してファイルに出力、
-        もしくは文字列を返します。"""
+        ともに呼び、このスコアをJSON形式に変換してファイルに出力します。"""
         from takt.text import writejson
-        return writejson(self, *args, **kwargs)
+        writejson(self, *args, **kwargs)
 
     def music21(self, min_note=L32, bar0len=None, *,
                 allow_tuplet=True, limit=5e5) -> 'music21.stream.Score':
+        """
+        Converts a Pytakt Score object to a music21 Score object.
+        In the conversion, each track in Pytakt, except track 0, is assigned
+        a music21 part (one stave).
+
+        The following information that the Pytakt score has is not output
+        to the music21 score.
+
+        * Played time information (dt and du attributes)
+        * MIDI channel information (ch attribute)
+        * Note-off velocity (nv attribute)
+        * Information contained in CtrlEvent (and its subclasses)
+          and SysExEvent
+        * Meta events other than key signature events, time signature events,
+          tempo events, copyright information events, track name events,
+          instrument name events, and marker events (The generic
+          text event (mtype=1) is output as a song title if it exists
+          on track 0.)
+
+        In the conversion, if NoteEvent has the following attributes,
+        it has the meaning written below.
+
+        * **voice** (int): Specifies a voice number, an integer greater
+          than or equal to 1, indicating how the music21 Voice streams
+          will be constructed if multiple voices are present.
+          If this attribute is not specified, the voice number is
+          automatically selected from the voice numbers that are not used
+          at the same time.
+        * **mark** (str or tuple of str): Specifies a string of symbols
+          (staccato, accents, finger numbers, trills, etc.) to be added
+          to each note.
+          Multiple markers can be specified by tuples. A list of available
+          strings can be found at the beginning of the takt.m21conv source
+          code.
+
+        Currently, lyrics and spanners such as slurs are not supported.
+
+        Args:
+            min_note(ticks, optional): The duration (note value) of the
+                shortest possible note to be used in the converted score.
+                The smaller this value, the more accurately the Pytakt score
+                is represented, but it may result in a score that is difficult
+                to read when converted to staff notation.
+            bar0len(ticks, optional): specifies the length of the bar
+                with bar number 0.
+            allow_tuplet(bool, optional): By default, up to tredecuplets
+                (13-tuplets) are automatically recognized, but setting this
+                argument to False disables the use of tuplets altogether.
+            limit(ticks, optional): limits the length of the score
+                (see :meth:`.Score.stream` for details).
+        """
         """
         Pytakt の Score オブジェクトを music21 のスコアオブジェクトへ変換
         します。変換において、Pytakt におけるトラック0を除くそれぞれの
@@ -779,7 +1181,6 @@ isinstance(ev, (NoteEvent, NoteOnEvent))])
         現在のところ、スラーなどの Spanner や歌詞には対応していません。
 
         Args:
-            score(Score): 対象となるスコア
             min_note(ticks, optional): 変換後のスコアで使用される可能性のある
                 最も短い音符の音価。この値が小さいほど、Pytakt のスコアを
                 より正確に表現できるようになりますが、五線譜にしたときに
@@ -797,6 +1198,16 @@ isinstance(ev, (NoteEvent, NoteOnEvent))])
 
     @staticmethod
     def frommusic21(m21score) -> 'Tracks':
+        """
+        Converts a music21 Score object (an object of
+        the music21.stream.stream class) to a Pytakt Score object.
+        In the conversion, a Pytakt track is assigned to each part of music21,
+        and the MIDI channel number is always 1.
+        If the music21 score uses the Voice structure, the 'voice' attribute
+        will be set to each NoteEvent.
+
+        Currently, lyrics and spanners such as slurs are not supported.
+        """
         """
         music21 のスコアオブジェクト (music21.stream.Streamクラスの
         オブジェクト）を Pytakt の Score オブジェクトへ変換します。
@@ -853,6 +1264,55 @@ isinstance(ev, (NoteEvent, NoteOnEvent))])
 
 class EventList(Score, list):
     """
+    EventList is a class for event lists and inherits from both the Score
+    and 'list' classes.
+    An event list is a list of zero or more events, with an attribute
+    called duration added, which represents the length of the performance.
+    The events in the list are not necessarily ordered by time.
+
+    Attributes:
+        duration (ticks): Duration in ticks. Must not be a negative value.
+
+    .. rubric:: Arithmetic Rules
+
+    * The bool value is False if the number of elements is 0, as in the normal
+      list. Note that an empty event list with a non-zero duration will
+      also be false.
+    * The equivalence comparison ('==') between event lists results in True
+      if and only if the classes match, the list lengths match, all list
+      elements are equivalent, and all attribute values of the event list
+      are equivalent.
+    * If the '|' operator is used with the left operand being a string and
+      the right operand being an event list, the left operand is ignored and
+      the result is the value of the event list itself. This is used
+      in showtext() to ignore measure numbers, etc. to the left of the '|'.
+
+    Args:
+        events (Score or iterable of Event):
+            * If it is a Score (including the case of an EventList),
+              the score is converted (or 'flattened') to an event list where
+              the events therein are sorted by time. Each event is not copied.
+              The value of the duration attribute is set to the value of
+              the `duration` argument, if any, otherwise
+              the duration of the source score (or the value of `limit`
+              if the EventStream is terminated by the `limit` feature below).
+            * If it is an Event iterable (but not an EventList or EventStream),
+              the event list is created with keeping the order of events
+              as it is. Each event is not copied.
+              The value of the duration attribute is determined in the
+              following order: (1) the value of the `duration` argument,
+              if any, (2) the value owned by StopIteration
+              if `events` is an iterator and has the value attribute
+              in its StopIteration, or (3) 0 for an empty iterable.
+              An exception is raised if none of these apply.
+        duration (ticks, optional):
+            Specifies the value of the duration attribute.
+        limit (ticks, optional):
+            If `events` is an EventStream, it limits the length of the score.
+            See the `limit` argument of :meth:`Score.stream` for details.
+        kwargs: Specifies additional attributes for the event list.
+    """
+    """
     EventListはイベントリストのクラスで、Scoreクラスとlistクラスの両方を
     継承しています。
     イベントリストとは、0個以上のイベントのリストに、durationと
@@ -860,8 +1320,7 @@ class EventList(Score, list):
     なお、リスト内のイベントは必ずしも時刻順に並んでいるとは限りません。
 
     Attributes:
-        duration (ticks): 演奏長 (ティック単位)。
-            0以上の任意の値を設定できます。
+        duration (ticks): 演奏長 (ティック単位)。負であってはなりません。
 
     .. rubric:: 演算規則
 
@@ -955,12 +1414,18 @@ class EventList(Score, list):
 
     def copy(self) -> 'EventList':
         """
+        Returns a duplicated event list (shallow copy).
+        """
+        """
         複製されたイベントリストを返します(浅いコピー)。
         """
         # 古い pytakt では深いコピーになってしまうバグがあった。
         return self.__class__(list(self), self.duration, **self.__dict__)
 
     def deepcopy(self) -> 'EventList':
+        """
+        Returns a new event list with each event duplicated.
+        """
         """
         各イベントが複製された新しいイベントリストを返します。
         """
@@ -969,11 +1434,20 @@ class EventList(Score, list):
 
     def sort(self, *, key=None) -> None:
         """
+        Sorts the events (by default, in ascending order of the t attribute
+        value). Uses the stable sorting algorithm same as list.sort().
+
+        Args: key(function, optional)
+            key(function, optional): has the same meaning as the 'key'
+               argument of list.sort().
+        """
+        """
         イベントを(デフォルトではt属性の時刻順に)ソートします。
-        list.sort と同様に安定なソートアルゴリズムを使用します。
+        list.sort() と同様に安定なソートアルゴリズムを使用します。
 
         Args:
-            key(function, optional): list.sort の key引数と同じ意味を持ちます。
+            key(function, optional): list.sort() の key引数と同じ意味を
+                持ちます。
         """
         if key is None:
             key = operator.attrgetter('t')
@@ -981,12 +1455,22 @@ class EventList(Score, list):
 
     def sorted(self, *, key=None) -> 'EventList':
         """
+        Returns a new list of events sorted (by default, in ascending order of
+        the t attribute value).
+        Uses the stable sorting algorithm same as list.sort().
+
+        Args: key(function, optional)
+            key(function, optional): has the same meaning as the 'key'
+                argument of list.sort().
+        """
+        """
         イベントを(デフォルトではt属性の時刻順に)ソートした新しい
         イベントリストを返します。
-        list.sort と同様に安定なソートアルゴリズムを使用します。
+        list.sort() と同様に安定なソートアルゴリズムを使用します。
 
         Args:
-            key(function, optional): list.sort の key引数と同じ意味を持ちます。
+            key(function, optional): list.sort() の key引数と同じ意味を
+                持ちます。
         """
         if key is None:
             key = operator.attrgetter('t')
@@ -1002,6 +1486,15 @@ class EventList(Score, list):
 
     def add(self, ev) -> None:
         """
+        Add an event `ev` to the end of the event list. In addition,
+        it updates the duration attribute of the event list by the greater
+        of that value and the t attribute value of `ev` (or the sum of the
+        t and L attribute values in the case of a NoteEvent).
+
+        Args: Args
+            ev(Event): event to add
+        """
+        """
         イベントリストの末尾にイベント `ev` を追加します。更に、
         イベントリストの duration 属性値を、その値と `ev` の
         t属性値（ただし NoteEvent の場合は t属性値とL属性値の和）
@@ -1015,6 +1508,19 @@ class EventList(Score, list):
                             ev.t + ev.L if isinstance(ev, NoteEvent) else ev.t)
 
     def merge(self, other, time=0) -> None:
+        """
+        Adds all events in the event list `other` to the end of the event
+        list `self`. The resulting duration attribute value of event list
+        `self` will be the greater of that value and the duration attribute
+        value of `other` plus `time`.
+
+        Caution: If `time` is non-zero, events in `other` are destroyed by
+        default. To avoid this, deepcopy `other` before calling this method.
+
+        Args:
+            other(EventList): list of events to merge
+            time(ticks, optional): add value of time
+        """
         """
         イベントリスト `self` の末尾に、別のイベントリスト `other` に含まれる
         すべてのイベントを追加します。その際、追加するイベントの時刻には `time`
@@ -1041,19 +1547,40 @@ class EventList(Score, list):
                             int_preferred(other.duration + time))
 
     def get_duration(self) -> Ticks:
+        """ Returns the value of the duration attribute. """
         """ スコアの演奏長として、duration属性の値を返します。"""
         return self.duration
 
     def tee(self) -> 'EventList':
+        """ Returns `self` as is. """
         """ `self` をそのまま返します。"""
         return self
 
     def count(self) -> int:
+        """ Returns the number of events in the score. """
         """ スコア中のイベント数を返します。"""
         return len(self)
 
 
 class Tracks(Score, list):
+    """
+    Container class for representing a concurrently played structure.
+    It inherits from both the Score and list classes.
+    Elements are limited to EventList or other Tracks containers;
+    EventStreams cannot be the elements.
+    The overall duration is the maximum of the elements' duration.
+
+    .. rubric:: Arithmetic Rules
+
+    * The equivalence comparison ('==') between Tracks objects results in true
+      if and only if the classes match, the list lengths match, all list
+      elements are equivalent, and all attribute values of the Tracks
+      object are equivalent.
+
+    Args:
+        elms(iterable of Score): element scores
+        kwargs: additional attributes for the Tracks object.
+    """
     """
     同時並行で演奏する構造を表現するためのコンテナクラスです。
     Scoreクラスとlistクラスの両方を継承しています。
@@ -1099,6 +1626,9 @@ class Tracks(Score, list):
 
     def copy(self) -> 'Tracks':
         """
+        Returns a duplicated object (shallow copy).
+        """
+        """
         複製されたオブジェクトを返します(浅いコピー)。
         """
         return self.__class__(self, **self.__dict__)
@@ -1110,30 +1640,59 @@ class Tracks(Score, list):
             return list.__getitem__(self, key)
 
     def get_duration(self) -> Ticks:
+        """ Returns the maximum of the elements' duration as the duration of
+            the score.
+        """
         """ スコアの演奏長として、構成要素の演奏長の最大値を返します。
         """
         return max((s.get_duration() for s in self), default=0)
 
     def tee(self) -> 'Tracks':
+        """ Returns `self` as is. """
         """ `self` をそのまま返します。"""
         return self
 
     def count(self) -> int:
+        """ Returns the number of events in the score. """
         """ スコア中のイベント数を返します。"""
         return sum(s.count() for s in self)
 
     def sort(self, *, key=None) -> None:
         """
+        Applies the sort() method to all the elements.
+
+        Args:
+            key(function, optional): has the same meaning as the 'key'
+                argument of list.sort().
+        """
+        """
         すべての構成要素に対して sortメソッドを適用します。
 
         Args:
-            key(function, optional): list.sort の key引数と同じ意味を持ちます。
+            key(function, optional): list.sort() の key引数と同じ意味を
+                持ちます。
         """
         for elm in self:
             elm.sort(key=key)
 
 
 class EventStream(Score):
+    """
+    Class for generators (generator iterators) that yield events in
+    chronological order.
+    This makes it possible to construct scores of infinite length.
+
+    Args:
+        iterator(iterator of Event): The iterator from which a sequence of
+            events are generated.
+            The order of events generated must be in ascending order
+            of time (the t attribute values).
+            In addition, the StopIteration object raised at the end of the
+            event sequence must have the 'value' attribute with the score
+            duration as its value.
+            This duration may be less than the time of the last event.
+        kwargs: Additional attributes for the EventStream object.
+    """
     """
     イベントを時刻順に yield するジェネレータ（ジェネレータイテレータ）の
     クラスです。
@@ -1168,6 +1727,8 @@ class EventStream(Score):
         return next(self.iterator)
 
     def is_consumed(self):
+        """ Returns True if next() has been executed on this stream in the
+        past, or False otherwise. """
         """ このストリームに対して過去にnextを実行したことがあればTrue、
         そうでなければFalseを返します。"""
         return self._is_consumed
@@ -1178,14 +1739,19 @@ class EventStream(Score):
                              self.iterator, ''.join(attrs))
 
     def get_duration(self) -> Ticks:
+        """ Raises an exception. """
         """ 例外を送出します。"""
         raise Exception("Cannot use get_duration() for EventStream")
 
     def count(self) -> int:
+        """ Raises an exception. """
         """ 例外を送出します。"""
         raise Exception("Cannot use count() for EventStream")
 
     def tee(self) -> 'EventStream':
+        """ Returns a new equivalent generator that can be read independently
+        without changing the read state of the original generator.
+        """
         """ 元のジェネレータの読み取り状態を変えることなく独立に読み出しできる
         ような、新たな等価ジェネレータを返します。
         """
@@ -1208,6 +1774,22 @@ class EventStream(Score):
         return rtn
 
     def merged(self, other, time=0) -> 'EventStream':
+        """
+        Returns a new EventStream that merges the two event streams `self`
+        and `other`.
+
+        The duration of the returned EventStream will be the greater of
+        `self`'s duration or `other`'s duration plus `time`.
+
+        Args:
+            other(EventStream):
+                Event stream to be merged.
+            time(ticks, optional):
+                This value is added to the time of the events output
+                by `other`.
+                At that time, the original events are rewritten without
+                copying the events.
+        """
         """
         `self` と `other` の2つのイベント列を併合した新たな EventStream を
         返します。
@@ -1290,6 +1872,17 @@ class EventStream(Score):
 
     def noteoff_inserted(self) -> 'EventStream':
         """
+        Returns a new EventStream with a NoteOffEvent inserted for each
+        NoteEvent in the event stream.
+        The t attribute value of the added NoteOffEvent is set to the sum
+        of the NoteEvent's t and L attribute values and inserted at the
+        appropriate position in the stream.
+        The attribute 'noteon' is added to that NoteOffEvent, whose value
+        is the original NoteEvent. This method is mainly used for the return
+        value of :meth:`.stream` and is useful when some processing needs to
+        be done at the time of note-off.
+        """
+        """
         イベント列中の各 NoteEvent に対して NoteOffEvent を追加した新たな
         EventStream を返します。
         追加される NoteOffEvent の t属性値は NoteEvent の t属性とL属性の
@@ -1325,6 +1918,10 @@ class EventStream(Score):
 
 class RealTimeStream(EventStream):
     """
+    A subclass of EventStream that represents an event stream
+    from an input device.
+    """
+    """
     入力デバイスからのイベントストリームを表す、EventStream のサブクラスです。
     """
     def __init__(self, iterator, starttime, **kwargs):
@@ -1338,6 +1935,20 @@ class RealTimeStream(EventStream):
 
 
 def seq(elms=[], **kwargs) -> 'EventList':
+    """
+    Returns an EventList that is a sequential concatenation of all scores
+    given in ``elms``.
+    For example, ``seq([note(C4), note(D4), note(E4)])`` is equivalent to
+    ``EvenList() + note(C4) + note(D4) + note(E4)``.
+    It cannot be used for infinite-length scores.
+
+    Args:
+        elms(iterable of Score): scores to concatenate
+        kwargs: additional attributes for the resulting EventList.
+
+    Examples:
+        ``seq(note(i) for i in range(C4, C5)).show()``
+    """
     """
     `elms` に指定されたスコアの列をすべて逐次結合した EventList を返します。
     例えば、``seq([note(C4), note(D4), note(E4)])`` は、
@@ -1359,6 +1970,18 @@ def seq(elms=[], **kwargs) -> 'EventList':
 
 def par(elms=[], **kwargs) -> 'EventList':
     """
+    Returns an EventList that merges all the scores given in ``elms``.
+    For example, ``par([note(C4), note(D4), note(E4)])`` is equivalent to
+    ``note(C4) & note(D4) & note(E4)``.
+
+    Args:
+        elms(iterable of Score): scores to merge
+        kwargs: additional attributes for the resulting EventList.
+
+    Examples:
+        ``par(note(i) for i in range(C4, C5, 2)).show()``
+    """
+    """
     `elms` に指定されたスコアの列をすべて併合した EventList を返します。
     例えば、``par([note(C4), note(D4), note(E4)])`` は、
     ``note(C4) & note(D4) & note(E4)`` と等価です。
@@ -1377,6 +2000,24 @@ def par(elms=[], **kwargs) -> 'EventList':
 
 
 def genseq(elms=[], **kwargs) -> 'EventStream':
+    """
+    Returns an EventStream that is a sequential concatenation of all the
+    scores given in `elms`.
+    `elms` can be a generator that generates an infinite number of scores.
+
+    Args:
+        elms(iterable of Score): Sequence of scores to be combined.
+             Each score must be an EventList or Tracks.
+        kwargs: Additional attributes for the resulting EventStream.
+
+    Examples:
+        >>> from itertools import count
+        >>> genseq(note(C4) for i in count()).play()
+        >>> genseq(note(C4 + (i % 4)) for i in count()).play()
+        >>> from random import randrange
+        >>> genseq(note(randrange(C4, C5)) for i in count()).play()
+
+    """
     """
     `elms` に指定されたスコアの列をすべて逐次結合した EventStream を返します。
     `elms` は無限にスコアを生成するジェネレータであっても構いません。

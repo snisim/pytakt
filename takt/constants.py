@@ -3,6 +3,9 @@ from takt.utils import int_preferred
 
 TICKS_PER_QUARTER = 480
 """
+Constant defining the length of one tick in the takt package.
+"""
+"""
 taktパッケージ内における1ティックの長さを定義している定数です。
 """
 
@@ -54,6 +57,11 @@ L128DOT = int_preferred(TICKS_PER_QUARTER / 32 * 1.5)
 ""
 L128DOTDOT = int_preferred(TICKS_PER_QUARTER / 32 * 1.75)
 """
+Constants that represent the number of ticks for each note value.
+L\\ :math:`n` means :math:`n`-th notes/rests.
+DOT means dotted, DOTDOT means double dotted note/rests.
+"""
+"""
 各音価に相当するティック数を表した定数です。
 L\\ :math:`n` は、:math:`n` 分音符/休符を意味します。
 DOTは付点、DOTDOTは複付点音符/休符を意味します。
@@ -61,6 +69,12 @@ DOTは付点、DOTDOTは複付点音符/休符を意味します。
 
 
 MAX_DELTA_TIME = L1
+"""
+Represents the maximum range of time that can be modified by the dt
+attribute of an event.
+The absolute value of the dt attribute must be less than or equal
+to this value.
+"""
 """
 イベントのdt属性によって修正できる時刻の最大幅を表します。
 dt属性の絶対値はこの値以下でなければなりません。
@@ -136,6 +150,11 @@ CONTROLLERS = {
     #    193: 'C_RTEMPO',# EXTENDED: tempo scaler
 }
 """
+A dict object defining the controller numbers.
+Each string that is a value of the dict can also be used as an independent
+constant, such as ``ctrl(C_BANK, 1)``.
+"""
+"""
 コントローラ番号を定義した dictオブジェクトです。
 値となっている各文字列は、``ctrl(C_BANK, 1)`` のように
 独立した定数としても使用可能です。
@@ -158,6 +177,10 @@ META_EVENT_TYPES = {
     0x58: 'M_TIMESIG',
     0x59: 'M_KEYSIG',
 }
+"""
+A dict object that defines numbers representing the types of meta-events.
+Each string value can also be used as an independent constant.
+"""
 """
 メタイベントの種類を表す番号を定義した dictオブジェクトです。
 値となっている各文字列は、独立した定数としても使用可能です。

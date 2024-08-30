@@ -1,5 +1,9 @@
 # coding:utf-8
 """
+This module defines a set of classes related to events.
+Most of these events are based on events defined in Standard MIDI files.
+"""
+"""
 このモジュールには、イベントに関するクラス群が定義されています。
 これらのイベントの多くは、標準MIDIファイルで定義されたイベントを
 基にしています。
@@ -26,6 +30,32 @@ class MidiEventWarning(TaktWarning): pass
 
 
 class Event(object):
+    """ Base class for all types of events.
+
+    Attributes:
+        t (ticks): time of the event in ticks
+        tk (int): track number (starting from 0)
+        dt (ticks): the difference between the notated time and the played
+            time; for performances, t plus this value (in ticks)
+            is used for timing; the range of the dt value is limited
+            (see :const:`takt.constants.MAX_DELTA_TIME`).
+
+    Args:
+        t(ticks): value of the t attribute
+        tk(int): value of the tk attribute
+        dt(ticks, optional): value of the dt attribute
+        kwargs: additional attributes for the event
+
+    .. rubric:: Arithmetic Rules
+
+    * The equivalence comparison ('==') between events results in true
+      only if the classes match and all attribute values are equivalent.
+    * If the '|' operator is used with the left operand being a string and
+      the right operand being an event, the left operand is ignored and the
+      result is the value of the event itself. This is used in showtext()
+      to ignore measure numbers, etc. to the left of the '|'.
+
+    """
     """ すべてのイベントの基底クラスです。
 
     Attributes:
@@ -67,12 +97,22 @@ class Event(object):
 
     def copy(self) -> 'Event':
         """
+        Returns a copied event (shallow copy).
+        """
+        """
         複製されたイベントを返します(浅いコピー)。
         """
         return self.__class__(self.t, self.tk, self.dt, **self.__dict__)
     __copy__ = copy
 
     def update(self, **kwargs) -> 'Event':
+        """
+        Adds or changes attributes according to the assignment description
+        in `kwargs`.
+
+        Returns:
+            self
+        """
         """
         `kwargs` の代入記述に従って属性を追加・変更します。
 
@@ -118,6 +158,13 @@ class Event(object):
             return "%r" % (value,)  # %sだとMetaEvent等で値が文字列の場合に問題
 
     def tostr(self, timereprfunc=std_time_repr) -> str:
+        """ Returns a string representation of the event.
+
+        Args:
+            timereprfunc(function): Function to convert a value of time to
+                a string. By default, it assumes a function that returns
+                a representation rounded to 5 decimal places.
+        """
         """ イベントを文字列に変換したものを返します。
 
         Args:
@@ -142,35 +189,44 @@ class Event(object):
             return NotImplemented
 
     def is_pitch_bend(self) -> bool:
+        """ Returns true for a Pitch Bend event. """
         """ピッチベンドイベントのとき真を返します。"""
         return (isinstance(self, CtrlEvent) and self.ctrlnum == C_BEND)
     def is_key_pressure(self) -> bool:
+        """ Returns true for a Key Pressure event. """
         """キープレッシャーイベントのとき真を返します。"""
         return isinstance(self, KeyPressureEvent)
     def is_channel_pressure(self) -> bool:
+        """ Returns true for a Channel Pressure event. """
         """チャネルプレッシャーイベントのとき真を返します。"""
         return (isinstance(self, CtrlEvent) and self.ctrlnum == C_CPR)
     def is_program_change(self) -> bool:
+        """ Return true for a Program Change event. """
         """プログラムチェンジイベントのとき真を返します。"""
         return (isinstance(self, CtrlEvent) and self.ctrlnum == C_PROG)
     def is_all_notes_off(self) -> bool:
+        """ Returns true for an all-note-off event (#123 control change
+            event with a value of 0). """
         """オールノートオフイベント(値が0の123番のコントロールチェンジ
             イベント)のとき真を返します。"""
         return (isinstance(self, CtrlEvent) and
                 self.ctrlnum == C_ALL_NOTES_OFF and self.value == 0)
     def is_marker(self) -> bool:
+        """ Returns true for a marker event (#6 meta event). """
         """マーカーイベント(6番のメタイベント）のとき真を返します。"""
         return (isinstance(self, MetaEvent) and self.mtype == M_MARK)
     def is_end_of_track(self) -> bool:
+        """ Returns true for a track-end event (#47 meta event). """
         """トラック終了イベント(47番のメタイベント）のとき真を返します。"""
         return (isinstance(self, MetaEvent) and self.mtype == M_EOT)
     def is_text_event(self) -> bool:
+        """ Returns true for text events (#1 to #15 meta events)."""
         """テキストイベント(1～15番のメタイベント）のとき真を返します。"""
         return (isinstance(self, MetaEvent) and 1 <= self.mtype <= 15)
 
     def to_message(self) -> Union[bytes, bytearray]:
-        """イベントをバイト列に変換します。
-        """
+        """ Convert an event to a byte sequence. """
+        """イベントをバイト列に変換します。"""
         return b''
 
     def _get_ch(self):
@@ -204,13 +260,18 @@ ctrlnum=%r, ch=%r)" % (self.value, self.ctrlnum, self.ch),
             return bytes(self.value)
 
     def ptime(self) -> Ticks:
+        """ Returns the performance time (sum of the t and dt attribute
+            values). """
         """ 演奏上の時刻 (t属性値とdt属性値の和) を返します。"""
         return self.t + self.dt
 
 
 class NoteEventClass(Event):
     """
-    NoteEvent, NoteOnEvent, および NoteOffEvent を総括した抽象クラスです。
+    Base class of NoteEvent, NoteOnEvent, and NoteOffEvent.
+    """
+    """
+    NoteEvent, NoteOnEvent, および NoteOffEvent を総括した基底クラスです。
     """
     __slots__ = ()
 
@@ -219,6 +280,38 @@ class NoteEventClass(Event):
 
 
 class NoteEvent(NoteEventClass):
+    """
+    Class for note events. A note event corresponds to a pair of note-on
+    and note-off.
+
+    Attributes:
+        ch (int): MIDI channel number (starting from 1)
+        n (int or Pitch): MIDI note number
+        L (ticks): notated duration in ticks (note value)
+        v (int): MIDI velocity
+        nv (int or None): MIDI note-off velocity; if this is None, a note-on
+            message with zero velocity is used when converted to a MIDI byte
+            sequence.
+        du (ticks, optional): playing duration in ticks (time difference
+            between note-on and note-off in the performance). When this
+            attribute is absent, it is assumed to have the same value as
+            the L attribute.
+
+    Other Inherited Attributes
+        t, tk, dt
+
+    Args:
+        t(ticks): value of the t attribute
+        n(int or Pitch): value of the n attribute
+        L(ticks): value of the L attribute
+        v(int, optional): value of the v attribute
+        nv(int or None, optional): value of the nv attribute
+        du(ticks, optional): value of the du attribute
+        tk(int, optional): value of the tk attribute
+        ch(int, optional): value of the ch attribute
+        dt(ticks, optional): value of the dt attribute
+        kwargs: additional attributes for the event
+    """
     """
     音符を表すイベントのクラスです。1対のノートオンとノートオフに相当します。
 
@@ -268,14 +361,19 @@ class NoteEvent(NoteEventClass):
     __copy__ = copy
 
     def get_du(self) -> Ticks:
+        """ Returns the value of the du attribute (or the value of L if it is
+            missing)."""
         """ du属性の値(なければLの値)を返します。"""
         return getattr(self, 'du', self.L)
 
     def offtime(self) -> Ticks:
+        """ Returns the notated note-off time (sum of the t and L attribute
+            values)."""
         """ ノートオフ時刻(t属性値とL属性値の和)を返します。"""
         return self.t + self.L
 
     def pofftime(self) -> Ticks:
+        """ Returns the played note-off time. """
         """ 演奏上のノートオフ時刻を返します。"""
         return self.ptime() + self.get_du()
 
@@ -284,6 +382,25 @@ class NoteEvent(NoteEventClass):
 
 
 class NoteOnEvent(NoteEventClass):
+    """ Class for note-on events.
+
+    Attributes:
+        ch (int): MIDI channel number (starting from 1)
+        n (int or Pitch): MIDI note number
+        v (int): MIDI velocity
+
+    Other Inherited Attributes
+        t, tk, dt
+
+    Args:
+        t(ticks): value of the t attribute
+        n(int or Pitch): value of the n attribute
+        v(int, optional): value of the v attribute
+        tk(int, optional): value of the tk attribute
+        ch(int, optional): value of the ch attribute
+        dt(ticks, optional): value of the dt attribute
+        kwargs: additional attributes for the event
+    """
     """ ノートオンイベントのクラスです。
 
     Attributes:
@@ -329,6 +446,27 @@ class NoteOnEvent(NoteEventClass):
 
 
 class NoteOffEvent(NoteEventClass):
+    """ Class for note-off events.
+
+    Attributes:
+        ch (int): MIDI channel number (starting from 1)
+        n (int or Pitch): MIDI note number
+        nv (int or None): MIDI note-off velocity; if this is None, a note-on
+            message with zero velocity is used when converted to a MIDI byte
+            sequence.
+
+    Other Inherited Attributes
+        t, tk, dt
+
+    Args:
+        t(ticks): value of the t attribute
+        n(int or Pitch): value of the n attribute
+        nv(int or None, optional): value of the nv attribute
+        tk(int, optional): value of the tk attribute
+        ch(int, optional): value of the ch attribute
+        dt(ticks, optional): value of the dt attribute
+        kwargs: additional attributes for the event
+    """
     """ ノートオフイベントのクラスです。
 
     Attributes:
@@ -379,6 +517,37 @@ class NoteOffEvent(NoteEventClass):
 
 
 class CtrlEvent(Event):
+    """
+    Class of control events with controller number and control value.
+    This includes MIDI Control Change, Program Change, Pitch Bend,
+    Channel Pressure, and Key Pressure.
+    For Key Pressure, a dedicated subclass is provided, so use its constructor
+    when instantiating.
+
+    Attributes:
+        ch (int): MIDI channel number (starting from 1)
+        ctrlnum (int): controller number, with the following meaning
+
+            * 0 to 127: MIDI control change (`value` is from 0 to 127)
+            * 128(C_BEND): MIDI pitch bend (`value` is from -8192 to 8191)
+            * 129(C_KPR): MIDI key pressure (see KeyPressureEvent)
+            * 130(C_CPR): MIDI channel pressure (`value` is from 0 to 127)
+            * 131(C_PROG): MIDI program change (`value` is from 1 to 128)
+            * Other: For internal processing.
+        value (int, etc.): control value
+
+    Other Inherited Attributes
+        t, tk, dt
+
+    Args:
+        t(ticks): value of the t attribute
+        ctrlnum (int): value of ctrlnum attribute
+        value(int, etc.): value of the value attribute
+        tk(int, optional): value of the tk attribute
+        ch(int, optional): value of the ch attribute
+        dt(ticks, optional): value of the dt attribute
+        kwargs: additional attributes for the event
+    """
     """
     コントローラ番号とコントロール値を持った制御イベントのクラスです。
     これには、MIDIコントロールチェンジ、プログラムチェンジ、ピッチベンド、
@@ -451,6 +620,24 @@ class CtrlEvent(Event):
 
 
 class KeyPressureEvent(CtrlEvent):
+    """ Class of Key Pressure events.
+
+    Attributes:
+        n (int or Pitch): MIDI note number
+        value (int or float): control value (0-127)
+
+    Other Inherited Attributes
+        t, tk, dt, ch, ctrlnum
+
+    Args:
+        t(ticks): value of the t attribute
+        n(int or Pitch): value of the n attribute
+        value(int, etc.): value of the value attribute
+        tk(int, optional): value of the tk attribute
+        ch(int, optional): value of the ch attribute
+        dt(ticks, optional): value of the dt attribute
+        kwargs: additional attributes for the event
+    """
     """ キープレッシャーイベントのクラスです。
 
     Attributes:
@@ -491,6 +678,27 @@ class KeyPressureEvent(CtrlEvent):
 
 
 class SysExEvent(Event):
+    """ Class for system-exclusive message events.
+
+    Attributes:
+        value (bytes, bytearray, or iterable of int):
+            The contents of the message explicitly including the leading
+            0xf0 and trailing 0xf7.
+            It is possible to split a single message into multiple
+            SysExEvent's, in which case 0xf0 is placed in the first event and
+            0xf7 in the last.
+
+    Other Inherited Attributes
+        t, tk, dt
+
+    Args:
+        t(ticks): value of the t attribute
+        value(bytes, bytearray, or iterable of int):
+            value of the value attribute
+        tk(int, optional): value of the tk attribute
+        dt(ticks, optional): value of the dt attribute
+        kwargs: additional attributes for the event
+    """
     """ システムエクスクルーシブメッセージのイベントです。
 
     Attributes:
@@ -521,6 +729,9 @@ class SysExEvent(Event):
     __copy__ = copy
 
     def to_message(self) -> Union[bytes, bytearray]:
+        """ Convert the event to a byte sequence (sequence prefixed with an
+            additional 0xf0).
+        """
         """イベントをバイト列(valueの先頭に更に0xf0を加えたもの)に変換します。
         """
         result = bytearray((0xf0,))
@@ -529,6 +740,42 @@ class SysExEvent(Event):
 
 
 class MetaEvent(Event):
+    """
+    Class for meta events defined in Standard MIDI files.
+    This includes text events, key signature events, time signature events,
+    tempo change events, and end-of-track events.
+
+    Attributes:
+        mtype (int): type of meta event (0-127)
+        value (bytes, bytearray, str, Key, int, float, or iterable of int):
+            Data of the meta event. If mtype is from 1 to 15, this attribute
+            should be of type str. If mtype is M_KEYSIG (key signature event),
+            this attribute should be of type Key. If mtype is M_TEMPO (tempo
+            change event), this attribute must be of type int or float.
+            For other meta events, bytes, bytearray, or iterable of int is
+            recommended.
+
+    Other Inherited Attributes
+        t, tk, dt
+
+    Args:
+        t(ticks): value of the t attribute
+        mtype(int): value of the mtype attribute
+        value(bytes, bytearray, str, Key, int, float, or iterable of int):
+            value of the value attribute
+        tk(int, optional): value of the tk attribute
+        dt(ticks, optional): value of the dt attribute
+        kwargs: additional attributes for the event
+
+    Notes:
+        The key signature event, the time signature event, and the tempo
+        change event have their own subclasses.
+        When instantiating a tempo change event, use the dedicated subclass
+        (TempoEvent).
+        Although it is possible to create the key and time signature events
+        using the constructor of this class, it is more convenient to use
+        the constructor of each subclass.
+    """
     """ 標準MIDIファイルで定義されているメタイベントのクラスです。
     これには、テキストイベント、調号イベント、拍子イベント、
     テンポ変更イベント、トラック終了イベントなどが含まれます。
@@ -591,6 +838,13 @@ class MetaEvent(Event):
     __copy__ = copy
 
     def to_message(self, encoding='utf-8') -> Union[bytes, bytearray]:
+        """ Converts the event to a byte sequence (data in a standard MIDI
+        file without length information).
+
+        Args:
+            encoding(str): specifies how the text event's string should be
+                encoded in the byte sequence.
+        """
         """ イベントをバイト列(長さ情報を除いた標準MIDIファイル中のデータ)に
         変換します。
 
@@ -616,6 +870,18 @@ class MetaEvent(Event):
 
 
 class KeySignatureEvent(MetaEvent):
+    """ Class for key signature events.
+
+    Inherited Attributes
+        t, tk, dt, mtype, value
+
+    Args:
+        t(ticks): value of the t attribute
+        value(Key, int, or str): first argument of the Key constructor
+        tk(int, optional): value of the tk attribute
+        dt(ticks, optional): value of the dt attribute
+        kwargs: additional attribute for the event
+    """
     """ 調号イベントのクラスです。
 
     継承された属性
@@ -639,6 +905,9 @@ class KeySignatureEvent(MetaEvent):
         return attrs
 
     def to_message(self, encoding='utf-8') -> Union[bytes, bytearray]:
+        """ Convert the event to a byte sequence (data in a standard MIDI file
+        without length information).
+        """
         """イベントをバイト列(長さ情報を除いた標準MIDIファイル中のデータ)に
         変換します。
         """
@@ -647,6 +916,25 @@ class KeySignatureEvent(MetaEvent):
 
 
 class TimeSignatureEvent(MetaEvent):
+    """ Class for time signature events.
+
+    Inherited Attributes
+        t, tk, dt, mtype, value
+
+    Args:
+        t(ticks): value of the t attribute
+        num(int): value of the numerator
+        den(int): value of the denominator
+        cc(int, optional): interval between metronome clicks in units of 1/24
+            of a quarter note. By default, it is automatically guessed from
+            `num` and `den`.
+        tk(int, optional): value of the tk attribute
+        dt(ticks, optional): value of the dt attribute
+        kwargs: additional attributes for the event
+
+    Examples:
+        ``TimeSignatureEvent(0, 3, 4)`` for 3/4 time and zero event time.
+    """
     """ 拍子イベントのクラスです。
 
     継承された属性
@@ -690,19 +978,24 @@ class TimeSignatureEvent(MetaEvent):
         return cc
 
     def numerator(self) -> int:
+        """ Returns the value of the numerator."""
         """ 分子の値を返します。"""
         return self._get_data_bytes()[0]
 
     def denominator(self) -> int:
+        """ Returns the value of the denominator."""
         """ 分母の値を返します。"""
         return 1 << self._get_data_bytes()[1]
 
     def num_den(self) -> Tuple[int, int]:
+        """ Returns a 2-tuple consisting of the numerator and denominator."""
         """ 分子と分母からなる2要素タプルを返します。"""
         data = self._get_data_bytes()
         return (data[0], 1 << data[1])
 
     def get_cc(self) -> int:
+        """ Returns the interval between metronome clicks (in 1/24ths of
+            a quarter note)."""
         """ メトロノームクリックの間隔(四分音符の1/24単位)を返します。"""
         return self._get_data_bytes()[2]
 
@@ -724,16 +1017,34 @@ class TimeSignatureEvent(MetaEvent):
             return super().tostr(timereprfunc)
 
     def beat_length(self) -> Ticks:
+        """ Returns the length of one beat in ticks."""
         """ 1拍の長さをティック単位で返します。"""
         data = self._get_data_bytes()
         return int_preferred(TICKS_PER_QUARTER * 4 / (1 << data[1]))
 
     def measure_length(self) -> Ticks:
+        """ Returns the length of one measure in ticks."""
         """ 1小節の長さをティック単位で返します。"""
         return self.numerator() * self.beat_length()
 
 
 class TempoEvent(MetaEvent):
+    """ Class for tempo change events.
+
+    Attributes:
+        value (int or float):
+            tempo value in quarter notes per minute (minimum value is 4)
+
+    Other Inherited Attributes
+        t, tk, dt, mtype, value
+
+    Args:
+        t(ticks): value of the t attribute
+        value(int or float): value of the value attribute
+        tk(int, optional): value of the tk attribute
+        dt(ticks, optional): value of the dt attribute
+        kwargs: additional attributes for the event
+    """
     """ テンポ変更イベントのクラスです。
 
     Attributes:
@@ -766,6 +1077,9 @@ class TempoEvent(MetaEvent):
         return attrs
 
     def to_message(self, encoding='utf-8') -> Union[bytes, bytearray]:
+        """ Convert the event to a byte sequence (data in a standard MIDI
+        file without length information).
+        """
         """イベントをバイト列(長さ情報を除いた標準MIDIファイル中のデータ)に
         変換します。
         """
@@ -779,6 +1093,21 @@ class TempoEvent(MetaEvent):
 
 
 class LoopBackEvent(Event):
+    """ Class for loopback events.
+
+    Attributes:
+        value: Arbitrary data to distinguish events
+
+    Other Inherited Attributes
+        t, tk, dt
+
+    Args:
+        t(ticks): value of the t attribute
+        value(str): value of the value attribute
+        tk(int, optional): value of the tk attribute
+        dt(ticks, optional): value of the dt attribute
+        kwargs: additional attribute for the event
+    """
     """ ループバックイベントのクラスです。
 
     Attributes:
@@ -810,6 +1139,40 @@ class LoopBackEvent(Event):
 
 
 class XmlEvent(Event):
+    """ A class of events describing additional information for staff notation.
+
+    Attributes:
+        xtype (str): a string representing the type of information
+        value: Content data of information
+
+    Other Inherited Attributes
+        t, tk, dt
+
+    Args:
+        t(ticks): value of t attribute
+        xtype(str): value of the xtype attribute
+        value: value of the value attribute
+        tk(int, optional): value of the tk attribute
+        dt(ticks, optional): value of the dt attribute
+        kwargs: additional attribute for the event
+
+    List of valid events
+        ========== ============ ============================= ================
+        xtype      desc.         value                        optional attrs.
+        ========== ============ ============================= ================
+        'clef'     clef         'G', 'F', 'C'                 line(int),
+                                'percussion', 'TAB',          octave_change
+                                'jianpu', 'none'              (int)
+        'barline'  bar line     'dashed', 'dotted', 'heavy',
+                                'heavy-heavy', 'heavy-light',
+                                'light-heavy', 'light-light',
+                                'none', 'regular', 'short',
+                                'tick', 'double', 'final',
+                                'repeat-start', 'repeat-end'
+        'chord'    chord symbol Chord
+        'text'     generic text str
+        ========== ============ ============================= ================
+    """
     """ 五線譜のための追加情報を記述したイベントのクラスです。
 
     Attributes:
@@ -864,6 +1227,14 @@ _msg_size_table = (3, 3, 3, 3, 2, 2, 3, 0)
 
 
 def midimsg_size(status) -> int:
+    """ Finds the length of a MIDI message from the status byte of the message.
+
+    Args:
+        status(int): MIDI status byte value
+
+    Returns:
+        Length of the message
+    """
     """ MIDIメッセージのステータスバイトからメッセージの長さを求めます。
 
     Args:
@@ -880,6 +1251,21 @@ def midimsg_size(status) -> int:
 
 
 def message_to_event(msg, time, tk, encoding='utf-8') -> Event:
+    """ Takes a byte sequence in the format returned by the to_message method
+    of each class and converts it to an event of the appropriate class (except
+    LoopBackEvent).
+
+    Args:
+        msg(bytes, bytearray, or iterable of int): Input byte sequence
+        time(ticks): time of event
+        tk(int): track number
+        encoding(str or None): specifies how the string of the text event is
+            encoded in the byte sequence; if this is None, the string is
+            copied verbatimly from the byte sequence.
+
+    Returns:
+        Event created
+    """
     """ 各クラスの to_message メソッドが返す形式のバイト列を受け取って、
     それを適切なクラスのイベントへ変換します (LoopBackEventを除く)。
 

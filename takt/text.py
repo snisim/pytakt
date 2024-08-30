@@ -1,5 +1,9 @@
 # coding:utf-8
 """
+This module defines functions for text format scores that are readable and
+can be evaluated in Python.
+"""
+"""
 このモジュールには、可読かつPythonで評価可能なテキスト形式のスコアに
 ついての関数が定義されています。
 """
@@ -106,14 +110,63 @@ def showtext(score, rawmode=False, time='measures',
              resolution=TICKS_PER_QUARTER, limit=DEFAULT_LIMIT, bar0len=None,
              file=sys.stdout, timereprfunc=None) -> None:
     """
+    This function displays the contents of the score in a Python-evaluatable
+    text, with notes, rests, and other information in chronological order for
+    each track.
+    This display contains all the information the score has.
+    By default, each line displays a note, rest, ctrl, tempo, timesig, keysig,
+    sysex, and other command, along with the measure number and number of
+    ticks in the measure.
+    This text can be eval'd to generate a score compatible with the original
+    (although the structure of the score will generally be different).
+
+    Args:
+        score(Score): Input score
+        rawmode(bool, optional): If True, events are displayed on each line
+            instead of commands. In this mode (raw mode), for a score read
+            from a standard MIDI file with pair_note_events=False as shown
+            below, converting it to text and then eval'ing it will
+            reproduce the exactly same score, except for the attribute
+            information of the Tracks object.
+
+            >>> buf = io.StringIO()
+            >>> score = readsmf('a.mid', pair_note_events=False)
+            >>> score.showtext(rawmode=True, file=buf)
+            >>> print(list(score) == list(eval(buf.getvalue())))
+            True
+        time(str, optional): One of the followings which determines the format
+            of the time displayed at the beginning of each line.
+
+            - 'measures' (default): displays the measure number and ticks
+              within the measure.
+            - 'mbt': displays measure number, beat number, and ticks
+              within the beat.
+            - 'ticks': displays ticks from the beginning of the score.
+            - 'all': displays all the values displayed by 'mbt' and 'ticks'.
+            - 'none': no display.
+        resolution(int or float, optional):
+            Specifies ticks per quarter note in the display.
+        limit(ticks, optional): Limits the length of the score.
+            For details on limit, see the same name argument of
+            :meth:`.Score.stream`.
+        bar0len(ticks, optional):
+            Specifies the length of the initial measure (Bar 0).
+            Affects only time display at the beginning of each line.
+        file(file object): Specifies the file object to output to.
+            The default is sys.stdout (standard output).
+        timereprfunc(function): Specifies the function to convert a time value
+            to a string.
+            By default, it is set to the 'repr' function for the raw mode
+            and :func:`.frac_time_repr` otherwise.
+    """
+    """
     スコアの内容を、トラックごと、時間順に音符、休符およびその他の
     情報を並べたPythonによって評価可能なテキストに変換して表示します。
     この表示には、スコアが持っているすべての情報が含まれています。
     デフォルトでは、各行に note, rest, ctrl, tempo, timesig, keysig, sysex
     などのコマンドが、小節番号、小節内ティック数とともに表示されます。
     このテキストは eval することによって元とコンパチブルなスコアを生成する
-    ことができます（ただし、スコアの構造や、スコアが生成するイベント列に
-    おける同時刻イベント間の順序は、一般に異なります)。
+    ことができます（ただし、スコアの構造は一般に異なります)。
 
     Args:
         score(Score): 入力スコア
@@ -129,8 +182,8 @@ def showtext(score, rawmode=False, time='measures',
             >>> score.showtext(rawmode=True, file=buf)
             >>> print(list(score) == list(eval(buf.getvalue())))
             True
-        time(str, optional): 次のいずれかにより、各行の時刻表示の形式を
-            決めます。小節番号と拍番号はともに 0 から始まります。
+        time(str, optional): 次のいずれかにより、各行先頭の時刻表示の形式を
+            決めます。
 
             - 'measures' (デフォルト): 小節番号と小節内ティック数を表示します。
             - 'mbt': 小節番号、拍番号、拍内ティック数を表示します。
@@ -143,11 +196,11 @@ def showtext(score, rawmode=False, time='measures',
             制限の詳細については、:meth:`.Score.stream` の同名の引数
             の項目を見てください。
         bar0len(ticks, optional):
-            小節番号 0 の小節の長さを指定します。時刻表示にのみ影響を与えます。
+            小節番号 0 の小節の長さを指定します。各行先頭の時刻表示にのみ
+            影響を与えます。
         file(file object): 出力先のファイルオブジェクトを指定します。
             デフォルトでは sys.stdout (標準出力) です。
-        timereprfunc(function): 時間の値 (上の `time` オプションで表示される
-            ものを除く) を文字列に変換する関数。
+        timereprfunc(function): 時間の値を文字列に変換する関数を指定します。
             デフォルトでは、rawモードならばrepr関数、そうでないなら
             :func:`.frac_time_repr` に設定されます。
     """
@@ -199,6 +252,34 @@ def writepyfile(score, filename, rawmode=False, time='measures',
                 resolution=TICKS_PER_QUARTER, limit=DEFAULT_LIMIT,
                 bar0len=None, end_score_args={}) -> None:
     """
+    Output the text converted by :func:`showtext` to a file with a header and
+    footer. This file is executable as a Python program, and when executed,
+    it can play the score, show the score content, and convert it to a
+    standard MIDI or JSON file, as shown in the example below.
+
+        | >>> score.writepyfile('sample.py')
+        | >>> <Ctrl-D>
+        | $ python sample.py
+        | Usage: /usr/bin/python sample.py (play|show|write) [WRITE_FILE] \
+[PARAM=VALUE ..]
+        | $ python sample.py play \
+　# Play the score. Parameters, if any, are passed to :func:`.play`.
+        | $ python sample.py show velocity=True \
+　# Show the piano roll. Parameters are passed to :func:`.show`.
+        | $ python sample.py write sample.mid "encoding='sjis'" \
+　# Write to SMF. Parameters are passed to :func:`.writesmf`.
+        | $ python sample.py write sample.json indent=4 \
+　# If the file name extension is '.json', it is written to a JSON file. \
+Parameters are passed to :func:`.writejson`.
+
+    Args:
+        filename(str): name of output file ('-' for standard output)
+        end_score_args(dict, optional): additional arguments passed to
+            the end_score function
+
+    The meaning of the other arguments is the same as :func:`showtext`.
+    """
+    """
     :func:`showtext` によって変換されたテキストを、ヘッダ、フッタとともに
     ファイルへ出力します。このファイルは Python のプログラムとして実行可能
     であり、実行すると下の例のようにスコア内容の再生、表示、および SMFやJSON
@@ -223,7 +304,7 @@ def writepyfile(score, filename, rawmode=False, time='measures',
         filename(str): 出力ファイル名 ('-' なら標準出力)
         end_score_args(dict, optional): end_score関数へ渡される追加の引数
 
-    他の引数の意味は :func:`showtext` と同じです:
+    他の引数の意味は :func:`showtext` と同じです。
     """
     def _writepyfile(f):
         print("from takt import *", file=f)
@@ -248,6 +329,32 @@ _score_file_reading = False
 
 
 def evalpyfile(filename, supply_tempo=True) -> Score:
+    """
+    Execute a Python file containing :func:`end_score` (which can be
+    generated by :func:`writepyfile` or written by a user) and return
+    the score described in it.
+
+    **Caution**: This function executes the contents of a file as a Python
+    program, and therefore poses a significant security risk. Use extreme
+    caution when applying this function to files obtained from outside such
+    as the Internet.
+
+    Args:
+        filename(str): file name
+        supply_tempo(bool or float, optional): If True, a tempo event of the
+            value specified in the `default_tempo` argument of
+            :func:`end_score` is supplied if there is no tempo event at time 0.
+            If a valid tempo value (BPM) is specified, a tempo event of that
+            value is inserted if there is no tempo event at time 0.
+            If False, no tempo event is added.
+
+    Returns:
+        The score passed as an argument to :func:`end_score`.
+        This score object has the additional attributes 'default_tempo',
+        'smf_format', and 'smf_resolution', whose values are set to the
+        values of the `default_tempo`, `format`, and `resolution` arguments
+        of :func:`end_score`.
+    """
     """
     :func:`end_score` を含んだ Python ファイル (これは、:func:`writepyfile` に
     よって生成されたものでも、ユーザによって書かれたものでも構いません) を
@@ -299,8 +406,28 @@ def evalpyfile(filename, supply_tempo=True) -> Score:
 
 def end_score(score, default_tempo=125.0, format=1, resolution=480) -> None:
     """
+    Depending on the command line arguments when Python is invoked,
+    this function plays, displays, or outputs the contents of `score`
+    to a file.
+    This function is intended to be used for final processing in a Python file
+    that describes a score.
+    Files generated by :func:`writepyfile` will have this function at the end.
+    See :func:`writepyfile` for the usage of command line arguments.
+
+    Args:
+        score(Score): the output score
+        default_tempo(float or int, optional):
+            Specifies the tempo when there is no tempo event at time 0.
+        format(int, optional):
+            Specifying the SMF format by one of the integers 0, 1, and 2.
+            This is referenced when writing to SMF with the write operation.
+        resolution(int, optional):
+            Specifies the resolution (ticks per quarter note) in SMF.
+            This is referenced when writing to SMF with the write operation.
+    """
+    """
     Python を起動したときのコマンドライン引数に応じて、`score` の内容を
-    再生、表示、あるいは SMFへ変換を行います。この関数は、スコアを記述した
+    再生、表示、あるいはファイルに出力します。この関数は、スコアを記述した
     Python ファイルにおいて、その終了処理として使用すること想定しています。
     :func:`writepyfile` によって生成されたファイルには末尾にこの関数が
     置かれています。コマンドライン引数の使い方については
@@ -311,11 +438,10 @@ def end_score(score, default_tempo=125.0, format=1, resolution=480) -> None:
         default_tempo(float or int, optional):
             時刻 0 にテンポイベントがないときのテンポを指定します。
         format(int, optional): 0, 1, 2いずれかの整数で、SMFのフォーマットを
-            指定します。write操作でSMFに書き出すとき、および
-            :func:`evalpyfile` で読まれたときに参照されます。
+            指定します。write操作でSMFに書き出すときに参照されます。
         resolution(int, optional): SMFにおける分解能(四分音符あたりの
-            ティック数)を指定します。write操作でSMFに書き出すとき、および
-            :func:`evalpyfile` で読まれたときに参照されます。
+            ティック数)を指定します。write操作でSMFに書き出すとき
+            に参照されます。
     """
     global _returned_score
     if _score_file_reading:
@@ -357,7 +483,53 @@ def end_score(score, default_tempo=125.0, format=1, resolution=480) -> None:
                   "[PARAM=VALUE ..]" % (sys.executable, sys.argv[0]))
 
 
-def writejson(score, filename, **kwargs) -> Optional[str]:
+def writejson(score, filename, **kwargs) -> None:
+    """
+    Writes the contents of `score` to Pytakt's original file in JSON format.
+    Reading this file with :func:`readjson` yields an object that is
+    equivalent to the original (i.e., true when compared with '==').
+    It cannot be used if `score` contains objects other than those of
+    the classes below.
+
+        int, float, str, bool, None, Fraction, Pitch, Interval, Key, list,
+        tuple, dict (each key must be a string), bytes, bytearray,
+        Event and its subclasses, EventList, Tracks, and Chord
+
+    Scores, except for EventStreams, usually consist of only the above objects,
+    so this function is useful for saving score information to a file.
+    It has the advantage over standard MIDI files in that it can include
+    information about enharmonics, both notated and played times,
+    and additional event attributes.
+
+    Args:
+        filename: Output filename ('-' for standard output)
+        kwargs: Other arguments passed to json.dump
+
+    Examples:
+        >>> writejson(note(C4), '-', indent=4)
+        {
+            "__event_list__": true,
+            "duration": 480,
+            "events": [
+                {
+                    "__event__": "NoteEvent",
+                    "t": 0,
+                    "n": {
+                        "__pitch__": "C4"
+                    },
+                    "L": 480,
+                    "v": 80,
+                    "nv": null,
+                    "tk": 1,
+                    "ch": 1
+                }
+            ]
+        }>>>
+        >>> s = mml("C C# Db> D")
+        >>> writejson(s, 'a.json')
+        >>> s == readjson('a.json')
+        True
+    """
     """
     `score` の内容をJSON形式によるPytakt独自のファイルに書き出します。
     このファイルを :func:`readjson` で読むと、元と等価な(つまり、
@@ -456,6 +628,13 @@ def writejson(score, filename, **kwargs) -> Optional[str]:
 
 def readjson(filename) -> Score:
     """
+    Reads a file in JSON format written by :func:`writejson` and
+    returns the object described.
+
+    Args:
+        filename: Input file name ('-' for standard input)
+    """
+    """
     :func:`writejson` で書き出されたJSON形式のファイルを読んで
     記述されているオブジェクトを返します。
 
@@ -537,6 +716,16 @@ def statis(values=(), weights=itertools.repeat(1), times=itertools.repeat(0)):
 
 
 def showsummary(score, default_tempo=125.0) -> None:
+    """
+    Displays summary information about the score, including length,
+    number of measures, pitch range, and number of events.
+
+    Args:
+        score(Score): Input score
+        default_tempo(float): If there is a section at the beginning of
+            the score with no tempo events, the tempo of that section is
+            assumed to be this value.
+    """
     """
     スコアに関して、演奏長、小節数、音域、イベント数などのサマリー情報を表示
     します。

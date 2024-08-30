@@ -1,5 +1,8 @@
 # coding:utf-8
 """
+This module defines classes related to effectors.
+"""
+"""
 このモジュールには、エフェクタ関連のクラスが定義されています。
 """
 # Copyright (C) 2023  Satoshi Nishimura
@@ -40,6 +43,40 @@ def _check_dt(ev):
 
 
 class Effector(ABC):
+    """ The Effector class is an abstract class on which every effector is
+    based.
+
+    An effector is a callable object that performs score transformation.
+    When it is called with a score as an argument, as in the example below,
+    it returns the transformed score.
+
+        >>> eff = Transpose('M2')
+        >>> eff(note(C4))
+        EventList(duration=480, events=[
+            NoteEvent(t=0, n=D4, L=480, v=80, nv=None, tk=1, ch=1)])
+
+    Score transformation by effectors has the following properties.
+
+    * The original scores remain unmodified and are not destroyed (although
+      in the case of an EventStream, elements may be consumed during
+      transformation).
+    * As a basic rule, events that do not require modification are output
+      without copying. Such events will be shared between the original score
+      and the transformed score.
+    * Events in each event list after transformation may not be sorted
+      in chronological order.
+
+    Unless otherwise noted, effectors are applicable to EventStream's
+    (including infinite-length scores). Also, they are applicable to scores
+    containing separated note events (NoteOnEvent and NoteOffEvent) unless
+    otherwise noted.
+
+    The constructor of each effector class is also available as a method of
+    the Score class, in which the creation of the effector instance and the
+    score transformation are done in succession
+    (e.g. ``note(C4).Transpose('M2')``).
+
+    """
     """ Effectorクラスは、すべてのエフェクタの基底となる抽象クラスです。
 
     エフェクタとは、スコア変換を行う呼び出し可能オブジェクト
@@ -101,11 +138,21 @@ class Effector(ABC):
 
 
 class EventEffector(Effector):
+    """ The EventEffector class is an abstract class of effectors that
+    performs transformations independently for each event.
+
+    Effectors of this class can apply transformations not only to scores
+    but also to a single event, as in the example below.
+
+        >>> eff = Transpose('M2')
+        >>> eff(NoteOnEvent(0, C4))
+        NoteOnEvent(t=0, n=D4, v=80, tk=1, ch=1)
+    """
     """ EventEffector クラスは、各イベントに対して独立に変換を行うエフェクタの
     抽象クラスです。
 
-    このクラスのエフェクタは、スコアだけでなく、単独のイベントに対しても変換
-    を適用することができます。
+    このクラスのエフェクタは、下の例のように、スコアだけでなく単独のイベントに
+    対しても変換を適用することができます。
 
         >>> eff = Transpose('M2')
         >>> eff(NoteOnEvent(0, C4))
@@ -124,6 +171,14 @@ class EventEffector(Effector):
 
 
 class CompositeEffector(Effector):
+    """ A class representing an effector that is a composite of two effectors.
+    When this effector is applied, the first effector is applied first,
+    then the second.
+
+    Args:
+        first(Effector): The object of the first effector.
+        second(Effector): The object of the second effector.
+    """
     """ 2つのエフェクタを合成したエフェクタのクラスです。
     このエフェクタを適用すると、まず第1のエフェクタが適用された後に
     第2のエフェクタが適用されます。
@@ -141,6 +196,33 @@ class CompositeEffector(Effector):
 
 
 class Transpose(EventEffector):
+    """ Applies a transposition (an operation that raises or lowers the pitch
+    by a certain interval).
+    Applies to all events with the 'n' attribute.
+
+    If `scale` is not specified, it does chromatic transposition.
+    The `value` can be either an Interval object or an integer representing
+    semitones (Interval objects are better for correctly handling enharnomics).
+
+    If `scale` is specified, it performs transposition on the scale (diatonic
+    transposition for a diatonic scale). The `value` is an integer representing
+    shift amount on the scale. If the original pitch is `n`
+    it is converted to `scale.pitch(scale.tonenum(n) + value)`.
+
+    Args:
+        value(Interval, str, or int): Amount of transposition.
+            If this is a string, it is the same as `Interval(value)`.
+        scale(Scale, optional): Specifies the scale.
+        transpose_keysig: If this argument is Ture (default) and no scale is
+            specified, KeySignatureEvent is also transposed. Otherwise,
+            KeySignatureEvent is output as it is.
+
+    Examples:
+        * ``mml("CDE").Transpose('M3')`` generates a score equivalent to
+          ``mml("EF#G#")``. ``Transpose(E4-C4)`` has the same meaning.
+        * ``mml("CDE").Transpose(DEG(3), scale=Scale(C4))`` generates a score
+          equivalent to ``mml("EFG")``.
+    """
     """ トランスポーズ操作 (ピッチを一定幅で上下させる操作) を適用します。
     n属性を持つすべてのイベントに対して適用されます。
 
@@ -188,6 +270,25 @@ class Transpose(EventEffector):
 
 
 class Invert(EventEffector):
+    """ Converts the score to the inverted form. Specifically, given a central
+    pitch `center`, it converts the pitch of each event having the 'n'
+    attribute to the pitch that is shifted in the opposite direction
+    from the `center` by the interval between the original pitch and
+    `center`.
+
+    Args:
+        center(Pitch or int): The pitch at the center of inversion.
+        scale(Scale, optional): Specifies a scale.
+            If omitted, the effector does chromatic inversion; if specified,
+            it performs inversion on the specified scale (diatonic inversion
+            for a diatonic scale).
+
+    Examples:
+        * ``mml("EFG*").Invert(E4)`` generates a score equivalent to
+          ``mml("ED#C#*")``.
+        * ``mml("EFG*").Invert(E4, scale=Scale(C4))`` generates a score
+          equivalent to ``mml("EDC*")``.
+    """
     """ 反行形のスコアに変換します。具体的には、中心となるピッチ `center` を
     指定し、n属性を持つ各イベントのピッチを、そのピッチと `center` との距離
     の分だけ `center` から逆方向へ動かしたピッチへ変換します。
@@ -220,6 +321,22 @@ class Invert(EventEffector):
 
 class ApplyScale(EventEffector):
     """
+    Converts the pitch of each event having the 'n' attribute to a pitch
+    that is on the specified scale and close to the original pitch using
+    :meth:`.Scale.get_near_scale_tone`.
+
+    Args:
+        scale(Scale): scale
+        round_mode(str or function):
+            Rounding mode passed to :func:`.takt_roundx`.
+
+    Examples:
+        * ``mml("C C# Db D E").ApplyScale(Scale(C4, 'minor'))`` generates
+          a score equivalent to ``mml("C C C D D Eb")``. The difference in
+          the results between 'C#' and 'Db' is due to the effect of
+          `enharmonic_delta` in :meth:`.Scale.tonenum`.
+    """
+    """
     n属性を持つ各イベントのピッチを、:meth:`.Scale.get_near_scale_tone`
     を用いて、それに近いスケール上の音のピッチに変換します。
 
@@ -247,6 +364,21 @@ class ApplyScale(EventEffector):
 
 class ConvertScale(EventEffector):
     """
+    For each event with the 'n' attribute, scale conversion is performed.
+    If the original pitch is `n`, the transformed pitch will be
+    `dst_scale.pitch(src_scale.tonenum(n))`.
+
+    Args:
+        src_scale(Scale): The source scale.
+        dst_scale(Scale): The target scale.
+            The number of its scale constituent tones must be the same
+            as that of `src_scale`.
+
+    Examples:
+        * ``mml("C C# D E").ConvertScale(Scale(C4, 'major'), Scale(C4, \
+'minor'))`` generates a score equivalent to ``mml("C C# D Eb")``.
+    """
+    """
     n属性を持つ各イベントについて、スケールの変換を行います。
     元のピッチを `n` とすると、変換後のピッチは
     `dst_scale.pitch(src_scale.tonenum(n))` になります。
@@ -254,8 +386,7 @@ class ConvertScale(EventEffector):
     Args:
         src_scale(Scale): 元のスケール。
         dst_scale(Scale): 変換後のスケール。
-            スケール構成音の数は、`src_scale` と `dst_scale` とで同じで
-            なければなりません。
+            スケール構成音の数は、`src_scale` と同じでなければなりません。
 
     Examples:
         * ``mml("C C# D E").ConvertScale(Scale(C4, 'major'), Scale(C4, \
@@ -277,6 +408,22 @@ class ConvertScale(EventEffector):
 
 class ScaleVelocity(EventEffector):
     """
+    Multiplies the value of velocity ('v' attribute) by `value`.
+
+    Args:
+        value(float, int, or list): The velocity multiplier.
+            If it is a float or int, the value is used as a fixed multiplier.
+            If it is a list, the value is passed to the constructor of
+            :class:`.Interpolator` and interpolated values are used as
+            the multipliers.
+
+    Examples:
+        * ``note(C4, v=80).ScaleVelocity(1.2)`` generates a score equivalent
+          to ``note(C4, v=96)``.
+        * ``mml("v=80 CDEF").ScaleVelocity([1.0, (L1, 0.5)])`` produces a
+          score equivalent to ``mml("C(v=80) D(v=70) E(v=60) F(v=50)")``.
+    """
+    """
     ベロシティー(v属性)の値に `value` の値を乗じます。
 
     Args:
@@ -291,7 +438,6 @@ class ScaleVelocity(EventEffector):
         * ``mml("v=80 CDEF").ScaleVelocity([1.0, (L1, 0.5)])`` は
           ``mml("C(v=80) D(v=70) E(v=60) F(v=50)")`` と
           等価なスコアを生成します。
-
     """
     def __init__(self, value):
         if isinstance(value, numbers.Real):
@@ -310,6 +456,13 @@ class ScaleVelocity(EventEffector):
 
 class Repeat(Effector):
     """
+    Converts the input score to a score that repeats the input score
+    `rep` times.
+
+    Args:
+        rep(int, optional): Number of repetitions (default is infinite)
+    """
+    """
     入力スコアを `rep` 回繰り返し演奏するスコアへ変換します。
 
     Args:
@@ -326,6 +479,16 @@ class Repeat(Effector):
 
 
 class TimeStretch(Effector):
+    """ Stretch time by the factor `stretch`.
+
+    Args:
+        stretch(float or int): The stretch factor. Must be a positive value.
+            Less than one means time shrinking.
+
+    Examples:
+        ``mml("CDE*").TimeStretch(2)`` generates a score equivalent to
+        ``mml("C*D*E**")``.
+    """
     """ 時間を `stretch` 倍に伸長します。
 
     Args:
@@ -358,6 +521,17 @@ class TimeStretch(Effector):
 
 class Retrograde(Effector):
     """
+    Converts the input score to the time-reversed score.
+
+    Time conversion is not performed for events other than NoteEvent.
+
+    It cannot be applied to an EventStream.
+
+    Examples:
+        * ``mml("CDE*").Retrograde()`` generates a score that is equivalent
+          to ``mml("E*DC")``.
+    """
+    """
     時間を逆行させたスコアへ変換します。
 
     NoteEvent 以外のイベントについては時間の変換を行いません。
@@ -385,6 +559,41 @@ class Retrograde(Effector):
 
 
 class Quantize(Effector):
+    """
+    Applies quantization to the time of each event as well as the duration of
+    the score.
+
+    Args:
+        tstep(ticks):
+            Step time for quantization.
+        strength(float, optional):
+            Strength of quantization (0-1). If it is 1.0 (default), then each
+            event time is modified to be an integer multiple of `tstep`.
+            Otherwise, the actual modification amount is a multiple of this
+            value and the modification amount when the value is 1.0.
+        window(float, optional):
+            The width of the time windows to be quantized, as a ratio to
+            to `tstep` (0 to 1). Only events within each window centered at
+            the time that is an integer multiple of `tstep` will be quantized.
+            For example, if `window=0.5`, the windows are positioned from
+            `tstep * (N - 0.25)` to `tstep * (N + 0.25)` (N=0,1,2,...).
+        keepdur(bool, optional):
+            If True, keeps the value of the L attribute of NoteEvent unchanged
+            and keeps the original note value (has no effect on NoteOffEvent).
+            If False (default), the value of the L attribute is adjusted
+            so that the end time of the note is also quantized.
+        saveorg(bool, optional):
+            If True, sets the 'dt' and 'du' attributes so that the
+            original (pre-quantized) time remains as the played time.
+            Values originally stored in the 'dt' and 'du' attributes will
+            be lost.
+
+    Examples:
+        * ``note(C4, 450).Quantize(120)`` generates a score equivalent to
+          ``note(C4, 480)``.
+        * ``note(C4, 450).Quantize(120, strength=0.5)`` generates a score
+          equivalent to ``note(C4, 465)``.
+    """
     """
     各イベントの時刻、およびスコアの演奏長に対して、クォンタイズ処理を
     適用します。
@@ -453,6 +662,35 @@ class Quantize(Effector):
 
 class TimeDeform(Effector):
     """
+    Converts the time of each event as well as the duration of the score
+    according to a time conversion function described by
+    :class:`.Interpolator`.
+
+    Args:
+        points(list of Points, etc.):
+            Arguments passed to :class:`.Interpolator`.
+            The time conversion function described the interpolator must be
+            a monotonically non-decreasing function.
+        periodic(bool, optional):
+            If True, the same pattern of time conversion are repeated with
+            its period of repetition being the time of the last control point
+            among `points`.
+        perf_only(bool, optional):
+            If True, the values of the 'dt' and 'du' attributes are adjusted
+            so that notated time (t and L attributes) is kept unchanged
+            and only played time is converted.
+            If False, notated time is also converted.
+
+    Examples:
+        * ``TimeDeform([(0, 0), (480, 482), (1920, 1950)])`` converts the
+          times 0, 240, 480, 1920, 2000 in the original score to 0, 241, 482,
+          1950, 1950 respectively.
+        * Applying ``TimeDeform([0, (240, 360), (480, 480)], periodic=True)``
+          will convert the times 0, 240, 480, 720, 960 in the original score
+          to 0, 360, 480, 840, 960 respectively. This kind of transformation
+          can be more briefly expressed by the Swing effector below.
+    """
+    """
     :class:`.Interpolator` によって記述された時間変換関数に従って、
     各イベントの時刻、および演奏長を変換します。
 
@@ -519,6 +757,25 @@ class TimeDeform(Effector):
 
 class Swing(TimeDeform):
     """
+    For each of time spans repeated with the period `period`, time is
+    transformed so that the time at the center of the span is mapped to
+    the time when `period * rate` is elapsed from the start of the span.
+
+    Args:
+        period(ticks): Period
+        rate(float): Adjustment value of the swing effect (0 to 1,
+            0.5 means no effect)
+        perf_only(bool, optional):
+            If True, the values of the 'dt' and 'du' attributes are adjusted
+            so that notated time (t and L attributes) is kept unchanged
+            and only played time is converted.
+            If False, notated time is also converted.
+
+    Examples:
+        ``mml("CDEF").Swing(L2, 0.75, False)`` generates a score equivalent
+        to ``mml("C.D/E.F/")``.
+    """
+    """
     周期 `period` の各時間区間において、その中央の時刻が区間開始から
     `period * rate` 経過した時刻になるように時間変換を行います。
 
@@ -540,6 +797,15 @@ class Swing(TimeDeform):
 
 
 class ToMilliseconds(TimeDeform):
+    """
+    Converts all times in the score to milliseconds and removes tempo events.
+
+    Examples:
+        >>> mml("$tempo(120) c $tempo(240) d").ToMilliseconds()
+        EventList(duration=750.0, events=[
+            NoteEvent(t=0.0, n=C4, L=500.0, v=80, nv=None, tk=1, ch=1),
+            NoteEvent(t=500.0, n=D4, L=250.0, v=80, nv=None, tk=1, ch=1)]
+    """
     """
     スコア中のすべて時間をミリ秒へ変換した上で、テンポイベントを取り除きます。
 
@@ -564,6 +830,34 @@ _RAND_LIMIT = 3
 
 class Randomize(Effector):
     """
+    For each note, this effector adds a random value to its played time (more
+    specifically to the 'dt' attribute value) and velocity. By default, it uses
+    random numbers with the Gaussian distribution with mean 0 and standard
+    deviation specified by the arguments.
+
+    Args:
+        time(int, float or function, optional):
+            If int or float, specifies the standard deviation (in ticks) of
+            the random values to be added to time. If the absolute value of
+            the generated random value exceeds 3 times the standard deviation,
+            it will be adjusted to within 3 times.
+            If this argument is a function, the random values are generated
+            by that function.
+        veloc(int, float or function, optional):
+            If int or float, specifies the standard deviation of the random
+            values to be added to velocity.
+            If this argument is a function, the random values are generated
+            by that function.
+        adjust_ctrl(bool, optional):
+            If True, the played time of CtrlEvent is adjusted to the
+            same value as the played time of NoteEvent or NoteOnEvent,
+            if the random value added to the played time of the note event is
+            negative, and if the CtrlEvent has the same track, same channel,
+            and same pitch (applicable only for a KeyPressureEvent) as the
+            note event and lies in the interval between the modified played
+            time and the original played time of the note event.
+    """
+    """
     各音符に対して、その演奏時刻 (実際には dt属性値) とベロシティに
     乱数値を加えます。デフォルトでは、平均0、標準偏差は引数で指定された値の
     ガウス分布に従った乱数が使われます。
@@ -573,10 +867,10 @@ class Randomize(Effector):
             int または float の場合、時刻に加える乱数値の標準偏差を
             指定します（ティック単位）。生成された乱数値の絶対値が
             標準偏差の3倍を超える場合は、3倍以内へ修正されます。
-            この引数が関数の場合は、その戻り値がそのまま乱数値になります。
+            この引数が関数の場合は、その関数によって乱数値が生成されます。
         veloc(int, float or function, optional):
             int または float の場合、ベロシティに加える乱数値の標準偏差を
-            指定します。関数の場合は、その戻り値が乱数値として使われます。
+            指定します。関数の場合は、その関数によって乱数値が生成されます。
         adjust_ctrl(bool, optional):
             Trueの場合、NoteEvent あるいは NoteOnEvent の演奏時刻に加えられる
             乱数値が負であった場合で、修正された演奏時刻から元の演奏時刻までの
@@ -661,17 +955,54 @@ class Randomize(Effector):
 
 class Clip(Effector):
     """
+    Cut out only those parts of the score whose time is greater than or equal
+    to `start` and less than `end`.
+    The structure of the score is preserved.
+
+    Args:
+        start(ticks or str): Start time.
+            It can be a number representing ticks from the beginning of the
+            score, or a string recognized
+            by :meth:`.TimeSignatureMap.mbt2ticks`.
+        end(ticks or str, optional): End time.
+            It can be a number representing ticks from the beginning of the
+            score, or a string recognized
+            by :meth:`.TimeSignatureMap.mbt2ticks`.
+            When only the measure number is given in the string, it means
+            up to the end of the measure.
+        initializer(bool, optional):
+            If True, all CtrlEvent's, TempoEvent's, KeySignatureEvent's, and
+            TimeSignatureEvent's that are active
+            (see :meth:`.active_events_at`) at the time of `start` are output
+            at the beginning.
+        split_notes(bool, optional):
+            If True, notes that span `start` and/or `end` boundaries are split
+            and the result will contain the fragments of the notes.
+            If False, no splitting is done and only notes whose onset time
+            (the t attribute value) is within the range of clipping are stored
+            in the result.
+            This feature is valid only for NoteEvent's and is not valid for
+            NoteOnEvent's or NoteOffEvent's.
+
+    Examples:
+        ``Clip(960)``
+            Clips scores after 960 ticks.
+
+        ``Clip('3:2', '7')``
+            Clips the score from Measure 3, Beat 2 to the end of Measure 7.
+            Note that the beat number starts from 0.
+    """
+    """
     時刻が `start` 以上、`end` 未満の部分だけ切り出します。
     スコアの構造は保たれます。
 
     Args:
         start(ticks or str): 開始時刻。
             スコア先頭からのティック数を表す数値、もしくは
-            :meth:`.mbt2ticks` が受けつける文字列で指定します。
+            :meth:`TimeSignatureMap.mbt2ticks` が受けつける文字列で指定します。
         end(ticks or str, optional): 終了時刻。
             スコア先頭からのティック数を表す数値、もしくは
-            :meth:`.mbt2ticks` が受けつける文字列で指定します。
-            省略すると、スコアの終わりまでの意味になります。
+            :meth:`TimeSignatureMap.mbt2ticks` が受けつける文字列で指定します。
             小節番号だけの文字列を与えたときは、その小節の終わりまでという
             意味になります。
         initializer(bool, optional):
@@ -747,6 +1078,19 @@ class Clip(Effector):
 
 
 class Arpeggio(Effector):
+    """
+    For each chord in the score (a group of notes started simultaneously),
+    this effector adds a value to the 'dt' attribute for each note in the
+    chord, according to its pitch order so that an arpeggio is played.
+    Also, the value of the 'du' attribute is adjusted so that the note-off
+    time remains the same. By default, the arpeggio is played from the lowest
+    to highest note.
+
+    Args:
+        delay(ticks):
+            Specifies the amount of time delay between the notes in the chord.
+            Negative numbers result in arpeggios from high to low.
+    """
     """
     スコア中のコード（同時に発音される音符のグループ）に対して、アルペジオ
     演奏が行われるように、コードの各構成音に対してピッチに順番に応じた値を
@@ -934,6 +1278,94 @@ def _event_dict(ev):
 
 class Filter(Effector):
     """
+    Converts the input score to a score containing only events that meet
+    (or do not meet) specified condition.
+    The structure of the score is preserved, and thus empty event lists may
+    remain in the output.
+    Each event is not copied.
+
+    Args:
+        conds(class, str, or function, each):
+            Each argument represents a primary condition, and the logical OR of
+            all of them is the final condition.
+            Each argument is one of the followings.
+
+            * An event class -- True if the event belongs to that class or
+              its subclass.
+            * A string that can be evaluated by eval() -- The condition is
+              specified by a string containing a Python expression that gives
+              a bool value. In the string, 'ev' represents the event itself,
+              and 't', 'tk', 'dt', 'n', 'v', 'nv', 'ch', 'L', 'du', 'ctrlnum',
+              'mtype', 'xtype', and 'value' are constants representing
+              attribute values of the event.
+              For attributes that the event does not have, the value of these
+              constants will be None (except for 'du' for NoteEvent, which will
+              have the same value as 'L'). If a TypeError exception is raised
+              while evaluating the expression, the expression value is assumed
+              to be False and processing continues.
+            * A function that returns a bool value -- Called with the event
+              as an argument, and the return value becomes the value of the
+              condition.
+
+        negate(bool, optional):
+            If False (default), a score consisting of events that satisfy the
+            condition is output; if True, a score consisting of events that do
+            not satisfy the condition (i.e., events not output in the default
+            case) is output.
+        globals(dict, optional):
+            Specifies a dictionary of the global symbol table used when `conds`
+            is a string.
+            By default, this is the value of globals() at the time when the
+            constructor is called.
+        locals(dict, optional):
+            Specifies a dictionary of the local symbol table used when `conds`
+            is a string,
+            By default, this is the value of locals() at the time when the
+            constructor is called.
+
+    Examples:
+        ``Filter(NoteEventClass, TempoEvent)``
+            Extracts events belonging to NoteEventClass (i.e., NoteEvent,
+            NoteOnEvent, and NoteOffEvent) and tempo events.
+
+        ``Filter('ctrlnum == 7')``
+            Extracts No. 7 control change events.
+
+        ``Filter(lambda ev: hasattr(ev, 'ctrlnum') and ev.ctrlnum == 7)``
+            The previous example can be rewritten using a function as this
+            example.
+
+        ``Filter('ctrlnum == C_PROG', negate=True)``
+            Removes program change events.
+            ``Filter('ctrlnum ! = C_PROG')`` or ``Reject('ctrlnum == C_PROG')``
+            has the same meaning.
+
+        ``Filter('n >= C4')``
+            Extracts NoteEventClass and KeyPressureEvent events whose pitch
+            is C4 or higher (events without the 'n' attribute will result in
+            TypeError and will not be output as a result).
+
+        ``Filter('n < C4', negate=True)``
+            Removes NoteEventClass and KeyPressureEvent events whose pitch
+            is lower than C4 (i.e., extracts those events with a pitch of C4 or
+            higher and other events without the 'n' attribute). Can also be
+            written as ``Reject('n < C4')``. Note that, in cases where a
+            TypeError exception occurs as in this example, ``Filter('...')``
+            and ``Reject('not ...')`` are not equivalent.
+
+        ``Filter('n >= C5 and L == L4')``
+            Extracts NoteEvent's with a pitch equal to or higher than C5 and
+            a note value equal to a quarter note.
+
+        ``Filter('ch in (1,2,4)', MetaEvent)``
+            Extract events whose MIDI channel is 1, 2, or 4, and all
+            MetaEvent's.
+
+        ``Filter('isinstance(ev, SysExEvent) and value[0] ! = 0xf0')``
+            Extracts events for system-exclusive messages whose first byte is
+            not 0xf0.
+    """
+    """
     条件を満たした（あるいは満たさない）イベントのみ含むスコアへ変換します。
     スコアの構造は保存され、従って、空のイベントリストが残ることがあります。
     各イベントはコピーされません。
@@ -1050,6 +1482,11 @@ class Filter(Effector):
 
 class Reject(Filter):
     """
+    Converts the input score to a score containing only events that
+    do not satisfy the condition.
+    Reject(...) is equivalent to Filter(... , negate=True).
+    """
+    """
     条件を満たさないイベントのみ含むスコアへ変換します。
     Reject(...) は Filter(..., negate=True) と等価です。
     """
@@ -1058,6 +1495,28 @@ class Reject(Filter):
 
 
 class Cond(Effector):
+    """
+    Applies the specified effector only to events that satisfy the condition.
+    Events that do not satisfy the condition are output as is.
+
+    If there are simultaneous events with and without effectors applied in the
+    output, the events with effectors applied will always be placed later.
+
+    Args:
+        cond(class, str, or function): Specifies the condition in the same
+            format as the `conds` argument of :class:`Filter` (but only one
+            primary condition is allowed).
+        effector(Effector): The effector object to apply.
+        globals(dict, optional):
+            Same meaning as the `globals` argument of :class:`Filter`.
+        locals(dict, optional):
+            Same meaning as the `locals` argument of :class:`Filter`.
+
+    Examples:
+        ``Cond('n >= C5', ScaleVelocity(1.2))``
+            For NoteEvent's and NoteOnEvent's with a pitch of C5 or higher,
+            the velocity is scaled by 1.2.
+    """
     """
     条件を満たしたイベントにのみ指定されたエフェクタを適用します。
     条件を満たさないイベントはそのまま出力されます。
@@ -1100,9 +1559,53 @@ class Cond(Effector):
 
 class Modify(EventEffector):
     """
-    各イベントに対して、`operation` で指定された文の列を実行し、その結果に
-    従って更新したイベントを出力します。これにより、:meth:`.Score.mapev` に
-    代わる簡易的なイベント更新の手段を提供します。
+    For each event, the effector executes the sequence of statements specified
+    by `operation` and outputs an updated event according to it. This provides
+    a handy way for updating events as an alternative to :meth:`.Score.mapev`.
+
+    Events are always copied before being updated (use :meth:`.Score.mapev`
+    if you want to avoid copying).
+
+    Args:
+        operation(str):
+            Specifies a string that is evaluated by exec().
+            In the string, 'ev' represents the event itself.
+            Also, 't', 'tk', 'dt', 'n', 'v', 'nv', 'ch', 'L', 'du', 'ctrlnum',
+            'mtype', 'xtype', and 'value' can be used as variables representing
+            the attribute values of the event, and by assigning values to them
+            the attribute values of the event can be changed.
+            It is also possible to add or change attributes through 'ev';
+            however, for the aforementioned variables, those values take
+            precedence over the attribute values set to 'ev'.
+            If a TypeError exception occurs while evaluating the string, no
+            update is made for that event.
+        globals(dict, optional):
+            Dictionary of the global symbol table used when `operation` is
+            evaluated. By default, this is the value of globals() at the time
+            when the constructor is called.
+        locals(dict, optional):
+            Dictionary of the local symbol table used when `operation` is
+            evaluated. By default, this is the value of locals() at the time
+            when the constructor is called.
+
+    Examples:
+        ``Modify('ch=3')``
+            Outputs events in which all MIDI channel numbers are changed to 3.
+            For events that do not have a 'ch' attribute, nothing is changed.
+        ``Modify('v*=0.8; nv=30')``
+            Outputs NoteEventClass events with velocity multiplied by 0.8 and
+            note-off velocity set to 30. All other events are output unchanged.
+        ``Modify('if tk==2: v*=1.1')``
+            For NoteEvent's and NoteOnEvent's with track number 2, velocity is
+            multiplied by 1.1. All other events are output unchanged.
+        ``Modify('ev.voice=2')``
+            For all events, sets the value of the 'voice' attribute to 2
+            (newly added if such an attribute does not exist).
+    """
+    """
+    各イベントに対して、`operation` で指定された文の列を実行し、それに従って
+    更新したイベントを出力します。これにより、:meth:`.Score.mapev` に代わる
+    簡易的なイベント更新の手段を提供します。
 
     イベントは常にコピーされてから更新されます（コピーを避けたい場合は
     :meth:`.Score.mapev` を使用して下さい）。
@@ -1266,6 +1769,94 @@ class _StreamReader:
 
 class Product(Effector):
     """
+    Replaces each note in the input score with a score that serves as a
+    pattern. This can be applied to octave playing, rolls, ornaments, trills,
+    and many other purposes. The pattern can be given in the form of an MML
+    string (see :func:`.mml`) or a function that returns a score.
+
+    By default, the pitch of each output note is the pitch in the input score
+    with added the interval from C4 to the pitch in the pattern. For example,
+    ``mml('CD').Product('[CE]')`` would mean to replace each of the original
+    notes with a chord consisting of a root and its major third, resulting
+    in a score equivalent to ``mml('[CE][DF#]')``.
+
+    The start time of each pattern in the output is always the same as the
+    start time of the note in the input score. Also, the overall duration of
+    the score remains the same.
+    If the duration of the pattern corresponding to a note is longer than
+    the note's length (i.e., the L attribute value), the pattern is terminated
+    with that length, except that, if the pattern is an EventList or Tracks
+    with zero duration (as in ``Product('{CDEF}&')``), the termination is
+    not performed, which would allow overlap between the pattern and the
+    pattern for the next note.
+
+    This effector can also be applied to a RealTimeStream from input devices.
+
+    Args:
+        pattern(str or function):
+            Specifies how pattern scores are generated by either an MML string
+            or a function that returns a score. The score may have infinite
+            length.
+            The context in which the MML string or the function is evaluated
+            is set up for each NoteEvent or NoteOnEvent in the input score,
+            allowing the pattern to reflect the parameters of the notes.
+            The v, nv, L, tk, ch, and dt context attributes are set to the
+            values of the same name attributes (if any) in the input event.
+            If the input event is a NoteOnEvent, the L attribute is set to
+            infinity. The 'dr' pseudo attribute in the context is set so that
+            the played duration is unchanged if the input event is a NoteEvent.
+            The 'o' attribute is always set to 4.
+        tail(str or function, optional):
+            Specifies how scores at the end of the pattern are generated by
+            either an MML string or a function that returns a score.
+            The score from `pattern` is shortened by the duration of the score
+            from `tail`. This can be used, for example, to insert ornaments
+            at the end of a trill performance.
+            Scores generated by `tail` must not have infinite length.
+            Also, it cannot be used if the event contained in the input score
+            is NoteOnEvent.
+            The context is set in the same way as for `pattern`.
+        scale(Scale, optional):
+            If a scale is specified with this argument, the pitch of the
+            output notes is determined based on the tone number on that scale
+            (see :class:`.Scale`). Specifically, the tone number of the output
+            note is the tone number of the note in the input score plus the
+            tone number of the pitch in the pattern.
+
+    Examples:
+        ``Product("[C ^C]")``.
+            Adds a note one octave higher for each note.
+        ``Product(lambda: note(C4) & note(C5))``
+            Equivalent to the above, written using a function.
+        ``Product("[[v*=0.9 CE]G]")``
+            Converts each note to a major triad chord rooted with that note.
+            Velocity is multiplied by 0.9 for all but the highest note.
+        ``Product("{CDEF}//", scale=Scale(C4))``
+            For each note, plays four consecutive notes on the C major scale
+            with a note value of 1/4 of the original. For example,
+            ``mml("CDE").Product("{CDEF}//", scale=Scale(C4))`` produces a
+            score equivalent to ``mml("{CDEF DEFG EFGA}//")``.
+        ``Product("{L16 CDEFGAB^C}&")``
+            For each note, plays a one-octave major scale with sixteenth notes
+            where the tonic of the scale is the input note. The scale is always
+            played to the end, regardless of the note value of the original
+            note. (If there were no trailing '&' in the MML, the scale would
+            be truncated to a length corresponding to the note value of the
+            original note.)
+        ``Product("G(L32)F", scale=Scale(F4, 'minor'))``
+            For each note, adds an appoggiatura one degree higher in the F
+            natural minor scale. The note value of the following note will be
+            decreased by the length of a 32nd note.
+        ``Product("L32 C@@")``
+            Repeats 32nd notes of the same pitch for each note (like a drum
+            roll).
+        ``Product("L32 {CD}@@", tail="L=L8/5 CDC_BC")``
+            Performs each note as a sequence of 32nd notes alternating with the
+            original pitch and the pitch a whole note higher (i.e., a trill).
+            The performance specified by `tail` is inserted at the end of the
+            trill.
+    """
+    """
     入力スコア中の各音符をパターンとなるスコアで置き換えます。
     これは、オクターブ演奏、ロール演奏、装飾音、トリル演奏など様々な用途に
     応用できます。パターンは、MML文字列 (:func:`.mml` を参照)、もしくは
@@ -1292,7 +1883,7 @@ class Product(Effector):
     Args:
         pattern(str or function):
             パターンのスコアを生成する MML 文字列、またはスコアを返す関数を
-            を指定します。生成されるスコアは無限長であっても構いません。
+            を指定します。無限長のスコアであっても構いません。
             この文字列や関数を評価するときのコンテキストは
             入力スコア中の NoteEvent または NoteOnEvent によって各音符ごとに
             設定され、それによって入力スコア中の音符のパラメータをパターンに
@@ -1330,8 +1921,8 @@ class Product(Effector):
             ``mml("CDE").Product("{CDEF}//", scale=Scale(C4))``
             は ``mml("{CDEF DEFG EFGA}//")`` と等価なスコアを生成します。
         ``Product("{L16 CDEFGAB^C}&")``
-            各音符に対して、それを開始音とした長音階スケールを16分音符
-            で演奏します。元の音符の音価にかかわらず、常に最後まで
+            各音符に対して、それを開始音とした1オクターブの長音階スケールを
+            16分音符で演奏します。元の音符の音価にかかわらず、常に最後まで
             スケールが演奏されます。(もしMML最後の '&' がない場合は、
             元の音符の音価に相当する長さに切り詰められます。）
         ``Product("G(L32)F", scale=Scale(F4, 'minor'))``
@@ -1340,10 +1931,10 @@ class Product(Effector):
             なります。
         ``Product("L32 C@@")``
             各音符に対して、32分音符で同じピッチの音を繰り返す演奏
-            (いわゆるロール演奏) を行います。
+            (いわゆるドラムロール演奏) を行います。
         ``Product("L32 {CD}@@", tail="L=L8/5 CDC_BC")``
             各音符に対して、32分音符でその全音上の音と交互に繰り返す
-            演奏 (いわゆるトリル演奏) を行います。各音符の終わりの部分には
+            演奏 (いわゆるトリル演奏) を行います。音符の終わりの部分には
             `tail` で指定した演奏が挿入されます。
     """
     def __init__(self, pattern, *, tail=None, scale=None):
@@ -1446,6 +2037,57 @@ class Product(Effector):
 
 class Apply(Effector):
     """
+    Applies rhythm and expressive information in another score (called a
+    pattern) to the input score. This is especially useful for describing music
+    in which phrases with different pitches but common rhythms and expressions
+    appear frequently.
+
+    The conversion is performed as follows. The notes of the input score are
+    matched against the notes of the pattern, and for each note in the input
+    score, the corresponding note information in the pattern is applied
+    with the following rules:
+
+    - Only pitches in the input score are valid and those of the pattern are
+      ignored.
+    - The resulting 'dt' attribute value is the sum of those in the input and
+      pattern scores.
+    - The resulting 'v' attribute value is that of the pattern plus the
+      difference between that of the input score and the value in the context.
+    - All other attributes, including 't' and 'L', are taken from the pattern.
+
+    The matching is performed on groups of simultaneously starting notes
+    (hereafter called chords, including the case of single notes).
+    Notes in each chord are matched in order of appearance. If a chord in the
+    input score has less notes than the pattern, first notes in the pattern are
+    ignored. If a chord in the input score has more notes than the pattern,
+    the first note of the pattern is used duplicatedly.
+
+    If the input score is shorter (fewer chords) than the pattern, the extra
+    chords in the pattern are discarded. If the input score has more chords
+    than the pattern, an exception is raised.
+
+    If the input score contains a NoteEvent whose 'n' attribute is None, it is
+    also matched as a note, but is not output.
+
+    Non-note events in the pattern are output as is. On the other hand,
+    events other than NoteEvent in the input score are ignored; this effector
+    is not available for input scores containing NoteOnEvent and NoteOffEvent.
+
+    Args:
+        pattern(Score or str): Specifies a score to be used as the pattern.
+            If it is a string, it is assumed to be MML. May be infinite in
+            length.
+
+    Examples:
+        ``mml("CDEF`").Apply("{C!C`>C/C/}")``
+            Produces a score equivalent to ``mml("C!D`>E/F`/")``.
+        ``mml("CDEF").Apply("{C.C/}@@")``
+            Applies a dotted rhythm and produces a score equivalent to
+            ``mml("C.D/E.F/")``.
+        ``mml("[CE] [EG] [EGB]").Apply("C [C? C] [C? C]")``
+            Generates a score equivalent to ``mml("[CE] [E? G] [E? G? B]")``.
+    """
+    """
     入力スコアに対して、別のスコア（パターン）のリズムおよび表情付け情報を
     適用します。ピッチは異なるが共通のリズムや表情付けを持ったフレーズが多く
     出現するような曲の記述に特に有効です。
@@ -1458,13 +2100,14 @@ class Apply(Effector):
     - dtは入力スコアのものとパターンのものの和になります。
     - vは、パターンのものに、入力スコアのものとコンテキストが持つ値との
       差分を加えた値になります。
-    - 発音時刻、音長を含むそれ以外の属性はパターンのものが使われます。
+    - t, Lを含むそれ以外の属性はパターンのものが使われます。
 
     照合は、同時発音される音符をまとめたグループ（単音の場合を含めて以下では
     コードと呼ぶ）を単位として行われます。
-    コード内における各音符の照合は、出現順に後ろから行われます。入力スコアの
-    方がコード構成音が多い時は、その分だけパターンの最初のコード構成音が複製
-    されます。
+    コード内における各音符の照合は、出現順に行われます。入力スコアの方が
+    コード構成音が少ない時は、パターンの最初の方の音が無視されます。
+    入力スコアの方がコード構成音が多い時は、パターンの最初のコード構成音が
+    重複して利用されます。
 
     入力スコアの方がパターンより短い (コード数が少ない) 場合、パターンにおける
     余ったコードは捨てられます。入力スコアの方がパターンよりコード数が
@@ -1473,8 +2116,8 @@ class Apply(Effector):
     入力スコア中に n属性が Noneである NoteEvent を含まれている場合、
     これも１つの音符として照合の対象になりますが、出力はされません。
 
-    パターン中のノート以外のイベントはそのまま出力されます。入力スコア中の
-    NoteEvent 以外のイベントは無視されます。NoteOnEvent および NoteOffEvent
+    パターン中のノート以外のイベントはそのまま出力されます。一方、入力スコア中
+    の NoteEvent 以外のイベントは無視されます。NoteOnEvent および NoteOffEvent
     を含んだ入力スコアに対しては使用できません。
 
     Args:
@@ -1542,9 +2185,25 @@ class Apply(Effector):
 
 class ToTracks(Effector):
     """
-    トラック番号 (tk属性の値) によって仕分けした構造に変換します。
-    変換されたスコアでは、トラック毎にイベントリストが存在し、それが
-    :class:`.Tracks` によって1つにまとめられた構造になります。
+    Converts the input score to a structure classified by track number (the
+    value of the 'tk' attribute).
+    The output score is a :class:`.Tracks` object where each EventList indexed
+    by `i` contains events with track number `i` (`i` >= 0).
+    The events for each track are sorted by time.
+
+    Args:
+        set_tk_by_ch(bool): If True, the value of the 'ch' attribute is
+            assigned to the 'tk' attribute for each event before the
+            classification, and events are effectively classified by MIDI
+            channel number.
+            The track number of events without the 'ch' attribute will be 0.
+        limit(ticks): Limits the length of the score.
+            See the same name argument of :meth:`.Score.stream` for details.
+    """
+    """
+    スコアをトラック番号 (tk属性の値) ごとに仕分けした構造に変換します。
+    変換されたスコアは :class:`.Tracks` オブジェクトであり、i番目のイベント
+    リストにはトラック番号がiのイベントが格納されます (i>=0).
     各トラックのイベントは時間順にソートされます。
 
     Args:
@@ -1582,9 +2241,23 @@ class ToTracks(Effector):
 
 class Render(Effector):
     """
-    楽譜上の時間を演奏上の時間で更新します。具体的には、t属性にdt属性の値を
-    加え、L属性に(あれば)du属性の値を設定します。その後、swap指定がない限り、
-    dt属性は0に変更され、du属性は削除されます。
+    Converts to a score where notated time is replaced by played time.
+    Specifically, it adds the value of the 'dt' attribute to the 't' attribute
+    and assigns the value of the 'du' attribute (if any) to the 'L' attribute.
+    The 'dt' attribute is then reset to 0 and the 'du' attribute is removed,
+    unless `swap` is True.
+
+    The transformation can be applied to a single event as well as a score.
+
+    Args:
+        swap(bool, optional): If True, the notated time and the performed
+            time are swapped. When applied twice, times are returned to the
+            orignal state.
+    """
+    """
+    楽譜上の時間を演奏上の時間で置きかえたスコアに変換します。具体的には、
+    t属性にdt属性の値を加え、L属性に(あれば)du属性の値を設定します。
+    その後、swap指定がない限り、dt属性は0に変更され、du属性は削除されます。
 
     スコアだけでなく、単独のイベントに対しても変換を適用することができます。
 
@@ -1640,6 +2313,8 @@ class Render(Effector):
 
 
 class Tie(EventEffector):
+    """ Adds an attribute indicating the start of a tie to each NoteEvent
+    in the score. """
     """ スコア中の NoteEvent に対して、タイの開始を表す属性を
     付加します。"""
     def _process_event(self, ev):
@@ -1650,6 +2325,9 @@ class Tie(EventEffector):
 
 
 class EndTie(EventEffector):
+    """ Adds an attribute indicating the end of a tie to each NoteEvent in the
+    score.  For notes at which a tie ends and another tie starts, apply
+    both the Tie() end EndTie() effectors. """
     """ スコア中の NoteEvent に対して、タイの終了を表す属性を
     付加します。タイの開始かつ終了となる音符に対しては、このエフェクタと
     Tie() エフェクタの両方を適用してください。"""
@@ -1661,6 +2339,11 @@ class EndTie(EventEffector):
 
 
 class ConnectTies(Effector):
+    """ Merges each set of NoteEvent's tied together in the score into a
+    single NoteEvent. In order to be correctly tied, the end time (sum of the
+    t and L attribute values) of a NoteEvent must match the start
+    time (the t attribute value) of the next NoteEvent in the tied set.
+    """
     """ スコア中のタイで結ばれた NoteEvent を統合して１つの NoteEvent に
     します。正しく結ばれるためには、前の NoteEvent の終了時刻 (t属性と
     L属性の値の和) と後の NoteEvent の開始時刻 (t属性値) が一致していなくては
@@ -1718,6 +2401,13 @@ class Dump(EventEffector):
 
 class Voice(EventEffector):
     """
+    Adds a 'voice' attribute to each event belonging to NoteEventClass
+    in the score. The 'voice' attribute is used in :meth:`.Score.music21`.
+
+    Args:
+        voice(int): value of the 'voice' attribute
+    """
+    """
     スコアに含まれる NoteEventClass に属するイベントに対して、
     voice属性を追加します。voice属性は :meth:`.Score.music21` で利用されます。
 
@@ -1735,6 +2425,15 @@ class Voice(EventEffector):
 
 
 class Mark(EventEffector):
+    """
+    Adds a 'mark' attribute (or appends a value to the 'mark' attribute if it
+    already exists) to each event belonging to NoteEventClass in the score.
+    The 'mark' attribute is used in :meth:`.Score.music21`.
+
+    Args:
+        mark(str or tuple of str): a string or a tuple of strings to be added
+            as the 'mark' attribute
+    """
     """
     スコアに含まれる NoteEventClass に属するイベントに対して、
     mark属性の追加（すでにmark属性が存在すればそれへの値の追加) を行います。
@@ -1759,21 +2458,44 @@ class Mark(EventEffector):
 
 class PairNoteEvents(Effector):
     """
+    Converts each pair of NoteOnEvent and NoteOffEvent in the score into a
+    NoteEvent. After this effector is applied, it is guaranteed that
+    NoteOnEvent and NoteOffEvent are not included.
+
+    The mapping between NoteOnEvent and NoteOffEvent is done between those
+    whose tk, ch, and n attributes all match, but if there are multiple
+    possibilities, the mapping is done in the FIFO manner, that is, the
+    NoteOnEvent at the earlier time is preferentially paired with the
+    NoteOffEvent.
+    Pairing across different EventList's or EventStream's is not performed.
+
+    If there is a NoteOffEvent that has no corresponding NoteOnEvent, it will
+    be deleted with a warning.
+    If there is a NoteOnEvent without a corresponding NoteOffEvent, a warning
+    is issued and a NoteEvent is generated as a note that lasts up to the
+    duration of the score.
+
+    Args:
+        ref_links(bool):
+            If True, for each generated NoteEvent, references to the original
+            NoteOnEvent and NoteOffEvent are added as the 'noteonev' and
+            'noteoffev' attributes, respectively.
+    """
+    """
     スコアに含まれる NoteOnEvent と NoteOffEvent を対にして、
     NoteEvent へ変換します。このエフェクタ適用後は NoteOnEvent と NoteOffEvent
     を含まないことが保証されます。
 
     NoteOnEventとNoteOffEventの対応づけは、tk属性、ch属性、n属性が
-    すべて一致するものの間で行われますが、複数の可能性がある場合は、
-    より早い時刻のNoteOnEventはより早い時刻のNoteOffEventと組になる
-    ような対応づけが行われます。なお、異なる EventList あるいは EventStream
-    にまたがった対応づけは行われません。
+    すべて一致するものの間で行われますが、複数の可能性がある場合はFIFOの
+    ルールに従った、すなわちより早い時刻のNoteOnEventが優先的にNoteOffEventと
+    組になるような対応づけが行われます。なお、異なる EventList あるいは
+    EventStream にまたがった対応づけは行われません。
 
     対応する NoteOnEvent が無い NoteOffEvent を含む場合は、警告とともに
     削除されます。
     対応する NoteOffEvent が無い NoteOnEvent を含む場合は、警告が出されると
-    ともに、当該 EventList または EventStream の演奏長まで続く音符（それが
-    不可能な場合は音価0の音符）として NoteEvent が生成されます。
+    ともに、スコアの演奏長まで続く音符として NoteEvent が生成されます。
 
     Args:
         ref_links(bool):
@@ -1832,8 +2554,19 @@ class PairNoteEvents(Effector):
 
 class UnpairNoteEvents(Effector):
     """
+    Converts each NoteEvent in the score into a pair of NoteOnEvent and
+    NoteOffEvent, where the time of the NoteOffEvent is the t attribute
+    value plus the L attribute value of the original NoteEvent.
+
+    Args:
+        ref_links(bool):
+            If True, for each NoteOnEvent and NoteOffEvent generated, a
+            reference to the original NoteEvent is added as the 'noteev'
+            attribute.
+    """
+    """
     スコア中に含まれる NoteEvent を、NoteOnEvent と NoteOffEvent の
-    対に変換します。NoteOffEvent の時刻は、元の NoteEvent の時刻に
+    対に変換します。NoteOffEvent の時刻は、元の NoteEvent のt属性値に
     L属性値を加えたものになります。
 
     Args:
@@ -1880,6 +2613,17 @@ class UnpairNoteEvents(Effector):
 
 
 class RetriggerNotes(Effector):
+    """
+    Applies retrigger processing to avoid note collisions.
+    A note collision is a situation where the sounding period (a period of the
+    length of the L attribute value starting from the t attribute value of
+    NoteEvent or a period from NoteOnEvent to NoteOffEvent) of two or more
+    notes overlap for the same pitch, track and MIDI channel.
+    When a note collision occurs, the sound duration may be shorter than
+    expected for some synthesizers.
+    The retrigger process avoids the collision by reducing the sounding period
+    of preceding notes appropriately.
+    """
     """
     ノート衝突に対してリトリガー処理を施して衝突を回避します。
     ノート衝突とは、同じトラック、同じMIDIチャネルの同じピッチに対して、

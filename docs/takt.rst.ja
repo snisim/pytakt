@@ -1,11 +1,10 @@
 takt package
 ============
 
-This is the documentation for the Pytakt music information processing library.
+これは音楽情報処理ライブラリ Pytakt のドキュメントです。
 
-When the data type is indicated as 'ticks', it means the time in units of
-1/480th of a quarter note, and can be 'int', 'float', or
-Fraction (rational number) type.
+データ型で ticks と示されている箇所は、4分音符の1/480の長さを単位した
+時間を意味し、int型、float型、および、Fraction (有理数) 型が使えます。
 
 Submodules
 ----------

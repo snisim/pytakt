@@ -1,29 +1,28 @@
-event.py:24:32: E701 multiple statements on one line (colon)
-event.py:25:36: E701 multiple statements on one line (colon)
-event.py:144:5: E301 expected 1 blank line, found 0
-event.py:147:5: E301 expected 1 blank line, found 0
-event.py:150:5: E301 expected 1 blank line, found 0
-event.py:153:5: E301 expected 1 blank line, found 0
-event.py:156:5: E301 expected 1 blank line, found 0
-event.py:158:5: E301 expected 1 blank line, found 0
-event.py:161:5: E301 expected 1 blank line, found 0
-event.py:164:5: E301 expected 1 blank line, found 0
-event.py:167:5: E301 expected 1 blank line, found 0
-mml.py:41:1: E302 expected 2 blank lines, found 0
+event.py:28:32: E701 multiple statements on one line (colon)
+event.py:29:36: E701 multiple statements on one line (colon)
+event.py:195:5: E301 expected 1 blank line, found 0
+event.py:199:5: E301 expected 1 blank line, found 0
+event.py:203:5: E301 expected 1 blank line, found 0
+event.py:207:5: E301 expected 1 blank line, found 0
+event.py:214:5: E301 expected 1 blank line, found 0
+event.py:218:5: E301 expected 1 blank line, found 0
+event.py:222:5: E301 expected 1 blank line, found 0
 mml.py:45:1: E302 expected 2 blank lines, found 0
-mml.py:48:1: E302 expected 2 blank lines, found 0
-mml.py:50:1: E302 expected 2 blank lines, found 0
-mml.py:56:1: E302 expected 2 blank lines, found 0
+mml.py:49:1: E302 expected 2 blank lines, found 0
+mml.py:52:1: E302 expected 2 blank lines, found 0
+mml.py:54:1: E302 expected 2 blank lines, found 0
 mml.py:60:1: E302 expected 2 blank lines, found 0
-mml.py:69:1: E302 expected 2 blank lines, found 0
+mml.py:64:1: E302 expected 2 blank lines, found 0
 mml.py:73:1: E302 expected 2 blank lines, found 0
-mml.py:77:1: E302 expected 2 blank lines, found 1
-mml.py:81:1: E302 expected 2 blank lines, found 0
-mml.py:82:1: E302 expected 2 blank lines, found 0
-mml.py:88:1: E302 expected 2 blank lines, found 1
-mml.py:91:1: E302 expected 2 blank lines, found 0
-mml.py:94:1: E302 expected 2 blank lines, found 0
-pitch.py:72:6: E201 whitespace after '('
-pitch.py:73:6: E201 whitespace after '('
-pitch.py:74:6: E201 whitespace after '('
-pitch.py:75:6: E201 whitespace after '('
+mml.py:77:1: E302 expected 2 blank lines, found 0
+mml.py:81:1: E302 expected 2 blank lines, found 1
+mml.py:85:1: E302 expected 2 blank lines, found 0
+mml.py:86:1: E302 expected 2 blank lines, found 0
+mml.py:92:1: E302 expected 2 blank lines, found 1
+mml.py:95:1: E302 expected 2 blank lines, found 0
+mml.py:98:1: E302 expected 2 blank lines, found 0
+pitch.py:111:6: E201 whitespace after '('
+pitch.py:112:6: E201 whitespace after '('
+pitch.py:113:6: E201 whitespace after '('
+pitch.py:114:6: E201 whitespace after '('
+

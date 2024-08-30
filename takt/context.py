@@ -1,5 +1,8 @@
 # coding:utf-8
 """
+This module defines the Context class and its associated functions.
+"""
+"""
 このモジュールには、Contextクラスおよびそれに関連した関数が定義されています。
 """
 # Copyright (C) 2023  Satoshi Nishimura
@@ -18,6 +21,128 @@ thread_local = threading.local()
 
 
 class Context(object):
+    """
+    The Context class object (context) is a collection of parameters that
+    are referenced by functions defined in the sc module as well as the mml()
+    function.
+
+    Contexts can be switched by using the 'with' syntax. For example::
+
+        mycontext = Context(ch=2, v=50)
+        with mycontext:
+            ...
+
+    will activate mycontext within the 'with' block, and return to the
+    original context upon exiting the block.
+
+    It is possible to change the value of the context's attribute by
+    ``mycontext.ch=3`` for example, but you must use the addattr() method
+    to add a new attribute.
+
+    The functions defined in the sc module and the mml() function can also
+    be used as methods of the Context class, allowing context-specific score
+    generation (e.g. ``mycontext.note(C4)``, ``mycontext.mml('CDE')``, etc.).
+
+    To ensure safe use in multi-threaded environments, the currently active
+    context is managed separately for each thread. When a new thread is
+    created, its context is always the default context (the context obtained
+    by Context()).
+
+    Attributes:
+        dt (ticks): Specifies the value of the dt attribute (difference
+            between the notated time and played time) of generated events.
+        tk (int): Specifies the value of the tk attribute (track number) of
+            generated events.
+        ch (int): Specifies the value of the ch attribute (MIDI channel
+            number) of generated events.
+        v (int): Specifies the value of the v attribute (velocity) of
+            generated NoteEvent events.
+        nv (int or None): Specifies the value of the nv attribute (note-off
+            velocity) of generated NoteEvent events.
+        L (ticks): Specifies the value of the L attribute of generated
+            NoteEvent events.
+            This corresponds to the note value in ticks in the score.
+            It is also used to specify the length of rests in the rest()
+            function.
+        duoffset(ticks or function): Holds the offset value of the playing
+            duration of the note (the difference between note-on and note-off
+            times in the performance, aka. gate time).
+            Optionally, a function to get that value from the value of
+            the L attribute can be specified.
+            Together with **durate** below, it is used to determine
+            the playing duration of a note.
+        durate(int or float): The value added to the playing duration
+            as a percentage of the note value. The playing duration is
+            determined by the following equation together with the
+            **duoffset** above.
+
+                note duration at play = **duoffset** + **L** * **durate** \
+/ 100 (when **duoffset** is an int/float)
+
+                note duration at play = **duoffset(L)** + **L** * **durate** \
+/ 100 (when **duoffset** is a function)
+
+            If the note duration at play is negative, it is corrected to 0.
+
+            The note() function sets the above value to the du attribute of
+            NoteEvent (or omitted if the value is the same as the L attribute
+            value).
+        o (int): An integer representing the octave (4 being the octave
+            starting from the middle C).
+            This is used only by the mml() function.
+        key (Key, int, or str): Specifies the key for automatic sharpening or
+            flattening. It can be a :class:`.Key` object or
+            the first argument of the Key() constructor.
+            This is only used by the mml() function.
+        effectors (list of callable objects): A list of callable objects
+            for score conversion; callables (typically Effector instances)
+            in this list are applied to the return value of the mml()
+            function or that of the functions in the sc module, in sequence
+            from the first element of the list to the last.
+
+    .. rubric:: Pseudo-attributes
+
+    In order to facilitate the specification of the playing duration of notes,
+    the following two pseudo-attributes are provided.
+    These can be read and written in the same way as normal instance
+    attributes, but they are not registered as attributes.
+
+    **du**
+        Represents the note duration at play.
+        Reading **du** yields the note duration at play (see the expression
+        shown in the **durate** item above).
+        Writing a value `x` to **du** sets **duoffset** to `x` and
+        simultaneously sets **durate** to 0 (or 100 if `x` is negative).
+
+        Examples:
+            ``note(C4, du=120)``: Fixes the note duration at play to 120 ticks.
+
+            ``note(C4, du=-30)``: sets the playing duration to 30 ticks less
+            than the L attribute value and thus keeps the gap between notes
+            to 30 ticks.
+
+        Type:: ticks
+
+    **dr**
+        Represents the percentage of the duration at play to the note value.
+        Reading **dr** yields the value of the **durate** attribute.
+        Writing a value to **dr** sets **durate** to that value and
+        simultaneously sets **duoffset** to 0.
+
+        Examples:
+            ``note(C4, dr=50)`` : sets the playing duration to 50% of
+            the note value (simulating so-called "staccato" playing).
+
+        Type:: int or float
+
+    Args:
+        dt, L, v, nv, duoffset, durate, tk, ch, o, key:
+            Specifies attribute values of the same name.
+        effectors:
+            Specifies the value of the 'effectors' attribute.
+            A copy of the list is assigned to the attribute.
+        kwargs: specifies additional attributes for the context.
+    """
     """ Context クラスのオブジェクト (コンテキスト) は、sc モジュールで
     定義されている関数および mml() 関数によって参照されるパラメータ情報を
     集めたものです。
@@ -46,8 +171,7 @@ class Context(object):
 
     Attributes:
         dt (ticks): 生成されるイベントの dt 属性の値 (楽譜上の時刻と
-            演奏上の時刻との差) を指定します。この値が 0 のときは、一般に
-            dt属性は付加されません。
+            演奏上の時刻との差) を指定します。
         tk (int): 生成されるイベントの tk 属性の値 (トラック番号)
             を指定します。
         ch (int): 生成されるイベントの ch 属性の値 (MIDIチャネル番号)
@@ -60,8 +184,8 @@ class Context(object):
             これは楽譜上の音価をティック単位で表したものに相当します。
             また、rest() 関数における休符の長さ指定にも使われます。
         duoffset(ticks or function): 演奏時音長 (ノートオンとノートオフ
-            の時間差) のオフセット値、もしくは L 属性の値からその値を得る
-            関数を保持します。
+            の時間差、いわゆるゲートタイム) のオフセット値、もしくは L 属性
+            の値からその値を得る関数を保持します。
             下の durate とともに、演奏時音長を決めるのに使われます。
         durate(int or float): 演奏時音長に対する加算値を音価に対する百分率で
             指定します。演奏時音長は、上の duoffsetとともに、下式によって
@@ -75,23 +199,23 @@ class Context(object):
 
             演奏時音長が負の場合は 0 に修正されます。
 
-            note() 関数は、上の演奏時音長を NoteEvent の du 属性に設定します
+            note() 関数は、上の演奏時音長を NoteEvent の du 属性に設定します。
             （ただし、L属性値と同じ値の場合は省略されます）。
         o (int):  オクターブを表す整数(4が中央ハから始まるオクターブ)。
             これは mml() 関数でのみ使用されます。
         key (Key, int, or str): 自動的にシャープやフラットをつけるための調
             を :class:`.Key` クラスのオブジェクト、もしくは
-            Key()コンストラクタの第1引数で指定します。
+            Key()コンストラクタの第1引数を指定します。
             これは mml() 関数でのみ使用されます。
         effectors (list of callable objects): スコア変換を行う呼び出し可能
             オブジェクトのリストです。scモジュールの関数や mml() 関数の
-            戻り値に対して、このリストに含まれる関数が変換前のスコアを引数
-            として先頭から順に適用されます。
+            戻り値に対して、このリストに含まれる呼び出し可能オブジェクト
+            （典型的にはEffectorインスタンス）が先頭から順に適用されます。
 
     .. rubric:: 疑似属性
 
-    演奏時音長 (表情づけされた音長、いわゆるゲートタイム) の指定を容易にする
-    ため、下の2つの疑似属性が提供されています。
+    各音符に対する演奏時音長の指定を容易にするため、下の2つの疑似属性が
+    提供されています。
     これらは通常のインスタンス属性と同じように値の読み出しや書き込みを行え
     ますが、属性として登録はされていません。
 
@@ -151,6 +275,10 @@ class Context(object):
 
     def copy(self) -> 'Context':
         """
+        Returns a duplicated context. For the 'effectors' attribute value,
+        the list is duplicated. For other attributes, a shallow copy is made.
+        """
+        """
         複製されたコンテキストを返します。effectors 属性値についてはリスト
         の複製が行われます。それ以外の属性については浅いコピーとなります。
         """
@@ -187,6 +315,13 @@ class Context(object):
 
     def addattr(self, name, value=None) -> None:
         """
+        Adds a new attribute to the context.
+
+        Args:
+            name(str): name of the attribute
+            value(any): initial value of the attribute
+        """
+        """
         コンテキストに新たな属性を追加します。
 
         Args:
@@ -196,6 +331,14 @@ class Context(object):
         object.__setattr__(self, name, value)
 
     def has_attribute(self, name) -> bool:
+        """
+        Returns true if `name` is an attribute of the context.
+        Differs from hasattr(self, name) in that it does not target
+        method names.
+
+        Args:
+            name(str): name of the attribute
+        """
         """
         `name` がコンテキストの属性であれば真を返します。メソッド名は対象に
         しない点において、hasattr(self, name) とは異なります。
@@ -207,6 +350,10 @@ class Context(object):
 
     def reset(self) -> None:
         """
+        Returns all the attribute values to their initial values
+        (i.e., default constructor argument values).
+        """
+        """
         すべての属性値を初期値 (デフォルトのコンストラクタ引数値) へ
         戻します。
         """
@@ -214,6 +361,9 @@ class Context(object):
         self.__init__()
 
     def keys(self) -> List[str]:
+        """
+        Returns a list of attribute names.
+        """
         """
         属性名のリストを返します。
         """
@@ -226,11 +376,21 @@ class Context(object):
 
     def items(self) -> List[Tuple[str, Any]]:
         """
+        Returns a list of attribute name/value pairs.
+        """
+        """
         属性名とその値の組のリストを返します。
         """
         return [(key, getattr(self, key)) for key in self.keys()]
 
     def update(self, **kwargs) -> 'Context':
+        """
+        Change attribute values according to the assignment description
+        in `kwargs`.
+
+        Returns:
+            self
+        """
         """
         `kwargs` の代入記述に従って属性値を変更します。
 
@@ -267,6 +427,15 @@ class Context(object):
         Context._pop()
 
     def do(self, func, *args, **kwargs) -> Any:
+        """ Execute the function `func` in this context and return
+        its return value.
+
+        Args:
+            args, kwargs: arguments passed to `func`.
+
+        Examples:
+            ``somecontext.do(lambda: note(C4) + note(D4))``
+        """
         """ このコンテキストにおいて関数 `func` を実行し、その戻り値を
         返します。
 
@@ -280,6 +449,19 @@ class Context(object):
             return func(*args, **kwargs)
 
     def attach(self, func) -> 'Context':
+        """
+        Inserts the score conversion function `func` at the beginning of
+        the list in the 'effectors' attribute.
+
+        Returns:
+            self
+
+        Examples:
+            >>> horn_in_F = newcontext().attach(Transpose(-Interval('P5')))
+            >>> horn_in_F.note(C4)
+            EventList(duration=480, events=[
+                NoteEvent(t=0, n=F3, L=480, v=80, nv=None, tk=1, ch=1)])
+        """
         """
         effectors属性が持つリストの先頭にスコア変換関数 `func` を挿入します。
 
@@ -297,6 +479,12 @@ class Context(object):
 
     def detach(self) -> 'Context':
         """
+        Deletes the first element of the list in the 'effectors' attribute.
+
+        Returns:
+            self
+        """
+        """
         effectors属性が持つリストの先頭要素を削除します。
 
         Returns:
@@ -311,6 +499,9 @@ class Context(object):
 # もって書き換えることができない。
 
 def context() -> Context:
+    """
+    Returns the currently active context.
+    """
     """
     現在有効になっているコンテキストを返します。
     """
@@ -334,6 +525,11 @@ if '__SPHINX_AUTODOC__' not in os.environ:
 
 
 def newcontext(**kwargs) -> Context:
+    """
+    Returns a copy of the currently active context with attribute values
+    changed according to the assignment description in `kwargs`.
+    Equivalent to ``context().copy().update(**kwargs)``.
+    """
     """
     現在有効になっているコンテキストをコピーし、`kwargs` の代入記述に従って
     属性値を変更したものを返します。``context().copy().update(**kwargs)`` と

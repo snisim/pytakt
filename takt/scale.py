@@ -1,5 +1,8 @@
 # coding:utf-8
 """
+This module defines classes and utility functions related to musical scales.
+"""
+"""
 このモジュールには、スケール (音階) に関連するクラスとユーティリティ関数が
 定義されています。
 """
@@ -20,6 +23,55 @@ __all__ = ['Scale', 'ScaleLibrary', 'DEG']
 
 
 class Scale(object):
+    """
+    A class for objects representing musical scales.
+
+    Attributes:
+        tonic(Pitch or int): Pitch of the starting tone of the scale
+            (octave is also meaningful)
+        tone_list(list of Interval or int): List of scale constituent tones.
+            Each element represents the interval from the `tonic`
+            (Interval object or integer representing the number of semitones).
+        minor_like(int): 1 if the scale is close to a minor scale, 0 otherwise.
+            This affects enharmonics in the Pitch object returned by pitch().
+
+    Args:
+        tonic(Pitch or int): Pitch of the starting tone
+        type(str or 2-tuple): Type of the scale. It is either a string of
+            class variable names registered in the ScaleLibrary class or
+            a 2-tuple consisting of the values of the tone_list and minor_like
+            attributes.
+
+    Examples:
+        >>> Scale(C4, 'major')
+        Scale(C4, ([Interval('P1'), Interval('M2'), Interval('M3'), \
+Interval('P4'), Interval('P5'), Interval('M6'), Interval('M7')], 0))
+        >>> s = Scale(F4, ScaleLibrary.minor)
+        >>> s.pitches()
+        [F4, G4, Ab4, Bb4, C5, Db5, Eb5]
+        >>> s[1], s[14]
+        (G4, F6)
+        >>> s.demo().play()
+
+    .. rubric:: Tone Number
+
+    Tone numbers are numbers assigned sequentially to the infinitely-continued
+    tones on the scale with the tonic being 0. Negative tone numbers assigned
+    to the tones below the tonic. For example, for the major scale with its
+    tonic C4, the tone numbers of C5, G5 and F3 are 7, 11, and -4,
+    respectively. Tone numbers are sometimes floating point numbers and are
+    used to represent non-scale tones.
+
+    .. rubric:: Arithmetic Rules
+
+    * If ``s`` is a Scale object, then the value of ``s[i]`` is the Pitch
+      object of the tone with tone number ``i`` (equivalent to ``s.pitch(i)``).
+    * len(a Scale object) returns the number of scale constituent tones.
+    * Equivalence comparison ('==') between Scale objects results in true
+      only if all the attribute values are equivalent.
+    * If ``s`` is a Scale object and ``p`` is a pitch, then ``p in s`` is
+      equivalent to ``s.is_scale_tone(p)``.
+    """
     """
     スケール (音階) を表すオブジェクトのクラスです。
 
@@ -53,8 +105,9 @@ Interval('P4'), Interval('P5'), Interval('M6'), Interval('M7')], 0))
 
     トーン番号とは、tonicを0として、スケール上の音に対して順に無限に
     番号を振ったもので、tonicより下の音には負のトーン番号が割り当て
-    られます。トーン番号は浮動小数点数のこともあり、非スケール音を
-    表すのに使われます。
+    られます。例えば、C4をtonicとするmajor scaleにおいて、C5, G5, F3 の
+    トーン番号はそれぞれ 7, 11, -4 です。
+    トーン番号は浮動小数点数のこともあり、非スケール音を表すのに使われます。
 
     .. rubric:: 演算規則
 
@@ -63,8 +116,8 @@ Interval('P4'), Interval('P5'), Interval('M6'), Interval('M7')], 0))
     * len(Scaleオブジェクト) は、スケール構成音の数を返します。
     * Scaleオブジェクトどうしの等価比較('==')は、すべての属性値が
       等価であるときのみ真となります。
-    * s を Scaleオブジェクトとするとき、p ``in`` s は s.is_scale_tone(p) と
-      等価です。
+    * s を Scaleオブジェクト、p をピッチとするとき、p ``in`` s は
+      s.is_scale_tone(p) と等価です。
     """
 
     def __init__(self, tonic, type='major'):
@@ -111,14 +164,22 @@ Interval('P4'), Interval('P5'), Interval('M6'), Interval('M7')], 0))
 
     def to_key(self) -> Key:
         """
+        Returns a Key object with the same tonic, a major key
+        if the minor_like attribute is 0 and a minor key if it is 1.
+        """
+        """
         同じ主音を持った、minor_like属性が0なら長調、1なら短調の
         Keyオブジェクトを返します。
         """
         return Key.from_tonic(self.tonic, self.minor_like, extended=True)
 
     def is_scale_tone(self, pitch) -> bool:
+        """ Returns true if `pitch` is a tone on the scale.
+
+        Args:
+            pitch(int): MIDI note number
+        """
         """ `pitch` がスケール上の音であれば真を返します。
-        なお、pitch ``in`` self は self.is_scale_tone(pitch) と等価です。
 
         Args:
             pitch(int): MIDIノート番号
@@ -129,6 +190,21 @@ Interval('P4'), Interval('P5'), Interval('M6'), Interval('M7')], 0))
         return self.tone_list + [self.tone_list[0] + Interval('P8')]
 
     def tonenum(self, pitch, enharmonic_delta=0.01) -> Union[int, float]:
+        """ Converts a Pitch object to a tone number.
+
+        Args:
+            pitch(Pitch or int):
+                Pitch object or integer representing a MIDI note number
+            enharmonic_delta(float): If `pitch` is a Pitch object and
+                represents a non-scale tone, the result will be increased or
+                decreased by this value depending on enharmonics. If the pitch
+                is raised from the lower scale note, the value is decreased,
+                and vice versa.
+
+        Returns:
+            Tone number. For non-scale tones, a floating-point number
+            computed by linear interpolation is returned.
+        """
         """ Pitch オブジェクトをトーン番号に変換します。
 
         Args:
@@ -161,6 +237,16 @@ Interval('P4'), Interval('P5'), Interval('M6'), Interval('M7')], 0))
         return result
 
     def pitch(self, tone_number) -> Pitch:
+        """ Converts a tone number to a Pitch object.
+        If the tone number is not an integer, a real-valued MIDI note number
+        is first computed by linear interpolation from the nearest scale
+        tones, and then rounded to an integer (if two integer MIDI note
+        numbers are equally closest, the upper one is chosen).
+
+        Args:
+            tone_number(int or float):
+                Tone number
+        """
         """ トーン番号を Pitch オブジェクトに変換します。
         トーン番号が整数でないときは、近傍のスケール音から線形補間によって
         実数のMIDIノート番号がまず求められ、それに最も近い整数が
@@ -199,6 +285,16 @@ Interval('P4'), Interval('P5'), Interval('M6'), Interval('M7')], 0))
             return Pitch(n).fixsf(self.to_key())
 
     def pitches(self, low=None, high=None) -> List[Pitch]:
+        """ Returns a list of pitches on the scale.
+
+        Args:
+            low(Pitch or int, optional):
+                Include only pitches of this value or above. By default,
+                this is the scale starting pitch.
+            high(Pitch or int, optional):
+                Include only pitches of this value or below. By default,
+                this is the highest pitch of the scale constituent tones.
+        """
         """ スケール上の音のピッチのリストを返します。
 
         Args:
@@ -215,6 +311,16 @@ Interval('P4'), Interval('P5'), Interval('M6'), Interval('M7')], 0))
         return [self.pitch(tn) for tn in range(low_tonenum, high_tonenum + 1)]
 
     def get_near_scale_tone(self, pitch, round_mode='nearestup') -> Pitch:
+        """ Returns the pitch on the scale close to `pitch`.
+        If ``s`` is the Scale object, then ``s.get_near_scale_tone(p, r)``
+        is equivalent to ``s[takt_roundx(s.tonenum(p), r)]``.
+
+        Args:
+            pitch(Pitch or int):
+                Pitch object or integer representing a MIDI note number
+            round_mode(str or function):
+                Rounding mode passed to :func:`.takt_roundx`.
+        """
         """ `pitch` に近いスケール上の音のピッチを返します。
         Scaleオブジェクトをsとしたとき、``s.get_near_scale_tone(p, r)`` は
         ``s[takt_roundx(s.tonenum(p), r)]`` と等価です。
@@ -228,6 +334,14 @@ Interval('P4'), Interval('P5'), Interval('M6'), Interval('M7')], 0))
         return self[takt_roundx(self.tonenum(pitch), round_mode)]
 
     def demo(self, noct=1, dir='up', **kwargs) -> Score:
+        """ Returns a score of demo performance for the scale.
+
+        Args:
+             noct(int): Number of octaves
+             dir(str): Either 'up' (going up), 'down' (going down), or
+                 'updown' (going up and then down)
+             kwargs: Additional arguments passed to the note function
+        """
         """ スケールについてのデモ演奏のスコアを返します。
 
         Args:
@@ -246,7 +360,10 @@ Interval('P4'), Interval('P5'), Interval('M6'), Interval('M7')], 0))
 
 
 class ScaleLibrary(object):
-    """さまざまな音階のライブラリ。各クラス変数の値は、
+    """ A library of various scales. The value of each class variable
+    is a 2-tuple corresponding to the tone_list and minor_like attributes
+    in the Scale class. """
+    """ さまざまな音階のライブラリ。各クラス変数の値は、
     Scaleクラスのtone_listとminor_likeに相当する2要素タプルを表します。"""
     def _mode(n, org):
         tlist = org[0]
@@ -337,6 +454,19 @@ class ScaleLibrary(object):
 
 
 def DEG(n) -> int:
+    """
+    Returns an integer whose absolute value is decreased by 1; if `n` is 0,
+    an exception is raised.
+    This function is useful in diatonic scales for expressing a distance
+    of tone numbers by a scale degree or the number of an interval.
+
+    Examples:
+        >>> s = Scale(C4, 'major')
+        >>> s[DEG(3)]
+        E4
+        >>> s[s.tonenum(D4) + DEG(6)]
+        B4
+    """
     """
     整数nに対して、絶対値を1減らした整数を返します。nが0なら例外を送出します。
     この関数は、ダイアトニックスケールおけるトーン番号の差を音度で表すのに

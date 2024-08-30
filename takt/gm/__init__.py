@@ -1,5 +1,31 @@
 # coding:utf-8
 """
+This subpackage defines the instrument names as defined in General MIDI.
+
+The following two constants define the relationship between instrument names
+and program numbers.
+
+    - ``INSTRUMENTS``: A map (dict) from program numbers (int) to instrument
+      names (str)
+    - ``ALIASES``: A list of 2-tuples consisting of an alias (str) and
+      the original instrument name (str).
+
+In addition, a constant whose name is an instrument name and whose value
+is its program number is defined for each instrument (also for aliases).
+
+Examples:
+    >>> gm.INSTRUMENTS[41]
+    'Violin'
+    >>> gm.Violin
+    41
+    >>> prog(gm.Piano2)
+    EventList(duration=0, events=[
+        CtrlEvent(t=0, ctrlnum=C_PROG, value=2, tk=1, ch=1)])
+    >>> mml("$prog(gm.Strings) [CEG]").play()
+    >>> getattr(gm, 'Flute')
+    74
+"""
+"""
 このサブパッケージには、General MIDI で定められている楽器名が
 定義されています。
 
@@ -8,8 +34,8 @@
     - ``INSTRUMENTS``: プログラム番号(int)から楽器名(str)へのマップ(dict)
     - ``ALIASES``: 別名(str)と元の楽器名(str)からなる 2-tuple を集めたリスト
 
-さらに、各楽器名をその名前とした、プログラム番号を値とした定数が
-定義されています。
+さらに、各楽器名（別名を含む) をその名前とした、プログラム番号を値とした定数
+が定義されています。
 
 Examples:
     >>> gm.INSTRUMENTS[41]

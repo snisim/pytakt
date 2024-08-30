@@ -1,7 +1,9 @@
 # coding:utf-8
 """
-このモジュールには、折れ線や区分3次曲線に沿って
-値を補間するためのクラスが定義されています。
+This module defines classes for piecewise linear or cubic interpolation.
+"""
+"""
+このモジュールには、折れ線補間や区分3次補間のためのクラスが定義されています。
 """
 # Copyright (C) 2023  Satoshi Nishimura
 
@@ -15,14 +17,40 @@ __all__ = ['Point', 'Interpolator']
 
 class Point(object):
     """
+    This class represents the control points on which the interpolation is
+    based. Each control point has information about time, value, and slope.
+    In this module's interpolation method, the interpolated line/curve
+    always passes through the control points.
+
+    Args:
+        t(int, float or None): The time at the control point, where None means
+            that the time of this control point is determined by dividing
+            equally between the non-None times of the nearby control points.
+        value(int or float): The value at the control point.
+        slope(int, float, None, or 2-tuple): The slope at the control point,
+            relative to the polyline case. Thus, if all slopes are 1,
+            interpolation is done along a polyline (default).
+            If at least one of the slopes at the start and end of an
+            interval span is a real number other than 1, the span is
+            interpolated by a cubic curve.
+            If `slope` is the string 'free', the slope is automatically
+            calculated from the information of the previous and next control
+            points to create a smooth connection.
+            The `slope` can also be a 2-tuple, in which case the left and
+            right slope values are specified separately. If the left slope
+            is None, it means that the values will be changed in a staircase
+            fashion without interpolation. `slope=None` is equivalent to
+            `slope=(None, 1)`.
+    """
+    """
     補間の基準となる制御点を表すクラスです。各制御点は、時刻と値、および
     傾きに関する情報を持ちます。このモジュールの補間法では、補間された
     直線/曲線は必ず制御点を通ります。
 
     Args:
-        t(int, float or None): 制御点の時刻。Noneの場合は、前後の制御点の
-            時刻から等分分割によってこの制御点の時刻を決定することを
-            意味します。
+        t(int, float or None): 制御点の時刻。Noneの場合は、Noneではない
+            前後の制御点の時刻から等分分割によってこの制御点の時刻を決定する
+            ことを意味します。
         value(int or float): 制御点での値。
         slope(int, float, None, or 2-tuple): 制御点での傾きを、折れ線の場合に
             対する相対倍率で指定します。従って、すべての傾きが1である
@@ -65,6 +93,60 @@ class Point(object):
 
 
 class Interpolator(object):
+    """
+    A class representing an object for interpolating values.
+    Given a list of control points, once this object `f` is created, it can be
+    called like `f(time)` to get the interpolated values.
+    Before the time of the first control point, `f(time)` is the value of the
+    first control point, and after the time of the last control point, it is
+    the value of the last control point.
+
+    Args:
+        points(list of Point, etc.): List of control points (must contain
+            at least 1 point). The control points must be ordered by time.
+            It is possible to specify two control points at the same time,
+            which can be used for sawtooth-like changes. Each control point
+            can be a :class:`Point` instance or the following shorthand forms.
+
+            * value -- equivalent to Point(None, value).
+            * (t, value) -- equivalent to Point(t, value).
+            * [value, slope] -- equivalent to Point(None, value, slope).
+            * (t, value, slope) -- equivalent to Point(t, value, slope).
+
+            If None is specified for the time of the first control point,
+            it is assumed to be 0.
+            None cannot be specified for the time of the last control point.
+            Only control points other than the first and last can use 'free'
+            for the slope attribute.
+
+    Examples:
+        ``Interpolator([0, (480, 100)])``
+            Represents a function that linearly interpolates such that
+            the value is 0 at time 0 and 100 at time 480.
+
+        ``Interpolator([0, 100, (960, 50)])``
+            Represents a function that varies along a polyline such that
+            the value is 0 at time 0, 100 at time 480, and 50 at time 960.
+
+        ``Interpolator([0, [100, None], (960, 50, None)])``
+            Represents a function that steps from 0 to 100 at time 480, and
+            from 100 to 50 at time 960.
+
+        ``Interpolator([0, [100, 'free'], (960, 50)])``
+            Represents a piecewise cubic curve that varies smoothly
+            from 0 at time 0, to 100 at time 480, to 50 at time 960.
+
+        ``Interpolator([(0, 100, 3.0), (480, 0, 0.0)])``
+            Represents a cubic curve (in this case a curve similar to an
+            exponential decay) such that at time 0 the value is 100 and
+            the slope is 3 times that of the line connecting the two points,
+            and at time 480 the value is 0 and the slope is 0.
+
+        ``Interpolator([(0, 100, 0), (240, 0, 0) (480, 100, 0)])``
+            Represents a piecewise cubic curve that varies smoothly like
+            the cosine function, 100 -> 0 -> 100.
+
+    """
     """
     値を補間するためのオブジェクトを表すクラスです。
     制御点のリストを与えてこのオブジェクト `f` を生成すると、
@@ -124,6 +206,7 @@ class Interpolator(object):
         self.tlist = [p.t for p in self.plist]
 
     def maxtime(self) -> Ticks:
+        """ Returns the time of the last control point. """
         """ 最後の制御点の時刻を返します。"""
         return self.tlist[-1]
 
@@ -247,6 +330,23 @@ class Interpolator(object):
 
     def iterator(self, tstep, ystep=-1) -> Iterator[Tuple[Ticks, float]]:
         """
+        Generator function that yields time/value pairs (t, value)
+        sequentially along an interpolated line or curve.
+        Times range from the time of the first control point to the time
+        of the last control point.
+
+        Args:
+            tstep(ticks): Specifies the time step value.
+                The pairs are output sequentially with this time interval
+                starting from the time at which each control point exists.
+                The pair at the time of the control point is always output.
+            ystep(int or float, optional): If specified, output is omitted
+                if the absolute value of the difference between the current
+                value and the previous value is less than or equal to `ystep`.
+                (But the pair will always be output at the time when a control
+                point exists.)
+        """
+        """
         補間された直線・曲線に沿って時刻と値の組 (t, value) を順に yield
         するジェネレータ関数です。時刻の範囲は、最初の制御点の時刻から
         最後の制御点の時刻までです。
@@ -254,8 +354,7 @@ class Interpolator(object):
         Args:
             tstep(ticks): 時間の刻み値を指定します。
                 制御点の存在する時刻を基準にしてそこからこの時間間隔で順に
-                出力されます。制御点の存在する時刻では、この値によらず、
-                必ず出力されます。
+                出力されます。制御点の存在する時刻では、必ず出力されます。
             ystep(int or float, optional): 指定した場合、
                 直前に出力した値と比べ変化の絶対値が `ystep` 以下の場合に
                 出力が省かれます(ただし、制御点の存在する時刻では、それに

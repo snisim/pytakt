@@ -1,5 +1,8 @@
 # coding:utf-8
 """
+This module defines classes that perform conversions to and from music21.
+"""
+"""
 このモジュールには、music21への変換、および music21からの変換を行うクラスが
 定義されています。
 """

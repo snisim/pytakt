@@ -1,11 +1,14 @@
 __pycache__
 .ipynb_checkpoints/
+.pytest_cache/
 untracked/
 /dist/
 /docs/_build/
 /takt.egg-info/
 /takt/old/
 /takt/tests/scores
+/_en/
+/_ja/
 *.dll
 *.pyd
 *.so

@@ -1,5 +1,11 @@
 # coding:utf-8
 """
+This module defines functions for generating note and other primitive scores.
+Functions other than note and rest are not imported to the namespace of
+the upper module (takt module), and therefore call them with submodule
+names like sc.ctrl.
+"""
+"""
 このモジュールには、音符など基本的なスコアを生成するための関数が定義されて
 います。
 noteとrest以外の関数は、上位モジュール（taktモジュール）の名前空間に取り
@@ -29,6 +35,14 @@ __all__ = []  # extended later
 
 
 def _getparams(kwargs, *attrs):
+    """ Returns a dict containing the keyword arguments of an event
+    constructor.
+
+    Args:
+        kwargs(dict): Keyword arguments passed to functions in this module
+        attrs(list of str): List of event constructor arguments whose values
+            are taken from the context
+    """
     """ イベントコンストラクタのキーワード引数格納したdictを返す。
 
     Args:
@@ -56,6 +70,44 @@ def _apply_effectors(score):
 
 def note(pitch, L=None, step=None, **kwargs) -> EventList:
     """
+    Generates an EventList containing one NoteEvent as a score consisting of
+    a single note. The time (t attribute value) of the generated NoteEvent
+    will always be 0.
+
+    Args:
+        pitch(Pitch or int): Specifies the pitch of the note.
+            The n attribute of the generated NoteEvent will have this value.
+        L(ticks, optional): Specifies the note value (note length).
+            If omitted, it takes the value from the L attribute of the context.
+            The L attribute of the generated NoteEvent will have this value.
+        step(ticks, optional): Specifies the value of the 'duration' attribute
+            of the generated event list (i.e., the duration of the generated
+            score). If omitted, it is the same as the note value.
+        kwargs: Additional keyword arguments. For each keyword argument,
+            if the context has a (pseudo)attribute of the same name,
+            it specifies a temporary change (override) of the context value;
+            otherwise, it produces an additional attribute in the generated
+            NoteEvent.
+
+    **Referenced context attributes**
+        dt, tk, ch, v, nv, L, duoffset, durate, effectors
+
+    Examples:
+        >>> note(C4)
+        EventList(duration=480, events=[
+            NoteEvent(t=0, n=C4, L=480, v=80, nv=None, tk=1, ch=1)])
+        >>> note(C4, L8, step=120)
+        EventList(duration=120, events=[
+            NoteEvent(t=0, n=C4, L=240, v=80, nv=None, tk=1, ch=1)])
+        >>> note(Db5, ch=3, dt=30, dr=50)  # modifying context
+        EventList(duration=480, events=[
+            NoteEvent(t=0, n=Db5, L=480, v=80, nv=None, tk=1, ch=3, dt=30, \
+du=240)])
+        >>> note(C3, voice=1)  # extra attribute
+        EventList(duration=480, events=[
+            NoteEvent(t=0, n=C3, L=480, v=80, nv=None, tk=1, ch=1, voice=1)])
+    """
+    """
     1つの音符からなるスコアとして、1つの NoteEvent を含む EventList を生成
     します。生成される NoteEvent の時刻 (t属性値) は常に 0 となります。
 
@@ -72,7 +124,7 @@ def note(pitch, L=None, step=None, **kwargs) -> EventList:
             場合は、その属性値を一時的に変更する指定となります。
             そうでなければ、NoteEvent に対する追加の属性となります。
 
-    **影響を受ける可能性のあるコンテキスト属性**
+    **参照されるコンテキスト属性**
 
         dt, tk, ch, v, nv, L, duoffset, durate, effectors
 
@@ -104,6 +156,18 @@ du=240)])
 
 
 def rest(L=None) -> EventList:
+    """ Generates an EventList with no events as a score of a rest.
+
+    Args:
+        L(ticks, optional): Specifies the length of the rests.
+            The duration attribute of the generated EventList will be
+            this value.
+            If omitted, it will be the value of the L attribute of the context.
+
+    **Referenced context attributes**
+        L, effectors
+
+    """
     """　休符のスコアとして、空イベントの EventList を生成します。
 
     Args:
@@ -111,7 +175,7 @@ def rest(L=None) -> EventList:
             生成されるイベントリストのduration属性はこの値と一致します。
             省略すると、コンテキストのL属性の値になります。
 
-    **影響を受ける可能性のあるコンテキスト属性**
+    **参照されるコンテキスト属性**
 
         L, effectors
 
@@ -122,6 +186,68 @@ def rest(L=None) -> EventList:
 
 def ctrl(ctrlnum, value, *, n=None, word=False, duration=0,
          tstep=L64, ystep=1, _rpc=None, **kwargs) -> EventList:
+    """ Generates an EventList containing CtrlEvent(s) or TempoEvent(s).
+    In addition to a single control value, it is possible to generate
+    incrementally changing multiple control values using
+    :class:`.Interpolator`.
+
+    Args:
+        ctrlnum(int): Specifies the controller number (see
+            :class:`.CtrlEvent`). If this value is C_TEMPO (192),
+            TempoEvent(s) are generated.
+        value(int, float, 2-tuple, or list): Specifies the control value.
+            If it is an int or float, a CtrlEvent/TempoEvent is generated
+            based on a single control value. If it is a 2-tuple, the `word`
+            argument is assumed to be implicitly True, and the upper and lower
+            bytes are specified separately in (MSB, LSB) format.
+            If it is a list, the value is passed to the constructor of
+            :class:`.Interpolator` to generate a stepwise sequence of
+            CtrlEvent/TempoEvent's.
+        n(int or Pitch, optional): For key-pressure events (i.e., when
+            `ctrlnum` is C_KPR), it specifies the MIDI note number.
+            Not applicable for other types of events.
+        word(bool, optional): In the case of a control change when `ctrlnum`
+            is 31 or less, setting this argument to True will cause a 14-bit
+            control value to be generated in two separate CtrlEvents with
+            different controller numbers. In the case of the stepwise control,
+            two CtrlEvents will be generated for each output value.
+        duration(ticks or str, optional): Specifies the value of the 'duration'
+            attribute of the output event list. If 'auto' is specified,
+            the duration will be 0 for a single control value and the time of
+            the last CtrlEvent/TempoEvent for a stepwise control.
+        tstep(ticks, optional): Specifies the time step value for a stepwise
+            control (see :meth:`.Interpolator.iterator`).
+        ystep(int or float, optional): Specifies the threshold of the output
+            value changes for a stepwise control
+            (see :meth:`.Interpolator.iterator`).
+        kwargs: Additional keyword arguments. For each keyword argument,
+            if the context has an attribute of the same name, it specifies
+            a temporary change (override) of the context value; otherwise,
+            it produces an additional attribute for each of the output
+            CtrlEvent/TempoEvent's.
+
+    **Referenced context attributes**
+        dt, tk, ch, effectors
+
+    Examples:
+        >>> sc.ctrl(7, 60, ch=2)  # volume control: value=60  MIDI_channel=2
+        EventList(duration=0, events=[
+            CtrlEvent(t=0, ctrlnum=C_VOL, value=60, tk=1, ch=2)])
+        >>> sc.ctrl(7, [0, (L4, 100)], tstep=120)  # linearly increasing volume
+        EventList(duration=480, events=[
+            CtrlEvent(t=0, ctrlnum=C_VOL, value=0.0, tk=1, ch=1),
+            CtrlEvent(t=120, ctrlnum=C_VOL, value=25.0, tk=1, ch=1),
+            CtrlEvent(t=240, ctrlnum=C_VOL, value=50.0, tk=1, ch=1),
+            CtrlEvent(t=360, ctrlnum=C_VOL, value=75.0, tk=1, ch=1),
+            CtrlEvent(t=480, ctrlnum=C_VOL, value=100, tk=1, ch=1)])
+        >>> sc.ctrl(1, 80, duration=120)
+        EventList(duration=120, events=[
+            CtrlEvent(t=0, ctrlnum=C_MOD, value=80, tk=1, ch=1)])
+        >>> sc.ctrl(0, (2, 3))  # specifying the value with (MSB,LSB) pair
+        EventList(duration=0, events=[
+            CtrlEvent(t=0, ctrlnum=C_BANK, value=2, tk=1, ch=1),
+            CtrlEvent(t=0, ctrlnum=C_BANK_L, value=3, tk=1, ch=1)])
+    """
     """ CtrlEvent または TempoEvent を含む EventList を生成します。
     単一のコントロール値だけでなく、:class:`.Interpolator` を利用して
     段階的に変化するような複数のコントロール値を生成することも可能です。
@@ -145,7 +271,7 @@ def ctrl(ctrlnum, value, *, n=None, word=False, duration=0,
             14ビットのコントロール値をコントローラ番号の異なる2つの CtrlEvent
             に分けて生成するようになります。段階的に変化するコントロールの
             場合でも、出力値のそれぞれにおいて2つのCtrlEvent が生成されます。
-        duration(ticks, optional): イベントリストの duration属性値を
+        duration(ticks or str, optional): イベントリストの duration属性値を
             指定します。'auto'を指定した場合、単一のコントロール値の場合は 0、
             段階的に変化するコントロールの場合は最後の CtrlEvent/TempoEvent
             の時刻になります。
@@ -160,7 +286,7 @@ def ctrl(ctrlnum, value, *, n=None, word=False, duration=0,
             そうでなければ、出力されるすべての CtrlEvent/TempoEvent に対する
             追加の属性となります。
 
-    **影響を受ける可能性のあるコンテキスト属性**
+    **参照されるコンテキスト属性**
         dt, tk, ch, effectors
 
     Examples:
@@ -227,12 +353,18 @@ def ctrl(ctrlnum, value, *, n=None, word=False, duration=0,
 
 
 def bank(value, **kwargs) -> EventList:
+    """ Generates an EventList containing CtrlEvent for bank selects
+    (#0 and #32 control changes).
+    Equivalent to ``ctrl(0, value, **kwargs)``. """
     """ バンクセレクト（0, 32番のコントロールチェンジ) の CtrlEvent を含む
     EventList を生成します。``ctrl(0, value, **kwargs)`` と等価です。"""
     return ctrl(C_BANK, value, **kwargs)
 
 
 def mod(value, **kwargs) -> EventList:
+    """ Generates an EventList containing CtrlEvent for modulation depth
+    (#1 and #33 control changes).
+    Equivalent to ``ctrl(1, value, **kwargs)``. """
     """ モジュレーションデプス（1, 33番のコントロールチェンジ) の CtrlEvent
     を含む EventList を生成します。
     ``ctrl(1, value, **kwargs)`` と等価です。"""
@@ -240,6 +372,9 @@ def mod(value, **kwargs) -> EventList:
 
 
 def breath(value, **kwargs) -> EventList:
+    """ Generates an EventList containing CtrlEvent for the breath
+    controller (#2 and #34 control changes).
+    Equivalent to ``ctrl(2, value, **kwargs)``. """
     """ ブレスコントローラ（2, 34番のコントロールチェンジ) の CtrlEvent
     を含む EventList を生成します。
     ``ctrl(2, value, **kwargs)`` と等価です。"""
@@ -247,6 +382,9 @@ def breath(value, **kwargs) -> EventList:
 
 
 def foot(value, **kwargs) -> EventList:
+    """ Generates an EventList containing CtrlEvent for the foot
+    controller (#4 and #36 control changes).
+    Equivalent to ``ctrl(4, value, **kwargs)``. """
     """ フットコントローラ（4, 36番のコントロールチェンジ) の CtrlEvent
     を含む EventList を生成します。
     ``ctrl(4, value, **kwargs)`` と等価です。"""
@@ -254,6 +392,9 @@ def foot(value, **kwargs) -> EventList:
 
 
 def porta(value, **kwargs) -> EventList:
+    """ Generates an EventList containing CtrlEvent for portamento
+    time (#5 and #37 control changes).
+    Equivalent to ``ctrl(5, value, **kwargs)``. """
     """ ポルタメントタイム（5, 37番のコントロールチェンジ) の CtrlEvent
     を含む EventList を生成します。
     ``ctrl(5, value, **kwargs)`` と等価です。"""
@@ -261,6 +402,9 @@ def porta(value, **kwargs) -> EventList:
 
 
 def vol(value, **kwargs) -> EventList:
+    """ Generates an EventList containing CtrlEvent for the main
+    (channel) volume (#7 and #39 control changes).
+    Equivalent to ``ctrl(7, value, **kwargs)``. """
     """ メイン(チャンネル)ボリューム（7, 39番のコントロールチェンジ) の
     CtrlEvent を含む EventList を生成します。
     ``ctrl(7, value, **kwargs)`` と等価です。"""
@@ -268,12 +412,18 @@ def vol(value, **kwargs) -> EventList:
 
 
 def pan(value, **kwargs) -> EventList:
+    """ Generates an EventList containing CtrlEvent for pan control
+    (#10 and #42 control changes).
+    Equivalent to ``ctrl(10, value, **kwargs)``. """
     """ パンポット（10, 42番のコントロールチェンジ) の CtrlEvent を含む
     EventList を生成します。``ctrl(10, value, **kwargs)`` と等価です。"""
     return ctrl(C_PAN, value, **kwargs)
 
 
 def expr(value, **kwargs) -> EventList:
+    """ Generates an EventList containing CtrlEvent for expression
+    control (#11 and #43 control changes).
+    Equivalent to ``ctrl(11, value, **kwargs)``. """
     """ エクスプレッション（11, 43番のコントロールチェンジ) の
     CtrlEvent を含む  EventList を 生成します。
     ``ctrl(11, value, **kwargs)`` と等価です。"""
@@ -281,6 +431,9 @@ def expr(value, **kwargs) -> EventList:
 
 
 def reverb(value, **kwargs) -> EventList:
+    """ Generates an EventList containing CtrlEvent for Effect 1
+    (reverb) depth (#91 control change).
+    Equivalent to ``ctrl(91, value, **kwargs)``. """
     """ エフェクト１（リバーブ）デプス（91番のコントロールチェンジ) の
     CtrlEvent を含む  EventList を 生成します。
     ``ctrl(91, value, **kwargs)`` と等価です。"""
@@ -288,72 +441,100 @@ def reverb(value, **kwargs) -> EventList:
 
 
 def ped(value=127, **kwargs) -> EventList:
+    """ Generate an EventList containing CtrlEvent that turns on the
+    damper pedal.
+    Equivalent to ``ctrl(64, value, **kwargs)``. """
     """ ダンパーペダルを ON にする CtrlEvent を含む EventList を生成します。
     ``ctrl(64, value, **kwargs)`` と等価です。"""
     return ctrl(C_SUSTAIN, value, **kwargs)
 
 
 def pedoff(**kwargs) -> EventList:
+    """ Generates an EventList containing a CtrlEvent that turn off the
+    damper pedal.
+    Equivalent to ``ctrl(64, 0, **kwargs)``. """
     """ ダンパーペダルを OFF にする CtrlEvent を含む EventList を生成します。
     ``ctrl(64, 0, **kwargs)`` と等価です。"""
     return ctrl(C_SUSTAIN, 0, **kwargs)
 
 
 def ped2(value=127, **kwargs) -> EventList:
+    """ Generate an EventList containing CtrlEvent that turn on the soft pedal.
+    Equivalent to ``ctrl(67, value, **kwargs)``. """
     """ ソフトペダルを ON にする CtrlEvent を含む EventList を生成します。
     ``ctrl(67, value, **kwargs)`` と等価です。"""
     return ctrl(C_SOFTPED, value, **kwargs)
 
 
 def ped2off(**kwargs) -> EventList:
+    """ Generate an EventList containing a CtrlEvent that turn off the soft
+    pedal.
+    Equivalent to ``ctrl(67, 0, **kwargs)``. """
     """ ソフトペダルを OFF にする CtrlEvent を含む EventList を生成します。
     ``ctrl(67, 0, **kwargs)`` と等価です。"""
     return ctrl(C_SOFTPED, 0, **kwargs)
 
 
 def ped3(value=127, **kwargs) -> EventList:
+    """ Generates an EventList containing CtrlEvent that turn on the
+    sostenuto pedal. Equivalent to ``ctrl(66, value, **kwargs)``. """
     """ ソステヌートペダルを ON にする CtrlEvent を含む EventList を生成
     します。``ctrl(66, value, **kwargs)`` と等価です。"""
     return ctrl(C_SOSTENUTO, value, **kwargs)
 
 
 def ped3off(**kwargs) -> EventList:
+    """ Generates an EventList containing a CtrlEvent that turn off the
+    sostenuto pedal. Equivalent to ``ctrl(66, 0, **kwargs)``. """
     """ ソステヌートペダルを OFF にする CtrlEvent を含む EventList を生成
     します。``ctrl(66, 0, **kwargs)`` と等価です。"""
     return ctrl(C_SOSTENUTO, 0, **kwargs)
 
 
 def portaon(value=127, **kwargs) -> EventList:
+    """ Generates an EventList containing CtrlEvent that turn portamento on.
+    Equivalent to ``ctrl(65, value, **kwargs)``. """
     """ ポルタメントを ON にする CtrlEvent を含む EventList を生成します。
     ``ctrl(65, value, **kwargs)`` と等価です。"""
     return ctrl(C_PORTAON, value, **kwargs)
 
 
 def portaoff(**kwargs) -> EventList:
+    """ Generates an EventList containing a CtrlEvent that turn portamento off.
+    Equivalent to ``ctrl(65, 0, **kwargs)``. """
     """ ポルタメントを OFF にする CtrlEvent を含む EventList を生成します。
     ``ctrl(65, 0, **kwargs)`` と等価です。"""
     return ctrl(C_PORTAON, 0, **kwargs)
 
 
 def all_sound_off(**kwargs) -> EventList:
+    """ Generates an EventList containing an all-sound-off CtrlEvent.
+    Equivalent to ``ctrl(120, 0, **kwargs)``. """
     """ オール・サウンド・オフの CtrlEvent を含む EventList を生成します。
     ``ctrl(120, 0, **kwargs)`` と等価です。"""
     return ctrl(C_ALL_SOUND_OFF, 0, **kwargs)
 
 
 def reset_all_ctrls(**kwargs) -> EventList:
+    """ Generates an EventList containing a reset-all-controllers CtrlEvent.
+    Equivalent to ``ctrl(121, 0, **kwargs)``. """
     """ リセット・オール・コントローラの CtrlEvent を含む EventList を
     生成します。``ctrl(121, 0, **kwargs)`` と等価です。"""
     return ctrl(C_RESET_ALL_CTRLS, 0, **kwargs)
 
 
 def all_notes_off(**kwargs) -> EventList:
+    """ Generates an EventList containing an all-note-off CtrlEvent.
+    Equivalent to ``ctrl(123, 0, **kwargs)``. """
     """ オール・ノート・オフの CtrlEvent を含む EventList を生成します。
     ``ctrl(123, 0, **kwargs)`` と等価です。"""
     return ctrl(C_ALL_NOTES_OFF, 0, **kwargs)
 
 
 def bend(value, **kwargs) -> EventList:
+    """ Generates an EventList containing CtrlEvent for pitch bending.
+    Values must be in the range of -8192 to 8191.
+    Equivalent to ``ctrl(C_BEND, value, **kwargs)``. """
     """ ピッチベンドの CtrlEvent を含む EventList を生成します。
     値は -8192～8191の範囲で指定します。
     ``ctrl(C_BEND, value, **kwargs)`` と等価です。"""
@@ -361,12 +542,17 @@ def bend(value, **kwargs) -> EventList:
 
 
 def cpr(value, **kwargs) -> EventList:
+    """ Generates an EventList containing CtrlEvent for channel pressure.
+    Equivalent to ``ctrl(C_CPR, value, **kwargs)``. """
     """ チャネルプレッシャーの CtrlEvent を含む EventList を生成します。
     ``ctrl(C_CPR, value, **kwargs)`` と等価です。"""
     return ctrl(C_CPR, value, **kwargs)
 
 
 def prog(value, **kwargs) -> EventList:
+    """ Generates an EventList containing CtrlEvent for program change.
+    The value must be in the range of 1-128.
+    Equivalent to ``ctrl(C_PROG, value, **kwargs)``. """
     """ プログラムチェンジの CtrlEvent を含む EventList を生成します。
     値は 1～128 の範囲で指定します。
     ``ctrl(C_PROG, value, **kwargs)`` と等価です。"""
@@ -374,25 +560,51 @@ def prog(value, **kwargs) -> EventList:
 
 
 def kpr(pitch, value, **kwargs) -> EventList:
+    """ Generate an EventList containing KeyPressureEvent for polyphonic key
+    pressure..
+    Equivalent to ``ctrl(C_KPR, value, n=pitch, **kwargs)``. """
     """ KeyPressureEvent を含む  EventList を生成します。
     ``ctrl(C_KPR, value, n=pitch, **kwargs)`` と等価です。"""
     return ctrl(C_KPR, value, n=pitch, **kwargs)
 
 
 def rpc(rpn, data, nrpc=False, **kwargs) -> EventList:
+    """ Generates an EventList for RPC (Registered Parameter Control) or
+    NRPC (Non-Registered Parameter Control).
+
+    Args:
+        rpn(int or 2-tuple): Specifies the parameter number (RPN or NRPN).
+            It is either a 16-bit number (upper 8 bits are MSB, lower 8 bits
+            are LSB) or a 2-tuple (MSB, LSB).
+        data(int, float, 2-tuple, or list): Specifies the data to be sent with
+            the data entry (#6 and #36 control changes).
+        nrpc(bool, optional): False for NPC, True for NRPC.
+        kwargs: Other arguments passed to the ctrl() function.
+
+    **Referenced context attributes**
+        dt, tk, ch, effectors
+
+    Examples:
+        >>> sc.rpc((0, 1), 8835, word=True)  # Fine tuning to A=442Hz
+        EventList(duration=0, events=[
+            CtrlEvent(t=0, ctrlnum=C_RPCL, value=1, tk=1, ch=1),
+            CtrlEvent(t=0, ctrlnum=C_RPCH, value=0, tk=1, ch=1),
+            CtrlEvent(t=0, ctrlnum=C_DATA, value=69, tk=1, ch=1),
+            CtrlEvent(t=0, ctrlnum=C_DATA_L, value=3, tk=1, ch=1)])
+    """
     """ RPC (Registered Parameter Control) または NRPC (Non-Registered
     Parameter Control) のための EventList を生成します。
 
     Args:
-        rpn(int or 2-tuple): RPN または NRPN を指定します。int 型の場合は
-            16ビットの数値(上位8ビットがMSB, 下位8ビットがLSB)、
+        rpn(int or 2-tuple): パラメタ番号(RPN または NRPN) を指定します。
+            int 型の場合は16ビットの数値(上位8ビットがMSB, 下位8ビットがLSB)、
             2-tuple の場合は (MSB, LSB) の形式で指定します。
         data(int, float, 2-tuple, or list): データエントリー
             (6, 36番のコントロールチェンジ) で送出するデータを指定します。
         nrpc(bool, optional): NPC のとき False, NRPC のとき True。
         kwargs: ctrl() 関数に渡される他の引数。
 
-    **影響を受ける可能性のあるコンテキスト属性**
+    **参照されるコンテキスト属性**
         dt, tk, ch, effectors
 
     Examples:
@@ -410,6 +622,13 @@ def rpc(rpn, data, nrpc=False, **kwargs) -> EventList:
 
 
 def bender_range(semitones, **kwargs) -> EventList:
+    """ Generates an EventList for setting pitch bend sensitivity using rpc().
+
+    Args:
+        semitones(int): Specifies the pitch bend range in semitones.
+        For example, 12 for +-1 octaves.
+        kwargs: Other arguments passed to the ctrl() function.
+    """
     """ rpc() を使ってピッチ・ベンド・センシティビティ設定のための
     EventList を生成します。
 
@@ -422,6 +641,18 @@ def bender_range(semitones, **kwargs) -> EventList:
 
 
 def fine_tune(*, freq=None, cents=None, **kwargs) -> EventList:
+    """ Generates an EventList for fine tuning using rpc().
+
+    Args:
+        freq(int or float): Specifies the frequency of the A4 tone.
+            Cannot be specified at the same time with `cents`.
+        cents(int or float):
+            Specifies the deviation from the standard tuning (A4=440Hz)
+            in cents (1/100 of a semitone). Must be ranged such that
+            -100 <= `cents` < 100.
+            Cannot be specified at the same time with `freq`.
+        kwargs: Other arguments passed to the ctrl() function.
+    """
     """ rpc() を使ってファイン・チューニングのための EventList を生成します。
 
     Args:
@@ -448,6 +679,12 @@ def fine_tune(*, freq=None, cents=None, **kwargs) -> EventList:
 
 
 def coarse_tune(semitones, **kwargs) -> EventList:
+    """ Generates an EventList for course tuning using rpc().
+
+    Args:
+        semitones(int): Deviation from standard tuning in semitones (signed).
+        kwargs: Other arguments passed to the ctrl() function.
+    """
     """ rpc() を使ってコース・チューニングのための EventList を生成します。
 
     Args:
@@ -459,6 +696,15 @@ def coarse_tune(semitones, **kwargs) -> EventList:
 
 
 def tempo(value, **kwargs) -> EventList:
+    """ Generates an EventList containing TempoEvent.
+    The track number (tk attribute) is 0 regardless of context unless
+    explicitly specified.
+    Equivalent to ``ctrl(C_TEMPO, value, **kwargs)``.
+
+    Args:
+        value (int or float): Tempo value in BPM (minimum value is 4)
+        kwargs: Other arguments passed to the ctrl() function.
+    """
     """ TempoEvent を含む EventList を生成します。
     トラック番号 (tk属性) は、明示的に指定しない限り、コンテキストによらず
     0 になります。
@@ -472,6 +718,37 @@ def tempo(value, **kwargs) -> EventList:
 
 
 def sysex(data, arbitrary=False, *, duration=0, **kwargs) -> EventList:
+    """ Generates an EventList containing a SysExEvent.
+
+    Args:
+        data(bytes, bytearray, or iterable of int):
+            Contents of the system-exclusive message.
+            The 0xf0 at the beginning of the message and the 0xf7 at the end
+            of the message need to be explicitly included. The value of each
+            byte except those must be less than or equal to 0x7f (127).
+        arbitrary(bool, optional):
+            When this value is true, the event list is successfully generated
+            even if the `data` does not start with 0xf0 and end with 0xf7
+            or contains data bytes larger than 0x7f (by default, an exception
+            is raised for such cases).
+            This is used to split a system-exclusive message into multiple
+            events or to send arbitrary messages to the synthesizer.
+        duration(ticks, optional): Specifies the 'duration' attribute value
+            of the event list.
+        kwargs: Additional keyword arguments. For each keyword argument,
+            if the context has an attribute of the same name, it specifies
+            a temporary change (override) of the context value; otherwise,
+            it produces an additional attribute in the output event.
+
+    **Referenced context attributes**
+        dt, tk, effectors
+
+    Examples:
+        ``sc.sysex((0xf0, 0x7e, 0x7f, 0x09, 0x01, 0xf7)) # GM On``
+
+        ``sc.sysex((0xf0, 0x7f, 0x7f, 4, 1, 0, 0, 50, 0xf7)) # Master volume \
+= 50``
+    """
     """ SysExEvent を含む EventList を生成します。
 
     Args:
@@ -482,7 +759,7 @@ def sysex(data, arbitrary=False, *, duration=0, **kwargs) -> EventList:
             である必要があります。
         arbitrary(bool, optional):
             この値が True のときは、`data` の先頭が 0xf0、末尾が 0xf7 で
-            なくても、また0x80以上のバイトデータを含んでいてもイベントを
+            なくても、また0x80以上のバイトデータを含んでいてもイベントリストを
             生成します (デフォルトでは例外を送出します)。
             これは、システム・エクスクルーシブ・メッセージを複数の SysEvEvent
             に分割したり、シンセサイザに任意のメッセージを送る際に使います。
@@ -492,7 +769,7 @@ def sysex(data, arbitrary=False, *, duration=0, **kwargs) -> EventList:
             場合は、その属性値を一時的に変更する指定となります。
             そうでなければ、出力されるイベントに対する追加の属性となります。
 
-    **影響を受ける可能性のあるコンテキスト属性**
+    **参照されるコンテキスト属性**
         dt, tk, effectors
 
     Examples:
@@ -512,6 +789,22 @@ def sysex(data, arbitrary=False, *, duration=0, **kwargs) -> EventList:
 
 
 def meta(mtype, data, *, duration=0, **kwargs) -> EventList:
+    """ Generates an EventList containing a MetaEvent.
+
+    Args:
+        mtype (int): Type of the meta-event (0-127)
+        data(bytes, bytearray, str, Key, or iterable of int):
+            Value of the 'value' attribute of :class:`.MetaEvent`
+        duration(ticks, optional): Value of the 'duration' attribute of the
+            event list.
+        kwargs: Additional keyword arguments. For each keyword argument,
+            if the context has an attribute of the same name, it specifies
+            a temporary change (override) of the context value; otherwise,
+            it produces an additional attribute in the output event.
+
+    **Referenced context attributes**
+        dt, tk, effectors
+    """
     """ MetaEvent を含む EventList を生成します。
 
     Args:
@@ -524,7 +817,7 @@ def meta(mtype, data, *, duration=0, **kwargs) -> EventList:
             場合は、その属性値を一時的に変更する指定となります。
             そうでなければ、出力されるイベントに対する追加の属性となります。
 
-    **影響を受ける可能性のあるコンテキスト属性**
+    **参照されるコンテキスト属性**
         dt, tk, effectors
     """
     return _apply_effectors(
@@ -532,6 +825,16 @@ def meta(mtype, data, *, duration=0, **kwargs) -> EventList:
 
 
 def seqno(value, **kwargs) -> EventList:
+    """ Generates an EventList containing a sequence-number event
+    (a MetaEvent with mtype=0).
+
+    Args:
+        value(int): Sequence number (0-65535)
+        kwargs: Other arguments passed to the meta() function.
+
+    **Referenced context attributes**
+        dt, effectors
+    """
     """ シーケンス番号のイベント (mtype=0 のメタイベント) を含むEventList を
     生成します。
 
@@ -539,13 +842,25 @@ def seqno(value, **kwargs) -> EventList:
         value(int): シーケンス番号 (0-65535)
         kwargs: meta() 関数に渡される他の引数。
 
-    **影響を受ける可能性のあるコンテキスト属性**
+    **参照されるコンテキスト属性**
         dt, effectors
     """
     return meta(M_SEQNO, bytes((value >> 8, value & 0xff)), **kwargs)
 
 
 def title(string, **kwargs) -> EventList:
+    """ Generates an EventList containing a generic text event (a MetaEvent
+    with mtype=1). Often used to describe song titles.
+    The track number (tk attribute) is 0 regardless of the context unless
+    explicitly specified.
+
+    Args:
+        string(str): Text string
+        kwargs: Other arguments passed to the meta() function.
+
+    **Referenced context attributes**
+        dt, effectors
+    """
     """ 汎用テキストのイベント (mtype=1 のメタイベント) を含む EventList
     を生成します。多くの場合、曲タイトルの記述に使われます。
     トラック番号 (tk属性) は、明示的に指定しない限り、コンテキストによらず
@@ -555,7 +870,7 @@ def title(string, **kwargs) -> EventList:
         string(str): テキスト文字列
         kwargs: meta() 関数に渡される他の引数。
 
-    **影響を受ける可能性のあるコンテキスト属性**
+    **参照されるコンテキスト属性**
         dt, effectors
     """
     with newcontext(tk=0):
@@ -563,6 +878,10 @@ def title(string, **kwargs) -> EventList:
 
 
 def comment(string, **kwargs) -> EventList:
+    """ Generate an EventList containing a generic text event (a MetaEvent
+    with mtype=1). Unlike :func:`title`, the track number is the value of
+    the tk attribute in the context.
+    Equivalent to ``meta(1, string, **kwargs)``. """
     """ 汎用テキストのイベント (mtype=1 のメタイベント) を含む EventList
     を生成します。:func:`title` と異なり、トラック番号はコンテキストのtk属性の
     値になります。``meta(1, string, **kwargs)`` と等価です。"""
@@ -570,6 +889,17 @@ def comment(string, **kwargs) -> EventList:
 
 
 def copyright(string, **kwargs) -> EventList:
+    """ Generates an EventList containing a copyright notice event (a MetaEvent
+    with mtype=2). The track number (tk attribute) will be 0 regardless of the
+    context unless explicitly specified.
+
+    Args:
+        string(str): Text string
+        kwargs: Other arguments passed to the meta() function.
+
+    **Referenced context attributes**
+        dt, effectors
+    """
     """ 著作権表示のイベント (mtype=2 のメタイベント) を含む EventList
     を生成します。トラック番号 (tk属性) は、明示的に指定しない限り、
     コンテキストによらず 0 になります。
@@ -578,7 +908,7 @@ def copyright(string, **kwargs) -> EventList:
         string(str): テキスト文字列
         kwargs: meta() 関数に渡される他の引数。
 
-    **影響を受ける可能性のあるコンテキスト属性**
+    **参照されるコンテキスト属性**
         dt, effectors
     """
     with newcontext(tk=0):
@@ -586,24 +916,41 @@ def copyright(string, **kwargs) -> EventList:
 
 
 def trackname(string, **kwargs) -> EventList:
+    """ Generate an EventList containing a track name event (a MetaEvent
+    with mtype=3). Equivalent to ``meta(3, string, **kwargs)``. """
     """ トラック名のイベント (mtype=3 のメタイベント) を含む EventList
     を生成します。``meta(3, string, **kwargs)`` と等価です。"""
     return meta(M_TRACKNAME, string, **kwargs)
 
 
 def instname(string, **kwargs) -> EventList:
+    """ Generates an EventList containing an instrument name event (a MetaEvent
+    with mtype=4). Equivalent to ``meta(4, string, **kwargs)``. """
     """ 楽器名のイベント (mtype=4 のメタイベント) を含む EventList
     を生成します。``meta(4, string, **kwargs)`` と等価です。"""
     return meta(M_INSTNAME, string, **kwargs)
 
 
 def lyric(string, **kwargs) -> EventList:
+    """ Generates an EventList containing a lyrics event (a MetaEvengt with
+    mtype=5). Equivalent to ``meta(5, string, **kwargs)``. """
     """ 歌詞のイベント (mtype=5 のメタイベント) を含む EventList
     を生成します。``meta(5, string, **kwargs)`` と等価です。"""
     return meta(M_LYRIC, string, **kwargs)
 
 
 def marker(string, **kwargs) -> EventList:
+    """ Generates an EventList containing a marker event (a MetaEvent with
+    mtype=6). The track number (tk attribute) is 0 regardless of the context
+    unless explicitly specified.
+
+    Args:
+        string(str): Marker string
+        kwargs: Other arguments passed to the meta() function.
+
+    **Referenced context attributes**
+        dt, effectors
+    """
     """ マーカーイベント (mtype=6 のメタイベント) を含む EventList
     を生成します。
     トラック番号 (tk属性) は、明示的に指定しない限り、コンテキストによらず
@@ -613,7 +960,7 @@ def marker(string, **kwargs) -> EventList:
         string(str): マーカー文字列
         kwargs: meta() 関数に渡される他の引数。
 
-    **影響を受ける可能性のあるコンテキスト属性**
+    **参照されるコンテキスト属性**
         dt, effectors
     """
     with newcontext(tk=0):
@@ -621,6 +968,9 @@ def marker(string, **kwargs) -> EventList:
 
 
 def chprefix(value, **kwargs) -> EventList:
+    """ Generate an EventList containing a MIDI channel prefix event
+    (a MetaEvent with mtype=0x20).
+    Equivalent to ``meta(0x20, bytes((value,))), **kwargs)``. """
     """ MIDIチャネルプレフィックスのイベント (mtype=0x20 のメタイベント)
     を含むEventList を生成します。``meta(0x20, bytes((value,)), **kwargs)`` と
     等価です。"""
@@ -628,6 +978,9 @@ def chprefix(value, **kwargs) -> EventList:
 
 
 def devno(value, **kwargs) -> EventList:
+    """ Generate an EventList containing a device (port) number event
+    (a MetaEvent with mtype=0x21).
+    Equivalent to ``meta(0x21, bytes((value,))), **kwargs)``. """
     """ デバイス(ポート)番号指定のイベント (mtype=0x21 のメタイベント) を含む
     EventList を生成します。``meta(0x21, bytes((value,)), **kwargs)`` と
     等価です。"""
@@ -635,12 +988,37 @@ def devno(value, **kwargs) -> EventList:
 
 
 def trackend(**kwargs) -> EventList:
+    """ Generates an EventList containing an end-of-track event (a MetaEvent
+    with mtype=0x2f). Equivalent to ``meta(0x2f, b'', **kwargs)``. """
     """ トラックの終りを表すイベント (mtype=0x2f のメタイベント) を含む
     EventList を生成します。``meta(0x2f, b'', **kwargs)`` と等価です。"""
     return meta(M_EOT, b'', **kwargs)
 
 
 def timesig(num, den, cc=None, *, duration=0, **kwargs) -> EventList:
+    """ Generates an EventList containing a time signature event (a MetaEvent
+    with mtype=0x58).
+    The track number (tk attribute) is 0 regardless of the context unless
+    explicitly specified.
+
+    Args:
+        num(int): Numerator value
+        den(int): Denominator value
+        cc(int, optional): Interval between metronome clicks
+            (see :class:`.KeySignatureEvent`).
+        duration(ticks, optional): Specifies the 'duration' attribute value
+            of the event list.
+        kwargs: Additional keyword arguments. For each keyword argument,
+            if the context has an attribute of the same name, it specifies
+            a temporary change (override) of the context value; otherwise,
+            it produces an additional attribute in the output event.
+
+    **Referenced context attributes**
+        dt, effectors
+
+    Examples:
+        ``sc.timesig(4,4) sc.timesig(5,8)``
+    """
     """ 拍子イベント (mtype=0x58 のメタイベント) を含む EventList を
     生成します。
     トラック番号 (tk属性) は、明示的に指定しない限り、コンテキストによらず
@@ -657,7 +1035,7 @@ def timesig(num, den, cc=None, *, duration=0, **kwargs) -> EventList:
             場合は、その属性値を一時的に変更する指定となります。
             そうでなければ、出力されるイベントに対する追加の属性となります。
 
-    **影響を受ける可能性のあるコンテキスト属性**
+    **参照されるコンテキスト属性**
         dt, effectors
 
     Examples:
@@ -670,6 +1048,22 @@ def timesig(num, den, cc=None, *, duration=0, **kwargs) -> EventList:
 
 
 def keysig(keydesc, minor=0, **kwargs) -> EventList:
+    """ Generates an EventList containing a key signature event (a MetaEvent
+    with mtype=0x59).
+    The track number (tk attribute) is 0 regardless of the context unless
+    explicitly specified.
+
+    Args:
+        keydesc(int, str, or Key): Description of the key (see :class:`.Key`)
+        minor(int, optional): Mode (see :class:`.Key`)
+        kwargs: Other arguments passed to the meta() function.
+
+    **Referenced context attributes**
+        dt, effectors
+
+    Examples:
+        ``sc.keysig('Eb-major') sc.keysig(0)``
+    """
     """ 調号イベント (mtype=0x59 のメタイベント) を含む EventList を
     生成します。
     トラック番号 (tk属性) は、明示的に指定しない限り、コンテキストによらず
@@ -680,7 +1074,7 @@ def keysig(keydesc, minor=0, **kwargs) -> EventList:
         minor(int, optional): モードの指定 (:class:`.Key` を参照)
         kwargs: meta() 関数に渡される他の引数。
 
-    **影響を受ける可能性のあるコンテキスト属性**
+    **参照されるコンテキスト属性**
         dt, effectors
 
     Examples:
@@ -692,6 +1086,19 @@ def keysig(keydesc, minor=0, **kwargs) -> EventList:
 
 
 def xml(xtype, value, *, duration=0, **kwargs) -> EventList:
+    """ Generates an EventList containing an XmlEvent (additional information
+    event for staff notation). See :class:`.XmlEvent` for a list of information
+    types.
+
+    Args:
+        xtype(str): String representing the information type
+        value: Data content of the information
+        duration(ticks, optional): Specifies the 'duration' attribute value
+            of the event list.
+
+    **Referenced context attributes**
+        dt, tk, effectors
+    """
     """ XmlEvent (五線譜のための追加情報イベント）を含む EventList を
     生成します。情報の種類の一覧については :class:`.XmlEvent` を見てください。
 
@@ -701,7 +1108,7 @@ def xml(xtype, value, *, duration=0, **kwargs) -> EventList:
         duration(ticks, optional): イベントリストの duration属性値を
             指定します。
 
-    **影響を受ける可能性のあるコンテキスト属性**
+    **参照されるコンテキスト属性**
         dt, tk, effectors
     """
     if xtype == 'clef':

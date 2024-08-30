@@ -18,6 +18,16 @@ Ticks = Union[int, float, Fraction]
 
 def takt_round(x) -> int:
     """
+    Round `x` to the nearest integer, the larger if there are two
+    possibilities.
+
+    Args:
+        x(float): the original value
+
+    Returns:
+        Resulting value
+    """
+    """
     `x` を最も近い整数へ丸めます。2つ可能性があるときは大きい方になります。
 
     Args:
@@ -34,6 +44,32 @@ _ROUNDX_EPSILON = 1e-4
 
 
 def takt_roundx(x, mode) -> int:
+    """
+    Rounding function to an integer with various rounding modes.
+
+    Args:
+        x(float): original value
+        mode(str or function): rounding mode represented by one of the
+            followings.
+
+            * 'nearestup': The integer closest to `x`.
+              If there are two possibilities, the larger one is chosen.
+            * 'nearestdown': The integer closest to `x`.
+              If there are two possibilities, the smaller one is chosen.
+            * 'floor': The largest integer less than or equal to `x`.
+            * 'ceil': The smallest integer greater than or equal to `x`.
+            * 'down': The largest integer less than or equal to (`x` + 10
+              :sup:`-4`) ('floor' with allowing calculation errors).
+            * 'up': The smallest integer greater than or equal to (`x` - 10
+              :sup:`-4`) ('ceil' with allowing calculation errors).
+            * 'random': 'up' or 'down' chosen at random with equal
+              probability.
+            * function: the function is called with `x` as argument, and
+              its return value is the result.
+
+    Returns:
+        Result value
+    """
     """さまざまな丸めモードを持った整数への丸め関数
 
     Args:
@@ -78,6 +114,16 @@ def takt_roundx(x, mode) -> int:
 
 def int_preferred(x) -> Union[int, float, Fraction]:
     """
+    If `x` has an integer value, convert it to the 'int' type, otherwise
+    return it as it is.
+
+    Args:
+        x(int, float, or Fraction): original value
+
+    Returns:
+        Resulting value
+    """
+    """
     `x` が整数値を持つ場合はint型に変換して、そうでなければ元のまま返します。
 
     Args:
@@ -94,6 +140,15 @@ def int_preferred(x) -> Union[int, float, Fraction]:
 
 def std_time_repr(time) -> str:
     """
+    Converts `time` to a string with 5 decimal places.
+
+    This function is used when converting an Event or EventList to a string
+    with the str function.
+
+    Args:
+        time(ticks): value
+    """
+    """
     `time` を小数点以下5桁以内で表した文字列へ変換します。
 
     この関数は、Event や EventList を str 関数で文字列に変換する際に、
@@ -108,6 +163,18 @@ def std_time_repr(time) -> str:
 
 
 def frac_time_repr(time) -> str:
+    """
+    Converts `time` to a string using fractional notation that is as accurate
+    and compact as possible.
+    Unlike the repr function, the result may contain a conversion error
+    up to 1e-8.
+
+    This function is the default time-to-string conversion function
+    in :func:`.showtext` when it is not in the raw mode.
+
+    Args:
+        time(ticks): value
+    """
     """
     `time` を分数表記を使ってできるだけ正確かつコンパクトな文字列に変換
     します。repr関数と異なり 1e-8 程度の変換誤差を含む場合があります。
@@ -140,6 +207,13 @@ class TaktWarning(UserWarning):
 
 
 class NoteDict:
+    """
+    A dictionary for finding correspondences between events (typically for
+    NoteOnEvent and NoteOffEvent).
+    By default, it uses (track number, MIDI channel number, MIDI note number)
+    as key to find events with the same key. Unlike normal dict, it allows
+    multiple elements for the same key.
+    """
     """
     イベント間 (典型的には NoteOnEvent と NoteOffEvent) の対応を見つけるため
     の辞書。
@@ -223,10 +297,29 @@ class NoteDict:
 
 def get_file_type(path, types=('smf', 'json', 'mxl'), guess=True) -> str:
     """
-    `path` で与えられたパス名に含まれる拡張子を調べて、
-    標準MIDIファイル、jsonファイル、MusicXMLファイルのうちのどれであるかを
-    判別します。パス名から判別できない場合は、ファイル内容から推測し
-    ます (guess=Trueの場合)。それでも判別できなければ例外を送出します。
+    Determines whether the file specified by `path` is a standard MIDI file,
+    a JSON file, or a MusicXML file.
+    First, the extension in the pathname is examined to determine the file
+    type.  If it cannot be determined from the pathname, it is inferred from
+    the file content (only if guess=True). If it still cannot be determined,
+    an exception is raised.
+
+    Args:
+        path(str): path name of the file
+        types(tuple of str): Acceptable file formats
+        guess(bool, optional): If True, guessed from the file content in
+            addition to the extension in the pathname.
+
+    Returns:
+        'smf' for standard MIDI files, 'json' for JSON files, or 'mxl' for
+        MusicXML files.
+    """
+    """
+    `path` で指定されたファイルが、標準MIDIファイル、JSONファイル、
+    MusicXMLファイルのうちのどれであるかを判別します。
+    まず、パス名に含まれる拡張子を調べて判別します。パス名から判別できない
+    場合は、ファイル内容から推測します (guess=Trueの場合)。それでも決定
+    できなければ例外を送出します。
 
     Args:
         path(str): ファイルのパス名
@@ -235,7 +328,7 @@ def get_file_type(path, types=('smf', 'json', 'mxl'), guess=True) -> str:
             推測します。
 
     Returns:
-        str: 標準MIDIファイルなら 'smf', jsonファイルなら 'json',
+        標準MIDIファイルなら 'smf', jsonファイルなら 'json',
         MusicXMLファイルなら 'mxl'
     """
     _, ext = os.path.splitext(path)

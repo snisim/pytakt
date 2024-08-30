@@ -1,5 +1,8 @@
 # coding:utf-8
 """
+This module defines functions to read and write standard MIDI files (SMF).
+"""
+"""
 このモジュールには、標準MIDIファイル(SMF)を読み書きするため関数が
 定義されています。
 """
@@ -222,6 +225,29 @@ def check_eot(tracks):
 
 def readsmf(filename, supply_tempo=True, pair_note_events=True,
             encoding='utf-8') -> Tracks:
+    """ Reads a standard MIDI file and returns its contents as a score.
+    The returned score is structured as an EventList for each track,
+    which is grouped together by Tracks.
+
+    Args:
+        filename(str): file name ('-' for standard input)
+        supply_tempo(bool or float, optional):
+            If True, a tempo event of 120 BPM is supplied if there is no
+            tempo event at time 0.
+            If a valid tempo value (BPM) is specified, a tempo event of
+            that value will be supplied if there is no tempo event at time 0.
+            If false, no tempo events are added.
+        pair_note_events(bool): If True, note-ons and note-offs are coupled
+            and all notes are output as NoteEvent's; if False, they are output
+            as independent NoteOnEvent and NoteOffEvent events.
+        encoding(str, optional): Specifies how the strings of text events are
+            encoded in the SMF.
+
+    Returns:
+        The resulting score. This Tracks object has two additional attributes,
+        smf_format and smf_resolution, which contain the SMF format
+        (0, 1, or 2) and resolution, respectively.
+    """
     """ 標準MIDIファイルを読んでスコアを返します。
     返されるスコアは、トラック毎にEventListがあり、それらがTracksとして
     まとめられた構造になっています。
@@ -268,8 +294,45 @@ def readsmf(filename, supply_tempo=True, pair_note_events=True,
 def writesmf(score, filename, format=1, resolution=480, ntrks=None,
              retrigger_notes=False, supply_tempo=True, render=True,
              encoding='utf-8', limit=DEFAULT_LIMIT) -> None:
+    """ Writes the contents of `score` to a standard MIDI file.
+    For SMFs other than format-0, the value of the tk attribute of each event
+    determines the track to be stored in the SMF.
+    If there is no end-of-track event at the end of each track, it will be
+    supplied.
+
+    Args:
+        score(Score): input score
+        filename(str): file name ('-' for standard output)
+        format(int, optional): one of the integers, 0, 1, and 2,
+            specifying the SMF format.
+        resolution(int, optional):
+            resolution (ticks per quarter note) in the SMF.
+        ntrks(int, optional): Specifies the number of tracks in the SMF
+            (not applicable for format-0 SMFs).
+            Defaults to the maximum value of the tk attribute among events
+            in `score` plus 1.
+            If a value greater than this is specified for `ntrks`,
+            empty tracks will be appended. Conversely, if a smaller value is
+            specified, events with the tk attribute values greater than `ntrks`
+            will not be stored.
+        retrigger_notes(bool, optional): If true, retrigger processing
+            (see :class:`.RetriggerNotes`) is applied to manage
+            note collisions before they are written to SMF.
+        supply_tempo(float or bool, optional):
+            If True, a tempo event with a tempo value of 125 BPM will be
+            supplied if there is no tempo event at time 0.
+            If a valid tempo value (BPM) is specified, a tempo event with
+            that value is supplied if there is no tempo event at time 0.
+            If False, no tempo events are added.
+        render(bool, optional):
+            If default (True), events are output using the played time.
+            If False, the notated time is used.
+        encoding(str, optional): Specifies how to encode text event strings
+            in the SMF.
+        limit(ticks, optional): Limit the length of the score.
+            See the same name argument of :meth:`.Score.stream` for details.
+    """
     """ `score` の内容を標準MIDIファイルに書き出します。
-    `score` はどのような構造のスコアであっても構いません。
     format-0以外のSMFでは、
     各イベントが持つtk属性の値に従って、SMF中での格納トラックが決まります。
     各トラックの最後にEnd-of-trackイベントがない場合は補われます。
@@ -289,7 +352,7 @@ def writesmf(score, filename, format=1, resolution=480, ntrks=None,
             されません。
         retrigger_notes(bool, optional): Trueであると、SMFに書き出される前に、
             衝突noteに対するリトリガー処理
-            (:meth:`.EventList.retrigger_notes` を参照)が適用されます。
+            (:class:`.RetriggerNotes` を参照)が適用されます。
         supply_tempo(float or bool, optional):
             Trueであると、時刻 0 にテンポイベントがない場合に、テンポ値が
             125 BPM のテンポイベントが補われます。
