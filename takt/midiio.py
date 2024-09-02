@@ -763,13 +763,17 @@ def _play_rec(score, rec=False, outdev=None, indev=None, metro=None,
         indevnum = _input_devnum if indev is None else find_input_device(indev)
     open_output_device(devnum)  # may take some seconds
     open_input_device(indevnum)
-    isstream = isinstance(score, EventStream)
-    if isstream and score.is_consumed():
-        raise Exception('play: Input stream has already been consumed')
-    if not isstream:
-        score = Tracks(
-            [score, EventList([LoopBackEvent(score.get_duration(), 'done')],
-                              0)])
+    if score is None:
+        score = EventList()
+        isstream = False
+    else:
+        isstream = isinstance(score, EventStream)
+        if isstream and score.is_consumed():
+            raise Exception('play: Input stream has already been consumed')
+        if not isstream:
+            score = Tracks([score,
+                            EventList([LoopBackEvent(score.get_duration(),
+                                                     'done')], 0)])
     if metro:
         score = score & metro.mapev(
             lambda ev: ev.copy().update(tk=_METRONOME_TRACK))
@@ -802,7 +806,8 @@ def _play_rec(score, rec=False, outdev=None, indev=None, metro=None,
                 qt = ev.t - _QUEUE_LOOK_AHEAD + toffset
             except StopIteration as e:
                 if isstream:
-                    queue_event(LoopBackEvent(e.value + toffset, 'done'))
+                    queue_event(LoopBackEvent(e.value, 'done'),
+                                e.value + toffset)
                 ev = None
             if isinstance(score, RealTimeStream):
                 if ev is None:
@@ -818,7 +823,7 @@ def _play_rec(score, rec=False, outdev=None, indev=None, metro=None,
                             if rev.value == 'next':
                                 break
                             elif rev.value == 'done':
-                                recevlist.duration = rev.t - toffset
+                                recevlist.duration = rev.t
                                 cancel_events(_METRONOME_TRACK, devnum)
                                 done = True
                                 break
@@ -905,8 +910,8 @@ def record(indev=None, play=None, outdev=None,
             output device is used; otherwise, the target device is the result
             of calling :func:`find_output_device` with this as the argument.
         metro(str, bool or Score, optional):
-            If specified, a metronome will be sounded. The standard metronome
-            assumes that a GM standard rhythm instrument is assigned to
+            If specified, a metronome will be sounded. The default metronome
+            assumes that a GM standard rhythmic instrument is assigned to
             MIDI channel 10.
             This argument can be a string representing a time signature,
             such as "3/4", True (equivalent to "4/4"), or a score to play
@@ -954,7 +959,6 @@ def record(indev=None, play=None, outdev=None,
     Returns:
         録音されたスコア
     """
-    score = play if play is not None else mml("L1r@@")
     try:
         if metro is True:
             metro = '4/4'
@@ -970,7 +974,7 @@ def record(indev=None, play=None, outdev=None,
     except ValueError:
         raise ValueError("Unrecognized 'metro' argument") from None
 
-    return _play_rec(score, True, outdev, indev, metro, monitor)
+    return _play_rec(play, True, outdev, indev, metro, monitor)
 
 
 def listen(dev=None) -> RealTimeStream:

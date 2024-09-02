@@ -250,6 +250,17 @@ def test_chord_iterator():
                                 cont_notes=False)) == s
 
 
+def test_genseq():
+    s = genseq([note(C4), rest(), note(D4)])
+    assert EventList(s) == mml("CrD")
+    s = genseq([note(C4, step=240), note(D4), note(E4, step=240)])
+    assert EventList(s) == mml("[c{r/d}{r/re}]& rr")
+    s = genseq(note(p) for p in range(40, 80))
+    s2 = seq(note(p) for p in range(40, 80))
+    assert(EventList(s.tee()) == s2)
+    assert(EventList(s.tee()) == EventList(s2.stream()))
+
+
 def test_scale():
     scale = Scale(C4, 'major')
     assert(scale[0] == C4 and scale[2] == E4 and scale[0.5] == Cs4)

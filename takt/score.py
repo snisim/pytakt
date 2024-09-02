@@ -2046,6 +2046,7 @@ def genseq(elms=[], **kwargs) -> 'EventStream':
     def _generator():
         duration = 0
         buf = []  # list of [top_event, time_offset, eventstream]
+        done = False
 
         def fill_top(k):
             try:
@@ -2070,8 +2071,9 @@ def genseq(elms=[], **kwargs) -> 'EventStream':
                 nexttime = duration
             except StopIteration:
                 nexttime = math.inf
+                done = True
 
-            if not buf:
+            if done and not buf:
                 break
 
             while True:
