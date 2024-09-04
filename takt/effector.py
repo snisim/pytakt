@@ -1491,6 +1491,10 @@ class Reject(Filter):
     Reject(...) は Filter(..., negate=True) と等価です。
     """
     def __init__(self, *conds, globals=None, locals=None):
+        if globals is None:
+            globals = takt.frameutils.outerglobals()
+        if locals is None:
+            locals = takt.frameutils.outerlocals()
         super().__init__(*conds, negate=True, globals=globals, locals=locals)
 
 

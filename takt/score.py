@@ -19,7 +19,7 @@ from typing import Union, List, Generator, Callable, Optional
 from takt.event import Event, NoteEvent, NoteOnEvent, NoteOffEvent, \
     NoteEventClass, CtrlEvent, KeyPressureEvent, TempoEvent, \
     KeySignatureEvent, TimeSignatureEvent, LoopBackEvent
-from takt.constants import C_DATA, C_DATA_L, EPSILON, L32
+from takt.constants import C_DATA, C_DATA_L, C_NRPCL, EPSILON, L32
 from takt.utils import int_preferred, std_time_repr, NoteDict, Ticks
 from takt.context import context
 
@@ -929,7 +929,8 @@ isinstance(ev, (NoteEvent, NoteOnEvent))])
             yield from flush(e.value)
             return e.value
 
-    def active_events_at(score, time, event_type=Event) -> List['Event']:
+    def active_events_at(score, time,
+                         event_type=Event, cache=True) -> List['Event']:
         """ Returns a list of events that are active (or effective) at `time`.
         Active events are specifically the following events.
 
@@ -945,8 +946,9 @@ isinstance(ev, (NoteEvent, NoteOnEvent))])
         * TempoEvent representing the tempo at `time`, including those
           that exist at exactly `time`.
         * The last CtrlEvent before `time` for each controller number,
-          each track number, and each MIDI channel number, excluding RPCs
-          and mode changes (controller numbers 6, 38, 96-101, and 124-127).
+          each track number, and each MIDI channel number, except
+          the mode changes (controller numbers 124-127). For RPCs,
+          CtrlEvent's needed to set each parameter value are included.
         * The last KeyPressureEvent before `time` for each track number,
           each MIDI channel number, and each MIDI note number.
 
@@ -957,15 +959,34 @@ isinstance(ev, (NoteEvent, NoteOnEvent))])
 
         Args:
             time(ticks): Time of interest
-            event_type(class or tuple of classes): If specified, limits the
-                type of events examined to events of this class or its
-                subclasses (or any of them in the case of tuples).
+            event_type(class, int, or tuple of class or int):
+                If a class is specified, the type of events examined is
+                limited to events of that class or its subclasses (in this
+                argument, NoteEvent, NoteOnEvent, and NoteOffEvent all have
+                the same meaning as NoteEventClass).
+                If an integer is specified, events are limited to CtrlEvent's
+                of that controller number.
+                In the case of a tuple of classes and/or integers, events
+                corresponding to any of them are targetted.
+                Note that when specifying RPC-related controller numbers
+                (6,38,98-101), all of these must be specified at the same time.
+            cache(bool):
+                If True (default), caching is enabled to speed up multiple
+                queries against the same score. However, if the score is
+                rewritten after using this method, it will not return correct
+                results thereafter, so use False in such a case.
 
         Returns:
             list of Event: List of active events, which are references to
             events in the score.
             The events are ordered by time. For events present at the same
             time, they are ordered by their appearance in the socre.
+
+        Notes:
+            Without caching, the computational complexity of M queries for
+            a score with N events is O(NM). With caching, it is reduced to
+            O(N+MlogN) for ordinary scores, although the worst-case complexity
+            remains O(MN).
         """
         """ 時刻 `time` においてアクティブな（効いている）イベントのリストを
         返します。アクティブなイベントとは具体的には次のようなイベントを
@@ -983,9 +1004,9 @@ isinstance(ev, (NoteEvent, NoteOnEvent))])
         * `time` におけるテンポを表す TempoEvent。ちょうど `time` に存在
           するものを含みます。
         * 各コントローラ番号、各トラック番号、各MIDIチャネル番号において、
-          `time` 以前に存在する最後の CtrlEvent。ただし、RPC関係と
-          モードチェンジ（コントローラ番号6,38,96〜101,124〜127) は除かれ
-          ます。
+          `time` 以前に存在する最後の CtrlEvent。モードチェンジ（コントローラ
+          番号124〜127) は対象外です。RPCはパラメータ番号ごとにその値の設定に
+          必要なCtrlEventが含められます。
         * 各トラック番号、各MIDIチャネル番号、各MIDIノート番号において、
           `time` 以前に存在する最後の KeyPressureEvent。
 
@@ -996,45 +1017,40 @@ isinstance(ev, (NoteEvent, NoteOnEvent))])
 
         Args:
             time(ticks): 対象となる時刻
-            event_type(class or tuple of classes): 指定すると、調べる
-                イベントの種類を、このクラスまたはそのサブクラスのイベント
-                (タプルの場合はそのいずれかに該当するイベント）に限定します。
+            event_type(class, int, or tuple of class or int): クラスを指定
+                すると、調べるイベントの種類を、そのクラスまたはそのサブクラス
+                のイベントに限定します (なお、NoteEvent, NoteOnEvent,
+                NoteOffEventはどれも NoteEventClassと同じ意味になります)。
+                整数を指定すると、そのコントローラ番号のCtrlEventに限定します。
+                クラスおよび整数のタプルの場合は、そのいずれかに該当する
+                イベントを対象とします。
+                なお、RPC関連のコントローラ番号(6,38,98-101)を指定する場合には
+                これらをすべて同時に指定してください。
+            cache(bool): True (デフォルト) の場合、キャシュを使用して同じ
+                スコアに対する複数の問い合わせを高速化します。ただし、
+                このメソッドを使用した後にスコアが書き換えられた場合は、それ
+                以降正しい結果を返さなくなりますので、このような場合はFalseに
+                して使用してください。
 
         Returns:
             list of Event: アクティブなイベント(スコア中のイベントへの参照)の
             リスト。イベントの順序は時刻順 (同時刻の場合は出現順）になります。
 
-        Tip:
-            計算量は少なくとも `time` に達するまでのイベント数のオーダーと
-            なります。テンポ、拍子、調のみを調べるのなら、それぞれ
-            :class:`.TempoMap`、:class:`.TimeSignatureMap`、
-            :class:`.KeySignatureMap` を使った方が一般に高速です。
+        Notes:
+            キャシュを使用しない場合、イベント数Nのスコアに対するM個の問い合わ
+            せの計算量は O(NM) になります。キャシュを使用した場合、最悪の
+            計算量は O(MN) のままですが、通常のスコアに対しては O(N+MlogN) に
+            削減されます。
         """
-        event_dict = NoteDict()
-        for ev in score.tee().stream().noteoff_inserted():
-            if ev.t > time:
-                break
-            elif isinstance(ev, event_type):
-                if isinstance(ev, NoteEvent):
-                    event_dict.push(ev, ev)
-                elif isinstance(ev, NoteOnEvent):
-                    event_dict.pushnote(ev, ev)
-                elif isinstance(ev, NoteOffEvent):
-                    if hasattr(ev, 'noteon'):
-                        event_dict.pop(ev.noteon)
-                    else:
-                        event_dict.popnote(ev, None)
-                elif isinstance(ev, KeyPressureEvent):
-                    event_dict.pushuniq((ev.ctrlnum, ev.tk, ev.ch, ev.n), ev)
-                elif (isinstance(ev, CtrlEvent) and
-                      not (ev.ctrlnum == C_DATA or ev.ctrlnum == C_DATA_L) and
-                      not 96 <= ev.ctrlnum <= 101 and  # exclude RPC related
-                      not 124 <= ev.ctrlnum <= 127):   # exclude mode change
-                    event_dict.pushuniq((ev.ctrlnum, ev.tk, ev.ch), ev)
-                elif isinstance(ev, (TempoEvent,
-                                     KeySignatureEvent, TimeSignatureEvent)):
-                    event_dict.pushuniq(ev.mtype, ev)
-        return list(event_dict.values())
+        if cache:
+            if not hasattr(score, '_cached_event_finder') or \
+               not score._cached_event_finder.check_event_type(event_type):
+                score._cached_event_finder = _EventFinder(score, event_type,
+                                                          True)
+            event_finder = score._cached_event_finder
+        else:
+            event_finder = _EventFinder(score, event_type, False)
+        return event_finder.events_at(time)
 
     def show(self, *args, **kwargs) -> None:
         """ Call :func:`.pianoroll.show` with the given arguments to
@@ -1262,6 +1278,167 @@ isinstance(ev, (NoteEvent, NoteOnEvent))])
     RetriggerNotes: Callable[..., 'Score'] = None
 
 
+class _EventFinder(object):
+    __noteevent = NoteEvent(0, 60, 0)
+
+    def __init__(self, score, event_type, cache):
+        self.event_type, self.ctrlnums = self._parse_event_type(event_type)
+        if isinstance(self.__noteevent, self.event_type):
+            self.stream = score.tee().stream().noteoff_inserted()
+        else:
+            self.stream = score.tee().stream()
+        self.cache = cache
+        self.noteevents = []  # list of (seqno, event, back-index)
+        # back-index は、直近の継続音を伴わない音符の noteeventsにおける位置
+        self.notedict = NoteDict()
+        self.ctrldict = {}  # key=ctrlnum etc.  value=list of (seqno, event)
+        self.seqno = 0
+        self.last_event_time = 0
+
+    def _parse_event_type(self, event_type):
+        if not isinstance(event_type, tuple):
+            event_type = (event_type,)
+        et = tuple(set((NoteEventClass if issubclass(elm, NoteEventClass)
+                        else elm if issubclass(elm, object)  # error check
+                        else None)  # not reached
+                       for elm in event_type
+                       if not isinstance(elm, int)))
+        cn = set(elm for elm in event_type if isinstance(elm, int))
+        return (et, cn)
+
+    def check_event_type(self, event_type):
+        return (self.event_type, self.ctrlnums) == \
+            self._parse_event_type(event_type)
+
+    def _bisect_right_ev(self, events, time):
+        lo = 0
+        hi = len(events)
+        while lo < hi:
+            mid = (lo+hi)//2
+            if time < events[mid][1].t:
+                hi = mid
+            else:
+                lo = mid+1
+        return lo
+
+    def _get_rpn(self, tk, ch):
+        # 現在アクティブな RPNの情報 ((L,H,N),(seqnoL,evL),(seqnoH,evH))を
+        # を返す。NはNRPCで0、RPCで1。
+        # NRPC と RPC が両方存在している場合は、より後に出現した方を返す。
+        rpns = [[None, None], [None, None]]
+        seqno = -1
+        last_n = 1
+        for n in (0, 1):
+            for lh in (0, 1):
+                try:
+                    s, ev = self.ctrldict[(C_NRPCL + n*2 + lh, tk, ch)][-1]
+                    rpns[n][lh] = s, ev
+                    if s > seqno:
+                        seqno = s
+                        last_n = n
+                except KeyError:
+                    pass
+        evL, evH = rpns[last_n]
+        return ((evL and evL[1].value, evH and evH[1].value, last_n),
+                evL, evH)
+
+    def _fill_until(self, ticks):
+        try:
+            while (self.last_event_time != math.inf and
+                   self.last_event_time <= ticks):
+                ev = next(self.stream)
+                if not self.cache and ev.t > ticks:
+                    break
+                if not (isinstance(ev, self.event_type) or
+                        (isinstance(ev, CtrlEvent) and
+                         ev.ctrlnum in self.ctrlnums)):
+                    continue
+                if isinstance(ev, NoteEventClass):
+                    if isinstance(ev, NoteEvent):
+                        self.notedict.push(ev, (self.seqno, ev,
+                                                len(self.noteevents)))
+                    elif isinstance(ev, NoteOnEvent):
+                        self.notedict.pushnote(ev, (self.seqno, ev,
+                                                    len(self.noteevents)))
+                    else:  # ev is a NoteOffEvent
+                        if hasattr(ev, 'noteon'):
+                            self.notedict.pop(ev.noteon)
+                        else:
+                            self.notedict.popnote(ev, None)
+                    if self.cache:
+                        try:
+                            backidx = next(self.notedict.values())[2]
+                        except StopIteration:
+                            backidx = None
+                        self.noteevents.append((self.seqno, ev, backidx))
+                elif isinstance(ev, KeyPressureEvent):
+                    self.ctrldict.setdefault(
+                        (ev.ctrlnum, ev.tk, ev.ch, ev.n), []) \
+                        .append((self.seqno, ev))
+                elif (isinstance(ev, CtrlEvent) and
+                      not 124 <= ev.ctrlnum <= 127):   # exclude mode change
+                    if ev.ctrlnum in (C_DATA, C_DATA_L):
+                        key, evL, evH = self._get_rpn(ev.tk, ev.ch)
+                        self.ctrldict.setdefault(
+                            (ev.ctrlnum, key, ev.tk, ev.ch), []) \
+                            .append((self.seqno, ev))
+                        if evL:
+                            self.ctrldict.setdefault(
+                                (evL[1].ctrlnum, key, ev.tk, ev.ch), []) \
+                                .append(evL)
+                        if evH:
+                            self.ctrldict.setdefault(
+                                (evH[1].ctrlnum, key, ev.tk, ev.ch), []) \
+                                .append(evH)
+                    else:
+                        self.ctrldict.setdefault(
+                            (ev.ctrlnum, ev.tk, ev.ch), []) \
+                                 .append((self.seqno, ev))
+                elif isinstance(ev, (TempoEvent, KeySignatureEvent,
+                                     TimeSignatureEvent)):
+                    self.ctrldict.setdefault(ev.mtype, []) \
+                                 .append((self.seqno, ev))
+                self.seqno += 1
+                self.last_event_time = ev.t
+        except StopIteration:
+            self.last_event_time = math.inf
+
+    def events_at(self, ticks):
+        self._fill_until(ticks)
+        results = {}  # RPCで重複が発生する可能があるため、dictにしている。
+
+        if not self.cache:
+            for seqno, ev, _ in self.notedict.values():
+                results[seqno] = ev
+        elif self.noteevents:
+            i = self._bisect_right_ev(self.noteevents, ticks)
+            if i > 0:
+                bi = self.noteevents[i-1][2]
+                if bi is not None:
+                    ndict = NoteDict()
+                    for seqno, ev, _ in self.noteevents[bi:i]:
+                        if isinstance(ev, NoteEvent):
+                            ndict.push(ev, (seqno, ev))
+                        elif isinstance(ev, NoteOnEvent):
+                            ndict.pushnote(ev, (seqno, ev))
+                        elif isinstance(ev, NoteOffEvent):
+                            if hasattr(ev, 'noteon'):
+                                ndict.pop(ev.noteon, None)
+                            else:
+                                ndict.popnote(ev, None)
+                    for seqno, ev in ndict.values():
+                        results[seqno] = ev
+
+        for events in self.ctrldict.values():
+            i = self._bisect_right_ev(events, ticks)
+            if i <= 0:
+                continue
+            seqno, ev = events[i-1]
+            results[seqno] = ev
+
+        return [results[seqno] for seqno in sorted(results)]
+
+
 class EventList(Score, list):
     """
     EventList is a class for event lists and inherits from both the Score
@@ -1357,7 +1534,7 @@ class EventList(Score, list):
             引数の項目を見てください。
         kwargs: イベントリストに対して追加の属性を指定します。
     """
-    __slots__ = ('duration', '__dict__')
+    __slots__ = ('duration', '__dict__', '_cached_event_finder')
 
     def __init__(self, events=[], duration=None,
                  *, limit=DEFAULT_LIMIT, **kwargs):
@@ -1598,6 +1775,8 @@ class Tracks(Score, list):
         elms(iterable of Score): 要素となるスコア群
         kwargs: Tracksオブジェクトに対して追加の属性を指定します。
     """
+    __slots__ = ('__dict__', '_cached_event_finder')
+
     def __init__(self, elms=[], **kwargs):
         list.__init__(self, elms)
         self.__dict__.update(kwargs)
@@ -1709,7 +1888,8 @@ class EventStream(Score):
     """
 
     # EventStream(score) で、イベントのコピーはしない。
-    __slots__ = 'iterator', '__dict__', '_is_consumed'
+    __slots__ = ('iterator', '__dict__',
+                 '_cached_event_finder', '_is_consumed')
 
     def __init__(self, iterator, **kwargs):
         if isinstance(iterator, collections.abc.Iterator):
