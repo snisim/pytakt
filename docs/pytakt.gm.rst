@@ -1,7 +1,7 @@
-takt.gm package
-===============
+pytakt.gm package
+=================
 
-.. automodule:: takt.gm
+.. automodule:: pytakt.gm
    :members:
    :undoc-members:
    :show-inheritance:
@@ -12,5 +12,5 @@ Submodules
 .. toctree::
    :maxdepth: 4
 
-   takt.gm.drums
+   pytakt.gm.drums
 

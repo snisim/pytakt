@@ -5,8 +5,8 @@ untracked
 ./.git
 ./dist
 ./docs/_build
-./takt.egg-info
-./takt/old
-./takt/tests/scores
+./pytakt.egg-info
+./pytakt/old
+./pytakt/tests/scores
 ./_en
 ./_ja

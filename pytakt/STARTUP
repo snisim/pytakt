@@ -1,6 +1,6 @@
-from takt import *
-from takt.midiio import *
-import takt
+from pytakt import *
+from pytakt.midiio import *
+import pytakt
 import music21
 import sys
-print("pytakt version", takt.__version__, file=sys.stderr)
+print("pytakt version", pytakt.__version__, file=sys.stderr)

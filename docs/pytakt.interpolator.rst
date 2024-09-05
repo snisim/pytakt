@@ -1,7 +1,7 @@
-takt.interpolator module
-========================
+pytakt.interpolator module
+==========================
 
-.. automodule:: takt.interpolator
+.. automodule:: pytakt.interpolator
    :members:
    :undoc-members:
    :show-inheritance:

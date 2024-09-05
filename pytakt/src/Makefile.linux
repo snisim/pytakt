@@ -1,5 +1,5 @@
 DEST = ../cmidiio.so
-INCLUDE = -I/usr/include/python3.6
+INCLUDE = -I/usr/include/python3.8
 LIBS = -lasound
 CXXFLAGS += -fPIC -shared $(INCLUDE)
 OBJS = cmidiio.o midiout.o midiin.o sysdep.o

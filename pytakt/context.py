@@ -11,8 +11,8 @@ import numbers
 import os
 import threading
 from typing import List, Tuple, Any
-from takt.utils import int_preferred
-from takt.constants import L4
+from pytakt.utils import int_preferred
+from pytakt.constants import L4
 
 __all__ = ['Context', 'context', 'newcontext']
 

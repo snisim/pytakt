@@ -2,18 +2,18 @@ from setuptools import setup, find_packages, Extension
 import sys
 
 
-with open('takt/__init__.py') as f:
+with open('pytakt/__init__.py') as f:
     for line in f.readlines():
         if '__version__ =' in line:
             exec(line)
 
 
-cmidiio = Extension('takt.cmidiio',
+cmidiio = Extension('pytakt.cmidiio',
                     sources=[
-                        'takt/src/cmidiio.cpp',
-                        'takt/src/midiin.cpp',
-                        'takt/src/midiout.cpp',
-                        'takt/src/sysdep.cpp',
+                        'pytakt/src/cmidiio.cpp',
+                        'pytakt/src/midiin.cpp',
+                        'pytakt/src/midiout.cpp',
+                        'pytakt/src/sysdep.cpp',
                     ],
                     libraries=(
                         ["winmm"] if (sys.platform == 'win32' or
@@ -29,7 +29,7 @@ cmidiio = Extension('takt.cmidiio',
                     )
 
 setup(
-    name="takt",
+    name="pytakt",
     version=__version__,
     author="Satoshi Nishimura",
     description="A Music Information Processing Library with Realtime MIDI I/O",
@@ -40,7 +40,7 @@ setup(
     ext_modules=[cmidiio],
     entry_points={
         "console_scripts": [
-            "pytakt = takt.pytakt:main",
+            "pytakt = pytakt.pytaktcmd:main",
         ],
     }
 )

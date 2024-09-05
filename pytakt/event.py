@@ -13,13 +13,13 @@ Most of these events are based on events defined in Standard MIDI files.
 import warnings
 import numbers
 from typing import Union, Tuple
-from takt.utils import takt_round, int_preferred, std_time_repr, TaktWarning
-from takt.constants import CONTROLLERS, META_EVENT_TYPES, M_TEXT_LIMIT, \
+from pytakt.utils import takt_round, int_preferred, std_time_repr, TaktWarning
+from pytakt.constants import CONTROLLERS, META_EVENT_TYPES, M_TEXT_LIMIT, \
      M_TEXT, C_BEND, C_KPR, C_CPR, C_PROG, C_TEMPO, C_ALL_NOTES_OFF, \
      M_SEQNO, M_CHPREFIX, M_SMPTE, M_MARK, M_TEMPO, M_TIMESIG, M_KEYSIG, \
      M_EOT, TICKS_PER_QUARTER
-from takt.pitch import Key
-from takt.utils import Ticks
+from pytakt.pitch import Key
+from pytakt.utils import Ticks
 
 __all__ = ['MidiEventError', 'MidiEventWarning', 'midimsg_size',
            'message_to_event']  # extended later
@@ -38,7 +38,7 @@ class Event(object):
         dt (ticks): the difference between the notated time and the played
             time; for performances, t plus this value (in ticks)
             is used for timing; the range of the dt value is limited
-            (see :const:`takt.constants.MAX_DELTA_TIME`).
+            (see :const:`pytakt.constants.MAX_DELTA_TIME`).
 
     Args:
         t(ticks): value of the t attribute
@@ -64,7 +64,7 @@ class Event(object):
         dt (ticks): 楽譜上の時刻と演奏上の時刻との差を表し、
             演奏のときは t にこの値(単位はティック)を加えた時刻が
             用いられます。dt値の大きさには制限があります
-            (:const:`takt.constants.MAX_DELTA_TIME` を参照)。
+            (:const:`pytakt.constants.MAX_DELTA_TIME` を参照)。
 
     Args:
         t(ticks): t属性の値

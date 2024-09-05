@@ -1,7 +1,7 @@
-takt.score module
-=================
+pytakt.score module
+===================
 
-.. automodule:: takt.score
+.. automodule:: pytakt.score
    :members:
    :undoc-members:
    :show-inheritance:

@@ -12,14 +12,14 @@ from struct import unpack, pack
 import warnings
 import math
 import sys
-from takt.score import EventList, EventStream, Tracks, DEFAULT_LIMIT
-from takt.event import NoteEventClass, CtrlEvent, KeyPressureEvent, \
+from pytakt.score import EventList, EventStream, Tracks, DEFAULT_LIMIT
+from pytakt.event import NoteEventClass, CtrlEvent, KeyPressureEvent, \
     MetaEvent, SysExEvent, TempoEvent, KeySignatureEvent, \
     midimsg_size, message_to_event
-from takt.constants import TICKS_PER_QUARTER, M_KEYSIG, M_EOT
-from takt.utils import int_preferred, TaktWarning
-from takt.pitch import Pitch, Key
-from takt.timemap import current_tempo, KeySignatureMap
+from pytakt.constants import TICKS_PER_QUARTER, M_KEYSIG, M_EOT
+from pytakt.utils import int_preferred, TaktWarning
+from pytakt.pitch import Pitch, Key
+from pytakt.timemap import current_tempo, KeySignatureMap
 
 __all__ = ['readsmf', 'writesmf', 'SMFError']
 

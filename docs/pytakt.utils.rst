@@ -1,7 +1,7 @@
-takt.utils module
-=================
+pytakt.utils module
+===================
 
-.. automodule:: takt.utils
+.. automodule:: pytakt.utils
    :members:
    :undoc-members:
    :show-inheritance:

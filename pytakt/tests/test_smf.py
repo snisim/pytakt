@@ -1,7 +1,7 @@
 # coding:utf-8
 import pytest
 import math
-from takt import *
+from pytakt import *
 
 
 @pytest.mark.parametrize("format,resolution,retrigger",

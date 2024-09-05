@@ -1,7 +1,7 @@
-takt.mml module
-===============
+pytakt.mml module
+=================
 
-.. automodule:: takt.mml
+.. automodule:: pytakt.mml
    :members:
    :undoc-members:
    :show-inheritance:

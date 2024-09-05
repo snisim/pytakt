@@ -1,7 +1,7 @@
-takt.context module
-===================
+pytakt.context module
+=====================
 
-.. automodule:: takt.context
+.. automodule:: pytakt.context
    :members:
    :undoc-members:
    :show-inheritance:

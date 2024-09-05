@@ -1,7 +1,7 @@
-takt.smf module
-===============
+pytakt.smf module
+=================
 
-.. automodule:: takt.smf
+.. automodule:: pytakt.smf
    :members:
    :undoc-members:
    :show-inheritance:

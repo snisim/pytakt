@@ -67,7 +67,7 @@ Examples:
 """
 # Copyright (C) 2023  Satoshi Nishimura
 
-from takt.sc import note
+from pytakt.sc import note
 
 #
 # Definitions for note numbers of drum sets

@@ -1,7 +1,7 @@
-takt.effector module
-=====================
+pytakt.effector module
+======================
 
-.. automodule:: takt.effector
+.. automodule:: pytakt.effector
    :members:
    :undoc-members:
    :show-inheritance:

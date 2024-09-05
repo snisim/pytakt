@@ -40,7 +40,7 @@ conv_docstr_ja:
 		mv -f $(TMPFILE) $$i; \
 	done
 	mv _ja/docs/conf.py.ja _ja/docs/conf.py
-	mv _ja/docs/takt.rst.ja _ja/docs/takt.rst
+	mv _ja/docs/pytakt.rst.ja _ja/docs/pytakt.rst
 
 clean:
 	rm -rf _en _ja

@@ -1,7 +1,7 @@
-takt.event module
-=================
+pytakt.event module
+===================
 
-.. automodule:: takt.event
+.. automodule:: pytakt.event
    :members: 
    :undoc-members: 
    :show-inheritance:

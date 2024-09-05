@@ -10,7 +10,7 @@ This module defines classes for piecewise linear or cubic interpolation.
 import numbers
 from bisect import bisect_right
 from typing import Iterator, Tuple
-from takt.utils import Ticks
+from pytakt.utils import Ticks
 
 __all__ = ['Point', 'Interpolator']
 

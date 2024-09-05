@@ -1,7 +1,7 @@
-takt.midiio module
-==================
+pytakt.midiio module
+====================
 
-.. automodule:: takt.midiio
+.. automodule:: pytakt.midiio
    :members:
    :undoc-members:
    :show-inheritance:

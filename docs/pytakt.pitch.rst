@@ -1,7 +1,7 @@
-takt.pitch module
-=================
+pytakt.pitch module
+===================
 
-.. automodule:: takt.pitch
+.. automodule:: pytakt.pitch
    :members:
    :undoc-members:
    :show-inheritance:

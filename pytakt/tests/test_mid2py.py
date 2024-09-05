@@ -2,7 +2,7 @@ import pytest
 import os
 import io
 import sys
-from takt import *
+from pytakt import *
 
 
 SKIP_SLOW = os.getenv('TEST_ALL') is None
@@ -28,7 +28,8 @@ def __test_mid2py_raw(tmp_path, midfile, options):
     pyfile = tmp_path.joinpath('tmp_mid2py.py')
     outmidfile = tmp_path.joinpath('tmp_mid2py.mid')
     os.system("rm -f %s" % str(pyfile))
-    os.system("pytakt.py -t -R %s %s > %s" % (options, midfile, str(pyfile)))
+    os.system("pytaktcmd.py -t -R %s %s > %s" %
+              (options, midfile, str(pyfile)))
     assert pyfile.exists() and pyfile.stat().st_size > 0
     os.system("rm -f %s" % str(outmidfile))
     os.system("%s %s write %s limit=1e10 supply_tempo=False" %
@@ -42,7 +43,7 @@ def __test_mid2py_normal(tmp_path, midfile, options):
     pyfile = tmp_path.joinpath('tmp_mid2py.py')
     outmidfile = tmp_path.joinpath('tmp_mid2py.mid')
     os.system("rm -f %s" % str(pyfile))
-    os.system("pytakt.py -t %s %s > %s" % (options, midfile, str(pyfile)))
+    os.system("pytaktcmd.py -t %s %s > %s" % (options, midfile, str(pyfile)))
     assert pyfile.exists() and pyfile.stat().st_size > 0
     os.system("rm -f %s" % str(outmidfile))
     os.system("%s %s write %s limit=1e10 supply_tempo=False" %

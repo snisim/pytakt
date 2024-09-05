@@ -69,10 +69,10 @@ as well as simple text-based music production or building music applications.
 
 ## How To Install
 
-Download a released package (`takt-<version>.tar.gz`)
+Download a released package (`pytakt-<version>.tar.gz`)
 from https://github.com/snisim/pytakt and install it with pip as below.
 
-    pip install takt-<version>.tar.gz
+    pip install pytakt-<version>.tar.gz
 
 If you need conversion to/from music21, music21 (version 6.7.1 or later)
 also needs to be installed (it is not installed automatically).
@@ -82,10 +82,10 @@ also needs to be installed (it is not installed automatically).
 
 ## Operation Check
 
-After starting Python, import the takt module as follows.
+After starting Python, import the pytakt module as follows.
 
-    >>> from takt import *
-    >>> from takt.midiio import *
+    >>> from pytakt import *
+    >>> from pytakt.midiio import *
 
 (The second line above is needed only if you perform direct operations on
 MIDI input/output; it is not necessary for show() or play())

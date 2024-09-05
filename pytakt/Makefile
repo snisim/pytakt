@@ -1,6 +1,6 @@
 PYFILES = __init__.py chord.py constants.py context.py effector.py \
 event.py frameutils.py interpolator.py m21conv.py midiio.py mml.py \
-pianoroll.py pitch.py pytakt.py sc.py scale.py score.py smf.py text.py \
+pianoroll.py pitch.py pytaktcmd.py sc.py scale.py score.py smf.py text.py \
 timemap.py utils.py gm/__init__.py gm/drums.py
 
 pycodestyle:

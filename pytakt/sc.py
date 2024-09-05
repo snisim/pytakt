@@ -2,13 +2,13 @@
 """
 This module defines functions for generating note and other primitive scores.
 Functions other than note and rest are not imported to the namespace of
-the upper module (takt module), and therefore call them with submodule
+the upper module (pytakt module), and therefore call them with submodule
 names like sc.ctrl.
 """
 """
 このモジュールには、音符など基本的なスコアを生成するための関数が定義されて
 います。
-noteとrest以外の関数は、上位モジュール（taktモジュール）の名前空間に取り
+noteとrest以外の関数は、上位モジュール（pytaktモジュール）の名前空間に取り
 込まれませんので、sc.ctrl のようにサブモジュール名をつけて呼び出して下さい。
 """
 # Copyright (C) 2023  Satoshi Nishimura
@@ -16,20 +16,20 @@ noteとrest以外の関数は、上位モジュール（taktモジュール）�
 import math
 import numbers
 import os
-from takt.score import EventList
-from takt.event import NoteEvent, CtrlEvent, KeyPressureEvent, TempoEvent, \
+from pytakt.score import EventList
+from pytakt.event import NoteEvent, CtrlEvent, KeyPressureEvent, TempoEvent, \
     SysExEvent, MetaEvent, TimeSignatureEvent, XmlEvent
-from takt.constants import C_MOD, C_BREATH, C_FOOT, C_PORTA, C_VOL, C_EXPR, \
+from pytakt.constants import C_MOD, C_BREATH, C_FOOT, C_PORTA, C_VOL, C_EXPR, \
     C_PAN, C_REVERB, C_SUSTAIN, C_SOFTPED, C_PORTAON, C_SOSTENUTO, \
     C_BEND, C_KPR, C_CPR, C_PROG, C_TEMPO, C_BANK, C_NRPCL, C_RPCL, \
     C_DATA, C_ALL_SOUND_OFF, C_RESET_ALL_CTRLS, C_ALL_NOTES_OFF, \
     M_SEQNO, M_TEXT, M_COPYRIGHT, M_TRACKNAME, M_INSTNAME, M_LYRIC, M_MARK, \
     M_EOT, M_KEYSIG, M_CHPREFIX, M_DEVNO, MAX_DELTA_TIME, L64
-from takt.context import context, newcontext, Context
-from takt.pitch import Key
-from takt.utils import takt_round
-from takt.interpolator import Interpolator
-from takt.chord import Chord
+from pytakt.context import context, newcontext, Context
+from pytakt.pitch import Key
+from pytakt.utils import takt_round
+from pytakt.interpolator import Interpolator
+from pytakt.chord import Chord
 
 __all__ = []  # extended later
 
@@ -1139,7 +1139,7 @@ def xml(xtype, value, *, duration=0, **kwargs) -> EventList:
 # モジュールで定義された関数を自動的に __all__ に含める
 __all__.extend([name for name, value in globals().items()
                 if name[0] != '_' and callable(value) and
-                value.__module__ == 'takt.sc'])
+                value.__module__ == 'pytakt.sc'])
 
 
 # 関数をContextクラスのメソッドとして利用できるようにする

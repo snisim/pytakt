@@ -1,7 +1,7 @@
-takt.scale module
-=================
+pytakt.scale module
+===================
 
-.. automodule:: takt.scale
+.. automodule:: pytakt.scale
    :members:
    :undoc-members:
    :show-inheritance:

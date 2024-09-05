@@ -1,5 +1,5 @@
-takt package
-============
+pytakt package
+==============
 
 This is the documentation for the Pytakt music information processing library.
 
@@ -13,23 +13,23 @@ Submodules
 .. toctree::
    :maxdepth: 4
 
-   takt.chord
-   takt.constants
-   takt.context
-   takt.effector
-   takt.event
-   takt.interpolator
-   takt.midiio
-   takt.mml
-   takt.pianoroll
-   takt.pitch
-   takt.sc
-   takt.scale
-   takt.score
-   takt.text
-   takt.smf
-   takt.timemap
-   takt.utils
+   pytakt.chord
+   pytakt.constants
+   pytakt.context
+   pytakt.effector
+   pytakt.event
+   pytakt.interpolator
+   pytakt.midiio
+   pytakt.mml
+   pytakt.pianoroll
+   pytakt.pitch
+   pytakt.sc
+   pytakt.scale
+   pytakt.score
+   pytakt.text
+   pytakt.smf
+   pytakt.timemap
+   pytakt.utils
 
 Subpackages
 -----------
@@ -37,4 +37,4 @@ Subpackages
 .. toctree::
    :maxdepth: 4
 
-   takt.gm
+   pytakt.gm

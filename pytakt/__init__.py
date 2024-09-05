@@ -1,19 +1,19 @@
-from takt.context import *
-from takt.pitch import *
-from takt.event import *
-from takt.constants import *
-from takt.score import *
-from takt.effector import *
-import takt.sc as sc
-from takt.sc import note, rest
-from takt.smf import *
-from takt.mml import *
-from takt.scale import *
-from takt.chord import *
-from takt.timemap import *
-from takt.interpolator import *
-from takt.utils import *
-from takt.text import *
-import takt.gm as gm
+from pytakt.context import *
+from pytakt.pitch import *
+from pytakt.event import *
+from pytakt.constants import *
+from pytakt.score import *
+from pytakt.effector import *
+import pytakt.sc as sc
+from pytakt.sc import note, rest
+from pytakt.smf import *
+from pytakt.mml import *
+from pytakt.scale import *
+from pytakt.chord import *
+from pytakt.timemap import *
+from pytakt.interpolator import *
+from pytakt.utils import *
+from pytakt.text import *
+import pytakt.gm as gm
 
 __version__ = '0.39'

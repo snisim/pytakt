@@ -1,7 +1,7 @@
-takt.pianoroll module
-=====================
+pytakt.pianoroll module
+=======================
 
-.. automodule:: takt.pianoroll
+.. automodule:: pytakt.pianoroll
    :members:
    :undoc-members:
    :show-inheritance:

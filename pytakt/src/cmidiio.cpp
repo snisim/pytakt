@@ -27,7 +27,7 @@ static void initialize()
 
 static void shutdown()
 {
-    // printf("shutdown takt.midiio\n");
+    // printf("shutdown pytakt.midiio\n");
     MidiOut::shutdown();
     MidiIn::shutdown();
 }

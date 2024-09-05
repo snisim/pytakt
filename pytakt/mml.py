@@ -15,15 +15,15 @@ import builtins
 from arpeggio import ZeroOrMore, Optional, RegExMatch, EOF, \
                      NonTerminal, ParserPython, NoMatch, Sequence
 from fractions import Fraction
-from takt.score import Score, EventList
-from takt.context import context, newcontext, Context
-from takt.pitch import *
-from takt.sc import *
-from takt.constants import *
-import takt.gm as gm
-from takt.gm.drums import *
-from takt.frameutils import outerglobals, outerlocals
-from takt.utils import int_preferred, Ticks
+from pytakt.score import Score, EventList
+from pytakt.context import context, newcontext, Context
+from pytakt.pitch import *
+from pytakt.sc import *
+from pytakt.constants import *
+import pytakt.gm as gm
+from pytakt.gm.drums import *
+from pytakt.frameutils import outerglobals, outerlocals
+from pytakt.utils import int_preferred, Ticks
 from typing import Optional as _Optional
 from typing import Union, Mapping, Callable
 
@@ -416,7 +416,7 @@ class MMLEvaluator(object):
         elif node[0].value == '&':
             context()._ampersand = True
         elif node[0].value == '@':
-            from takt.effector import Repeat
+            from pytakt.effector import Repeat
             if node[1].value == '@':
                 context()._effectors.append(Repeat())
             else:
@@ -591,7 +591,7 @@ G/!? G/ G/!? G3*").show(True)
         32, 64, or 128.
         Execution of this command will set the L attribute value in the context
         to the value of the constant of the same name defined in the
-        :mod:`takt.constants` module. For example, ``L8`` makes
+        :mod:`pytakt.constants` module. For example, ``L8`` makes
         subsequent notes and rests eighth-note length.
     <context attribute name> ``=`` <simple expression>
         Changes the value of a context attribute (e.g. ``v=100``).
@@ -625,7 +625,7 @@ commands ``}``
         The <Python function name> may contain dots ('.').
         Note that the names defined in the following modules can be used in
         the MML string without specifying the package or module name:
-        takt.pitch, takt.sc, takt.constants, takt.gm.drums.
+        pytakt.pitch, pytakt.sc, pytakt.constants, pytakt.gm.drums.
 
     .. rubric:: Simple Expressions
 
@@ -794,7 +794,7 @@ G/!? G/ G/!? G3*").show(True)
     ``L``\\ <整数>, ``L``\\ <整数>\\ ``DOT``, ``L``\\ <整数>\\ ``DOTDOT``
         音価を設定します。<整数>は 1, 2, 4, 8, 16, 32, 64, 128 のいずれかです。
         このコマンドの実行により、コンテキストのL属性の値が
-        :mod:`takt.constants` モジュールに定義されている同名の定数の値に
+        :mod:`pytakt.constants` モジュールに定義されている同名の定数の値に
         なります。たとえば、``L8`` は以降の音符・休符を8分音符の長さに設定
         します。
     <コンテキスト属性名> ``=`` <単純式>
@@ -826,8 +826,8 @@ G/!? G/ G/!? G3*").show(True)
         スコアとして挿入します (ただし、Noneの場合は挿入されません)。
         <Python関数名> はドット('.')を含んでいても構いません。
         なお、次のモジュールで定義されている名前は、MML文字列の中では
-        パッケージ名やモジュール名を指定せずに使えます: takt.pitch, takt.sc,
-        takt.constants, takt.gm.drums。
+        パッケージ名やモジュール名を指定せずに使えます: pytakt.pitch,
+        pytakt.sc, pytakt.constants, pytakt.gm.drums。
 
     .. rubric:: 単純式
 

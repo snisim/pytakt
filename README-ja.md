@@ -66,10 +66,10 @@ Pytakt は、音符やMIDIコントロールチェンジといった**イベン�
 ## インストール方法
 
 https://github.com/snisim/pytakt から release されたパッケージ
-(`takt-<バージョン番号>.tar.gz`) をダウンロードし、pip によって下のように
+(`pytakt-<バージョン番号>.tar.gz`) をダウンロードし、pip によって下のように
 インストールしてください。
 
-    pip install takt-<バージョン番号>.tar.gz
+    pip install pytakt-<バージョン番号>.tar.gz
 
 もしmusic21との変換が必要であれば、music21 (version 6.7.1以降) も
 インストールしてください (自動ではインストールされません)。
@@ -79,10 +79,10 @@ https://github.com/snisim/pytakt から release されたパッケージ
 
 ## 動作の確認
 
-Pythonを起動したあと、次のようにしてtaktモジュールをインポートします。
+Pythonを起動したあと、次のようにしてpytaktモジュールをインポートします。
 
-    >>> from takt import *
-    >>> from takt.midiio import *
+    >>> from pytakt import *
+    >>> from pytakt.midiio import *
 
 MIDI入出力に対する操作を行わないのであれば2行目は不要です（show()やplay()だけ
 なら必要ありません)。

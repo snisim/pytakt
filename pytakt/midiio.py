@@ -111,14 +111,14 @@ PytaktではMIDIメッセージの送信の対象となるもの（MIDIインタ
 import os
 import itertools
 from typing import List, Optional
-import takt.cmidiio as _cmidiio
-from takt.event import NoteEvent, NoteEventClass, CtrlEvent, SysExEvent, \
+import pytakt.cmidiio as _cmidiio
+from pytakt.event import NoteEvent, NoteEventClass, CtrlEvent, SysExEvent, \
      MetaEvent, TempoEvent, LoopBackEvent, Event, message_to_event
-from takt.pitch import Pitch
-from takt.constants import TICKS_PER_QUARTER
-from takt.score import Score, EventList, EventStream, RealTimeStream, Tracks
-from takt.mml import mml
-from takt.timemap import _current_tempo_value
+from pytakt.pitch import Pitch
+from pytakt.constants import TICKS_PER_QUARTER
+from pytakt.score import Score, EventList, EventStream, RealTimeStream, Tracks
+from pytakt.mml import mml
+from pytakt.timemap import _current_tempo_value
 
 __all__ = ['DEV_DUMMY', 'DEV_LOOPBACK']  # extended later
 
@@ -1038,7 +1038,7 @@ def monitor(dev=None) -> None:
 # モジュールで定義された関数を自動的に __all__ に含める
 __all__.extend([name for name, value in globals().items()
                 if name[0] != '_' and callable(value) and
-                value.__module__ == 'takt.midiio'])
+                value.__module__ == 'pytakt.midiio'])
 
 
 # current output device は、PYTAKT_OUTPUT_DEVICE 環境変数が定義されていれば

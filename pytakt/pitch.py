@@ -13,7 +13,7 @@ import re
 import numbers
 import math
 from typing import List
-from takt.utils import takt_round
+from pytakt.utils import takt_round
 
 __all__ = ['chroma', 'octave', 'chroma_profile', 'Pitch', 'Interval', 'Key']
 
@@ -93,9 +93,9 @@ def chroma_profile(pitches) -> List[int]:
         >>> chroma_profile(readsmf('menuet.mid'))
         [20, 5, 33, 0, 14, 0, 19, 48, 0, 30, 0, 35]
     """
-    from takt.score import Score
-    from takt.event import NoteEvent, NoteOnEvent
-    from takt.effector import Filter
+    from pytakt.score import Score
+    from pytakt.event import NoteEvent, NoteOnEvent
+    from pytakt.effector import Filter
     if isinstance(pitches, Score):
         pitches = (ev.n for ev in
                    pitches.Filter(NoteEvent, NoteOnEvent).stream())

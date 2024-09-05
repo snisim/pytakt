@@ -12,9 +12,9 @@ import math
 import itertools
 import warnings
 from typing import Tuple, List, Dict, Iterator, Optional
-from takt.pitch import Pitch, Interval, chroma, C3
-from takt.constants import L16
-from takt.utils import TaktWarning
+from pytakt.pitch import Pitch, Interval, chroma, C3
+from pytakt.constants import L16
+from pytakt.utils import TaktWarning
 
 __all__ = ['Chord']
 
@@ -1042,8 +1042,8 @@ musicxml-reference/data-types/kind-value/>`.
         Args:
              kwargs: note関数に渡される追加の引数
         """
-        from takt.sc import note
-        from takt.score import par
+        from pytakt.sc import note
+        from pytakt.score import par
         score = par(note(p, **kwargs) for p in self.pitches())
         return score * 4 + score.TimeStretch(3).Arpeggio(L16)
 

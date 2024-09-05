@@ -1,7 +1,7 @@
-takt.chord module
-=================
+pytakt.chord module
+===================
 
-.. automodule:: takt.chord
+.. automodule:: pytakt.chord
    :members:
    :undoc-members:
    :show-inheritance:

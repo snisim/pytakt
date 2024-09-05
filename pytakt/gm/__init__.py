@@ -51,7 +51,7 @@ Examples:
 """
 # Copyright (C) 2023  Satoshi Nishimura
 
-# import takt.gm.drums
+# import pytakt.gm.drums
 
 #
 # Definitions for General MIDI instrument names

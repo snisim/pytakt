@@ -8,7 +8,7 @@ import os
 import sys
 import re
 import math
-import takt
+import pytakt as takt
 
 
 def StoreAndCheck(valid_modes, append=False, const=None):
@@ -64,7 +64,7 @@ def filter_tracks(args, score):
 
 
 def pytakt_eval(expr, _locals={}):
-    # ここで from takt import * は実行できないで、dirを使ってtaktの
+    # ここで from pytakt import * は実行できないで、dirを使ってpytaktの
     # 名前空間を取得し、locals として指定する。
     tdict = {name: getattr(takt, name) for name in dir(takt)
              if not name.startswith('_')}
@@ -229,7 +229,7 @@ When invoked with no arguments, it enters interactive mode.""",
     if args.mode == 'i':
         print("pytakt version", takt.__version__)
         set_device(args)
-        cmd = 'from takt import *; from takt.midiio import *; '
+        cmd = 'from pytakt import *; from pytakt.midiio import *; '
         if sys.platform == 'win32':
             try:
                 os.system(sys.executable + ' -i -c "' + cmd + '"')
@@ -240,7 +240,7 @@ When invoked with no arguments, it enters interactive mode.""",
             os.execl(sys.executable, sys.executable, '-i', '-c', cmd)
     elif args.mode == 'l':
         set_device(args)
-        from takt.midiio import show_devices
+        from pytakt.midiio import show_devices
         show_devices()
         sys.exit(0)
 

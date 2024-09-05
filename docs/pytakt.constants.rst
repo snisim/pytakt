@@ -1,7 +1,7 @@
-takt.constants module
-=====================
+pytakt.constants module
+=======================
 
-.. automodule:: takt.constants
+.. automodule:: pytakt.constants
    :members:
    :undoc-members:
    :show-inheritance:

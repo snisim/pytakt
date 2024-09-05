@@ -14,10 +14,10 @@ import numbers
 import collections.abc
 import itertools
 from typing import Union, List
-from takt.pitch import chroma, octave, Pitch, Key, Interval
-from takt.utils import takt_round, takt_roundx
-from takt.sc import note
-from takt.score import seq, Score
+from pytakt.pitch import chroma, octave, Pitch, Key, Interval
+from pytakt.utils import takt_round, takt_roundx
+from pytakt.sc import note
+from pytakt.score import seq, Score
 
 __all__ = ['Scale', 'ScaleLibrary', 'DEG']
 

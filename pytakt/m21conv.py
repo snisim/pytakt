@@ -14,15 +14,15 @@ import heapq
 import warnings
 import math
 from fractions import Fraction
-from takt.score import Score, EventList, EventStream, Tracks
-from takt.event import NoteEvent, CtrlEvent, MetaEvent, TimeSignatureEvent, \
+from pytakt.score import Score, EventList, EventStream, Tracks
+from pytakt.event import NoteEvent, CtrlEvent, MetaEvent, TimeSignatureEvent, \
     KeySignatureEvent, TempoEvent, XmlEvent
-from takt.pitch import Pitch, Key
-from takt.constants import TICKS_PER_QUARTER, EPSILON, \
+from pytakt.pitch import Pitch, Key
+from pytakt.constants import TICKS_PER_QUARTER, EPSILON, \
     M_TEXT, M_COPYRIGHT, M_TEMPO, M_TRACKNAME, M_INSTNAME, M_MARK, BEGIN, END
-from takt.timemap import TimeSignatureMap
-from takt.utils import Ticks, int_preferred, TaktWarning
-from takt.chord import Chord
+from pytakt.timemap import TimeSignatureMap
+from pytakt.utils import Ticks, int_preferred, TaktWarning
+from pytakt.chord import Chord
 from typing import List, Tuple, Optional, Iterator, Union
 
 

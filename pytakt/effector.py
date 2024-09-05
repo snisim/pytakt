@@ -17,21 +17,21 @@ import random
 from collections import deque
 from abc import ABC, abstractmethod
 from typing import Optional
-from takt.event import Event, NoteEvent, NoteOnEvent, NoteOffEvent, \
+from pytakt.event import Event, NoteEvent, NoteOnEvent, NoteOffEvent, \
     NoteEventClass, CtrlEvent, KeyPressureEvent, MetaEvent, \
     KeySignatureEvent, LoopBackEvent, TempoEvent
-from takt.pitch import Interval, C4, Key
-from takt.utils import int_preferred, TaktWarning, NoteDict
-from takt.context import context, newcontext
-from takt.score import Score, EventList, EventStream, Tracks, \
+from pytakt.pitch import Interval, C4, Key
+from pytakt.utils import int_preferred, TaktWarning, NoteDict
+from pytakt.context import context, newcontext
+from pytakt.score import Score, EventList, EventStream, Tracks, \
     DEFAULT_LIMIT, genseq, RealTimeStream
-from takt.mml import mml
-from takt.interpolator import Interpolator
-from takt.sc import note
-from takt.constants import L32, L1, MAX_DELTA_TIME, EPSILON, LOG_EPSILON, \
+from pytakt.mml import mml
+from pytakt.interpolator import Interpolator
+from pytakt.sc import note
+from pytakt.constants import L32, L1, MAX_DELTA_TIME, EPSILON, LOG_EPSILON, \
     BEGIN, END
-from takt.timemap import TimeSignatureMap, TempoMap
-import takt.frameutils
+from pytakt.timemap import TimeSignatureMap, TempoMap
+import pytakt.frameutils
 
 __all__ = []  # extended later
 
@@ -1456,9 +1456,9 @@ class Filter(Effector):
                 raise Exception("each argument must be a event class, "
                                 "a string or a function")
         self.negate = negate
-        self.globals = (takt.frameutils.outerglobals()
+        self.globals = (pytakt.frameutils.outerglobals()
                         if globals is None else globals)
-        self.locals = (takt.frameutils.outerlocals()
+        self.locals = (pytakt.frameutils.outerlocals()
                        if locals is None else locals)
 
     def _eval_cond(self, cond, ev):
@@ -1492,9 +1492,9 @@ class Reject(Filter):
     """
     def __init__(self, *conds, globals=None, locals=None):
         if globals is None:
-            globals = takt.frameutils.outerglobals()
+            globals = pytakt.frameutils.outerglobals()
         if locals is None:
-            locals = takt.frameutils.outerlocals()
+            locals = pytakt.frameutils.outerlocals()
         super().__init__(*conds, negate=True, globals=globals, locals=locals)
 
 
@@ -1546,9 +1546,9 @@ class Cond(Effector):
         self.conds = cond if isinstance(cond, tuple) else (cond,)
         self.effector = effector
         if globals is None:
-            globals = takt.frameutils.outerglobals()
+            globals = pytakt.frameutils.outerglobals()
         if locals is None:
-            locals = takt.frameutils.outerlocals()
+            locals = pytakt.frameutils.outerlocals()
         self.filter_t = Filter(*self.conds, globals=globals, locals=locals)
         self.filter_f = Filter(*self.conds, negate=True,
                                globals=globals, locals=locals)
@@ -1652,9 +1652,9 @@ class Modify(EventEffector):
     """
     def __init__(self, operation, globals=None, locals=None):
         self.operation = operation
-        self.globals = (takt.frameutils.outerglobals()
+        self.globals = (pytakt.frameutils.outerglobals()
                         if globals is None else globals)
-        self.locals = (takt.frameutils.outerlocals()
+        self.locals = (pytakt.frameutils.outerlocals()
                        if locals is None else locals)
 
     class _du_hooked_dict(dict):
@@ -1687,36 +1687,36 @@ if '__SPHINX_AUTODOC__' not in os.environ:
     # デフォルトのScoreへの登録法だと outerglobals/locals が正しく設定されない.
     def __filter(score, *args, globals=None, locals=None, **kwargs):
         if globals is None:
-            globals = takt.frameutils.outerglobals()
+            globals = pytakt.frameutils.outerglobals()
         if locals is None:
-            locals = takt.frameutils.outerlocals()
+            locals = pytakt.frameutils.outerlocals()
         eff = Filter(*args, globals=globals, locals=locals, **kwargs)
         return eff(score)
     setattr(Score, Filter.__name__, __filter)
 
     def __reject(score, *args, globals=None, locals=None, **kwargs):
         if globals is None:
-            globals = takt.frameutils.outerglobals()
+            globals = pytakt.frameutils.outerglobals()
         if locals is None:
-            locals = takt.frameutils.outerlocals()
+            locals = pytakt.frameutils.outerlocals()
         eff = Reject(*args, globals=globals, locals=locals, **kwargs)
         return eff(score)
     setattr(Score, Reject.__name__, __reject)
 
     def __cond(score, *args, globals=None, locals=None, **kwargs):
         if globals is None:
-            globals = takt.frameutils.outerglobals()
+            globals = pytakt.frameutils.outerglobals()
         if locals is None:
-            locals = takt.frameutils.outerlocals()
+            locals = pytakt.frameutils.outerlocals()
         eff = Cond(*args, globals=globals, locals=locals, **kwargs)
         return eff(score)
     setattr(Score, Cond.__name__, __cond)
 
     def __modify(score, *args, globals=None, locals=None, **kwargs):
         if globals is None:
-            globals = takt.frameutils.outerglobals()
+            globals = pytakt.frameutils.outerglobals()
         if locals is None:
-            locals = takt.frameutils.outerlocals()
+            locals = pytakt.frameutils.outerlocals()
         eff = Modify(*args, globals=globals, locals=locals, **kwargs)
         return eff(score)
     setattr(Score, Modify.__name__, __modify)

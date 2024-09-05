@@ -1,5 +1,5 @@
 import pytest
-from takt import *
+from pytakt import *
 import random
 import os
 

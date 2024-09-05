@@ -1,7 +1,7 @@
-takt.gm.drums module
-====================
+pytakt.gm.drums module
+======================
 
-.. automodule:: takt.gm.drums
+.. automodule:: pytakt.gm.drums
    :members:
    :undoc-members:
    :show-inheritance:

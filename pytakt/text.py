@@ -16,17 +16,17 @@ import json
 import warnings
 from fractions import Fraction
 from typing import Optional
-from takt.score import EventList, EventStream, Tracks, Score, DEFAULT_LIMIT
-from takt.timemap import TempoMap, TimeSignatureMap, TimeMap, current_tempo
-import takt.event
-from takt.event import Event, NoteEvent, NoteOnEvent, NoteOffEvent, \
+from pytakt.score import EventList, EventStream, Tracks, Score, DEFAULT_LIMIT
+from pytakt.timemap import TempoMap, TimeSignatureMap, TimeMap, current_tempo
+import pytakt.event
+from pytakt.event import Event, NoteEvent, NoteOnEvent, NoteOffEvent, \
     CtrlEvent, MetaEvent, SysExEvent, TempoEvent, TimeSignatureEvent, \
     KeySignatureEvent
-from takt.pitch import Pitch, Interval, Key
-from takt.chord import Chord
-from takt.constants import CONTROLLERS, META_EVENT_TYPES, TICKS_PER_QUARTER, \
-    M_TIMESIG
-from takt.utils import frac_time_repr, get_file_type
+from pytakt.pitch import Pitch, Interval, Key
+from pytakt.chord import Chord
+from pytakt.constants import CONTROLLERS, META_EVENT_TYPES, \
+    TICKS_PER_QUARTER, M_TIMESIG
+from pytakt.utils import frac_time_repr, get_file_type
 
 __all__ = ['showtext', 'writepyfile', 'evalpyfile', 'end_score',
            'writejson', 'readjson', 'showsummary']
@@ -307,8 +307,8 @@ Parameters are passed to :func:`.writejson`.
     他の引数の意味は :func:`showtext` と同じです。
     """
     def _writepyfile(f):
-        print("from takt import *", file=f)
-        print("from takt.sc import *", file=f)
+        print("from pytakt import *", file=f)
+        print("from pytakt.sc import *", file=f)
         print("\nscore = ", end='', file=f)
         showtext(score, rawmode, time, resolution, limit, bar0len, f)
         print("", file=f)
@@ -471,11 +471,11 @@ def end_score(score, default_tempo=125.0, format=1, resolution=480) -> None:
     else:
         exec('kwargs.update(%s)' % ','.join(sys.argv[2:]))
         if len(sys.argv) > 1 and sys.argv[1] == 'play':
-            from takt.midiio import set_tempo
+            from pytakt.midiio import set_tempo
             set_tempo(default_tempo)
             score.play(**kwargs)
         elif len(sys.argv) > 1 and sys.argv[1] == 'show':
-            from takt.midiio import set_tempo
+            from pytakt.midiio import set_tempo
             set_tempo(default_tempo)
             score.show(**kwargs)
         else:
@@ -660,7 +660,7 @@ def readjson(filename) -> Score:
             obj = bytearray(dic['__bytearray__'])
         elif '__event__' in dic:
             try:
-                evclass = getattr(takt.event, dic['__event__'])
+                evclass = getattr(pytakt.event, dic['__event__'])
                 if not issubclass(evclass, Event):
                     raise Exception()
             except Exception:

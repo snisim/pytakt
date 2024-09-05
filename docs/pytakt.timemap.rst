@@ -1,7 +1,7 @@
-takt.timemap module
-===================
+pytakt.timemap module
+=====================
 
-.. automodule:: takt.timemap
+.. automodule:: pytakt.timemap
    :members:
    :inherited-members:
    :undoc-members:

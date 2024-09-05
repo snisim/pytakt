@@ -14,18 +14,18 @@ import math
 import sys
 from bisect import bisect_right
 from typing import Union, Tuple, Generator
-from takt.event import TempoEvent, TimeSignatureEvent, KeySignatureEvent
-from takt.constants import TICKS_PER_QUARTER, EPSILON
-from takt.score import EventStream
-from takt.pitch import Key
-from takt.utils import int_preferred, Ticks
+from pytakt.event import TempoEvent, TimeSignatureEvent, KeySignatureEvent
+from pytakt.constants import TICKS_PER_QUARTER, EPSILON
+from pytakt.score import EventStream
+from pytakt.pitch import Key
+from pytakt.utils import int_preferred, Ticks
 
 
 __all__ = ['current_tempo', 'set_tempo',
            'TempoMap', 'TimeSignatureMap', 'TimeMap', 'KeySignatureMap']
 
 
-# takt.midiio モジュールをインポートしないでもテンポ値の設定・取得を
+# pytakt.midiio モジュールをインポートしないでもテンポ値の設定・取得を
 # できるようにしている。
 _current_tempo_value = 125.0
 
@@ -42,7 +42,7 @@ def current_tempo() -> float:
         テンポ値 (beats per minute)
     """
     try:
-        return sys.modules['takt.midiio']._current_tempo()
+        return sys.modules['pytakt.midiio']._current_tempo()
     except KeyError:
         return _current_tempo_value
 
@@ -61,7 +61,7 @@ def set_tempo(bpm) -> None:
     global _current_tempo_value
     _current_tempo_value = bpm
     try:
-        sys.modules['takt.midiio']._set_tempo(bpm)
+        sys.modules['pytakt.midiio']._set_tempo(bpm)
     except KeyError:
         pass
 

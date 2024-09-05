@@ -1,12 +1,12 @@
 # coding:utf-8
-from takt.utils import int_preferred
+from pytakt.utils import int_preferred
 
 TICKS_PER_QUARTER = 480
 """
-Constant defining the length of one tick in the takt package.
+Constant defining the length of one tick in the pytakt package.
 """
 """
-taktパッケージ内における1ティックの長さを定義している定数です。
+pytaktパッケージ内における1ティックの長さを定義している定数です。
 """
 
 L1 = int_preferred(TICKS_PER_QUARTER * 4)  # whole note

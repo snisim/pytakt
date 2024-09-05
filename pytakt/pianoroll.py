@@ -12,16 +12,17 @@ import tkinter.simpledialog
 import math
 import sys
 import os
-from takt.score import EventList, EventStream
-from takt.event import NoteEventClass, NoteEvent, NoteOnEvent, NoteOffEvent, \
-    MetaEvent, CtrlEvent, TempoEvent, KeyPressureEvent, SysExEvent
-from takt.constants import M_TRACKNAME, M_INSTNAME, CONTROLLERS, C_BEND, \
+from pytakt.score import EventList, EventStream
+from pytakt.event import NoteEventClass, NoteEvent, NoteOnEvent, \
+    NoteOffEvent, MetaEvent, CtrlEvent, TempoEvent, KeyPressureEvent, \
+    SysExEvent
+from pytakt.constants import M_TRACKNAME, M_INSTNAME, CONTROLLERS, C_BEND, \
     C_PROG, C_KPR, C_CPR, C_TEMPO, TICKS_PER_QUARTER, EPSILON
-from takt.pitch import Pitch
-from takt.timemap import TimeSignatureMap, current_tempo
-from takt.utils import std_time_repr
-from takt.effector import Render
-import takt.midiio as midiio
+from pytakt.pitch import Pitch
+from pytakt.timemap import TimeSignatureMap, current_tempo
+from pytakt.utils import std_time_repr
+from pytakt.effector import Render
+import pytakt.midiio as midiio
 
 __all__ = ['show']
 

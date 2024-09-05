@@ -1,7 +1,7 @@
-takt.text module
-====================
+pytakt.text module
+==================
 
-.. automodule:: takt.text
+.. automodule:: pytakt.text
    :members:
    :undoc-members:
    :show-inheritance:

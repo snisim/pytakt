@@ -1,7 +1,7 @@
-takt.sc module
-==============
+pytakt.sc module
+================
 
-.. automodule:: takt.sc
+.. automodule:: pytakt.sc
    :members:
    :undoc-members:
    :show-inheritance:

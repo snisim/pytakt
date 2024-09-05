@@ -16,12 +16,12 @@ import itertools
 import operator
 import heapq
 from typing import Union, List, Generator, Callable, Optional
-from takt.event import Event, NoteEvent, NoteOnEvent, NoteOffEvent, \
+from pytakt.event import Event, NoteEvent, NoteOnEvent, NoteOffEvent, \
     NoteEventClass, CtrlEvent, KeyPressureEvent, TempoEvent, \
     KeySignatureEvent, TimeSignatureEvent, LoopBackEvent
-from takt.constants import C_DATA, C_DATA_L, C_NRPCL, EPSILON, L32
-from takt.utils import int_preferred, std_time_repr, NoteDict, Ticks
-from takt.context import context
+from pytakt.constants import C_DATA, C_DATA_L, C_NRPCL, EPSILON, L32
+from pytakt.utils import int_preferred, std_time_repr, NoteDict, Ticks
+from pytakt.context import context
 
 __all__ = ['Score', 'EventList', 'Tracks', 'EventStream', 'RealTimeStream',
            'seq', 'par', 'genseq']
@@ -1057,7 +1057,7 @@ isinstance(ev, (NoteEvent, NoteOnEvent))])
         display a pianoroll window."""
         """ :func:`.pianoroll.show` を与えられた引数と
 　　　　ともに呼び、ピアノロールウィンドウを表示します。"""
-        from takt.pianoroll import show
+        from pytakt.pianoroll import show
         show(self, *args, **kwargs)
 
     def showtext(self, *args, **kwargs) -> None:
@@ -1067,7 +1067,7 @@ isinstance(ev, (NoteEvent, NoteOnEvent))])
         """ :func:`.text.showtext` を与えられた引数と
         ともに呼び、このスコアをpythonで評価可能なテキストに変換して
         出力します。"""
-        from takt.text import showtext
+        from pytakt.text import showtext
         showtext(self, *args, **kwargs)
 
     def summary(self, *args, **kwargs) -> None:
@@ -1075,7 +1075,7 @@ isinstance(ev, (NoteEvent, NoteOnEvent))])
         to output statistics of the score. """
         """ :func:`.text.showsummary` を与えられた引数と
 　　　　ともに呼び、統計情報を出力します。"""
-        from takt.text import showsummary
+        from pytakt.text import showsummary
         showsummary(self, *args, **kwargs)
 
     def play(self, *args, **kwargs) -> None:
@@ -1083,7 +1083,7 @@ isinstance(ev, (NoteEvent, NoteOnEvent))])
         to play this score. """
         """ :func:`.midiio.play` を与えられた引数と
 　　　　ともに呼び、このスコアを演奏します。"""
-        from takt.midiio import play
+        from pytakt.midiio import play
         play(self, *args, **kwargs)
 
     def writesmf(self, *args, **kwargs) -> None:
@@ -1091,7 +1091,7 @@ isinstance(ev, (NoteEvent, NoteOnEvent))])
         write this score to a standard MIDI file. """
         """ :func:`.smf.writesmf` を与えられた引数と
 　　　　ともに呼び、このスコアを標準MIDIファイルに書き出します。"""
-        from takt.smf import writesmf
+        from pytakt.smf import writesmf
         writesmf(self, *args, **kwargs)
 
     def writepyfile(self, *args, **kwargs) -> None:
@@ -1101,7 +1101,7 @@ isinstance(ev, (NoteEvent, NoteOnEvent))])
         """ :func:`.text.writepyfile` を与えられた引数と
 　　　　ともに呼び、このスコアをpythonで評価可能なテキストに変換して
 　　　　ファイルに出力します。"""
-        from takt.text import writepyfile
+        from pytakt.text import writepyfile
         writepyfile(self, *args, **kwargs)
 
     def writejson(self, *args, **kwargs) -> None:
@@ -1109,7 +1109,7 @@ isinstance(ev, (NoteEvent, NoteOnEvent))])
         to convert this score to JSON format and output it to a file. """
         """ :func:`.text.writejson` を与えられた引数と
         ともに呼び、このスコアをJSON形式に変換してファイルに出力します。"""
-        from takt.text import writejson
+        from pytakt.text import writejson
         writejson(self, *args, **kwargs)
 
     def music21(self, min_note=L32, bar0len=None, *,
@@ -1146,7 +1146,7 @@ isinstance(ev, (NoteEvent, NoteOnEvent))])
           (staccato, accents, finger numbers, trills, etc.) to be added
           to each note.
           Multiple markers can be specified by tuples. A list of available
-          strings can be found at the beginning of the takt.m21conv source
+          strings can be found at the beginning of the pytakt.m21conv source
           code.
 
         Currently, lyrics and spanners such as slurs are not supported.
@@ -1192,7 +1192,7 @@ isinstance(ev, (NoteEvent, NoteOnEvent))])
         * **mark** (str or tuple of str): 音符ごとに付加される記号（
           スタッカート、アクセント、指番号、トリルなど）を文字列で指定します。
           タプルによって複数指定することも可能です。使用できる文字列の一覧
-          は takt.m21conv のソースコードの冒頭で確認できます。
+          は pytakt.m21conv のソースコードの冒頭で確認できます。
 
         現在のところ、スラーなどの Spanner や歌詞には対応していません。
 
@@ -1208,7 +1208,7 @@ isinstance(ev, (NoteEvent, NoteOnEvent))])
             limit(ticks, optional): スコアの長さを制限します
                 (詳細については、:meth:`.Score.stream` を参照)。
         """
-        from takt.m21conv import TaktToMusic21
+        from pytakt.m21conv import TaktToMusic21
         return TaktToMusic21().convert_to_music21(self, min_note, bar0len,
                                                   allow_tuplet, limit)
 
@@ -1234,7 +1234,7 @@ isinstance(ev, (NoteEvent, NoteOnEvent))])
 
         現在のところ、スラーなどの Spanner や歌詞には対応していません。
         """
-        from takt.m21conv import Music21ToTakt
+        from pytakt.m21conv import Music21ToTakt
         return Music21ToTakt().convert_to_takt(m21score)
 
     def dump(self) -> None:
@@ -2109,7 +2109,7 @@ class RealTimeStream(EventStream):
         super().__init__(iterator, **kwargs)
 
     def queue_event(self, ev, time=None, devnum=None):
-        from takt.midiio import queue_event as _queue_event
+        from pytakt.midiio import queue_event as _queue_event
         _queue_event(ev, (ev.t if time is None else time) + self.starttime,
                      devnum)
 
