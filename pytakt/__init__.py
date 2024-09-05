@@ -15,5 +15,4 @@ from pytakt.interpolator import *
 from pytakt.utils import *
 from pytakt.text import *
 import pytakt.gm as gm
-
-__version__ = '0.39'
+from pytakt._version import __version__

@@ -1,5 +1,6 @@
 exclude pytakt/*.py
 include pytakt/__init__.py
+include pytakt/_version.py
 include pytakt/chord.py
 include pytakt/constants.py
 include pytakt/context.py

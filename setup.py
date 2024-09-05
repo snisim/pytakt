@@ -2,7 +2,7 @@ from setuptools import setup, find_packages, Extension
 import sys
 
 
-with open('pytakt/__init__.py') as f:
+with open('pytakt/_version.py') as f:
     for line in f.readlines():
         if '__version__ =' in line:
             exec(line)
