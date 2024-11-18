@@ -2347,12 +2347,21 @@ class ConnectTies(Effector):
     single NoteEvent. In order to be correctly tied, the end time (sum of the
     t and L attribute values) of a NoteEvent must match the start
     time (the t attribute value) of the next NoteEvent in the tied set.
+
+    Args:
+        errhdr(str, optional): header string for error and warning messages
     """
     """ スコア中のタイで結ばれた NoteEvent を統合して１つの NoteEvent に
     します。正しく結ばれるためには、前の NoteEvent の終了時刻 (t属性と
     L属性の値の和) と後の NoteEvent の開始時刻 (t属性値) が一致していなくては
     なりません。
+
+    Args:
+        errhdr(str, optional): エラー、警告メッセージの先頭文字列
     """
+    def __init__(self, errhdr=''):
+        self.errhdr = errhdr
+
     def _connect_ties(self, stream):
         notedict = NoteDict()  # (firstev, lastev)   lastevは警告メッセージ用。
         evbuf = []  # notedictが空でない間は、出力をここへ一時保管する。
@@ -2382,13 +2391,14 @@ class ConnectTies(Effector):
                             else:  # end
                                 del firstev.tie
                         except KeyError:
-                            warnings.warn("Beginning of the tie not found: %r"
-                                          % (ev,), TaktWarning, stacklevel=2)
+                            warnings.warn(self.errhdr + (
+                                "Beginning of the tie not found: %r" % (ev,)),
+                                TaktWarning, stacklevel=2)
                         continue
                 evbuf.append(ev)
         except StopIteration as e:
             for _, ev in notedict.values():
-                warnings.warn("Unterminted tie: %r" % (ev,),
+                warnings.warn(self.errhdr + ("Unterminted tie: %r" % (ev,)),
                               TaktWarning, stacklevel=2)
             yield from evbuf
             return e.value
@@ -2484,6 +2494,7 @@ class PairNoteEvents(Effector):
             If True, for each generated NoteEvent, references to the original
             NoteOnEvent and NoteOffEvent are added as the 'noteonev' and
             'noteoffev' attributes, respectively.
+        errhdr(str, optional): header string for error and warning messages
     """
     """
     スコアに含まれる NoteOnEvent と NoteOffEvent を対にして、
@@ -2506,9 +2517,11 @@ class PairNoteEvents(Effector):
             Trueにすると、生成された各NoteEventについて、その元となった
             NoteOnEventおよびNoteOffEventへの参照を、それぞれnoteonev,
             noteoffevという名の属性として追加します。
+        errhdr(str, optional): エラー、警告メッセージの先頭文字列
     """
-    def __init__(self, ref_links=False):
+    def __init__(self, ref_links=False, errhdr=''):
         self.ref_links = ref_links
+        self.errhdr = errhdr
 
     def _pair_note_events(self, stream):
         notedict = NoteDict()
@@ -2530,9 +2543,9 @@ class PairNoteEvents(Effector):
                     try:
                         noteev = notedict.popnote(ev)
                     except KeyError:
-                        warnings.warn("deleted orphan note-off events "
-                                      "(t=%r, n=%r)" % (ev.t, ev.n),
-                                      TaktWarning, stacklevel=1)
+                        warnings.warn(self.errhdr + (
+                            "deleted orphan note-off events (t=%r, n=%r)" %
+                            (ev.t, ev.n)), TaktWarning, stacklevel=1)
                     else:
                         noteev.L = ev.t - noteev.t
                         noteev.nv = ev.nv
@@ -2545,9 +2558,10 @@ class PairNoteEvents(Effector):
         except StopIteration as e:
             for ev in outqueue:
                 if isinstance(ev, NoteEvent) and ev.L is None:
-                    warnings.warn("forced to close unterminated notes "
-                                  "(tk=%r, t=%r, n=%r)" % (ev.tk, ev.t, ev.n),
-                                  TaktWarning, stacklevel=1)
+                    warnings.warn(self.errhdr + (
+                        "forced to close unterminated notes "
+                        "(tk=%r, t=%r, n=%r)" %
+                        (ev.tk, ev.t, ev.n)), TaktWarning, stacklevel=1)
                     ev.L = max(e.value - ev.t, 0)
                 yield ev
             return e.value

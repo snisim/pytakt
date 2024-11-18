@@ -224,32 +224,40 @@ class Event(object):
         """テキストイベント(1～15番のメタイベント）のとき真を返します。"""
         return (isinstance(self, MetaEvent) and 1 <= self.mtype <= 15)
 
-    def to_message(self) -> Union[bytes, bytearray]:
-        """ Convert an event to a byte sequence. """
-        """イベントをバイト列に変換します。"""
+    def to_message(self, errhdr='') -> Union[bytes, bytearray]:
+        """ Convert an event to a byte sequence.
+
+        Args:
+            errhdr(str, optional): header string for error and warning messages
+        """
+        """ イベントをバイト列に変換します。
+
+        Args:
+            errhdr(str, optional): エラー、警告メッセージの先頭文字列
+        """
         return b''
 
-    def _get_ch(self):
+    def _get_ch(self, errhdr):
         if not isinstance(self.ch, numbers.Integral) or not 1 <= self.ch <= 16:
-            raise MidiEventError("event with invalid channel number")
+            raise MidiEventError(errhdr + "event with invalid channel number")
         return min(max(self.ch, 1), 16) - 1
 
-    def _get_n(self):
+    def _get_n(self, errhdr):
         if not isinstance(self.n, numbers.Real):
-            raise MidiEventError("event with ill-typed note number")
+            raise MidiEventError(errhdr + "event with ill-typed note number")
         n = takt_round(self.n)
         if not 0 <= n <= 127:
-            warnings.warn("Out-of-range note number (n=%r, ch=%r)" %
-                          (self.n, self.ch), MidiEventWarning, stacklevel=2)
+            warnings.warn(errhdr + ("Out-of-range note number (n=%r, ch=%r)" %
+                          (self.n, self.ch)), MidiEventWarning, stacklevel=2)
         return min(max(n, 0), 127)
 
-    def _get_ctrl_val(self, low, high):
+    def _get_ctrl_val(self, low, high, errhdr):
         if not isinstance(self.value, numbers.Real):
-            raise MidiEventError("event with ill-typed control value")
+            raise MidiEventError(errhdr + "event with ill-typed control value")
         val = takt_round(self.value)
         if not low <= val <= high:
-            warnings.warn("Out-of-range control value (value=%r, \
-ctrlnum=%r, ch=%r)" % (self.value, self.ctrlnum, self.ch),
+            warnings.warn(errhdr + ("Out-of-range control value (value=%r, \
+ctrlnum=%r, ch=%r)" % (self.value, self.ctrlnum, self.ch)),
                           MidiEventWarning, stacklevel=2)
         return min(max(val, low), high)
 
@@ -377,8 +385,9 @@ class NoteEvent(NoteEventClass):
         """ 演奏上のノートオフ時刻を返します。"""
         return self.ptime() + self.get_du()
 
-    def to_message(self) -> Union[bytes, bytearray]:
-        return NoteOnEvent.to_message(self) + NoteOffEvent.to_message(self)
+    def to_message(self, errhdr='') -> Union[bytes, bytearray]:
+        return NoteOnEvent.to_message(self, errhdr) + \
+            NoteOffEvent.to_message(self, errhdr)
 
 
 class NoteOnEvent(NoteEventClass):
@@ -434,15 +443,16 @@ class NoteOnEvent(NoteEventClass):
                               self.tk, self.ch, self.dt, **self.__dict__)
     __copy__ = copy
 
-    def to_message(self) -> Union[bytes, bytearray]:
+    def to_message(self, errhdr='') -> Union[bytes, bytearray]:
         if not isinstance(self.v, numbers.Real):
-            raise MidiEventError("note-on with ill-typed velocity")
+            raise MidiEventError(errhdr + "note-on with ill-typed velocity")
         v = takt_round(self.v)
         if not 1 <= v <= 127:
-            warnings.warn("Out-of-range velocity (v=%r, ch=%r)" %
-                          (self.v, self.ch), MidiEventWarning, stacklevel=2)
+            warnings.warn(errhdr + ("Out-of-range velocity (v=%r, ch=%r)" %
+                          (self.v, self.ch)), MidiEventWarning, stacklevel=2)
         v = min(max(v, 1), 127)
-        return b"%c%c%c" % (0x90 | self._get_ch(), self._get_n(), v)
+        return b"%c%c%c" % (0x90 | self._get_ch(errhdr),
+                            self._get_n(errhdr), v)
 
 
 class NoteOffEvent(NoteEventClass):
@@ -501,19 +511,23 @@ class NoteOffEvent(NoteEventClass):
                               self.tk, self.ch, self.dt, **self.__dict__)
     __copy__ = copy
 
-    def to_message(self) -> Union[bytes, bytearray]:
+    def to_message(self, errhdr='') -> Union[bytes, bytearray]:
         if self.nv is None:
-            return b"%c%c%c" % (0x90 | self._get_ch(), self._get_n(), 0)
+            return b"%c%c%c" % (0x90 | self._get_ch(errhdr),
+                                self._get_n(errhdr), 0)
         else:
             if not isinstance(self.nv, numbers.Real):
-                raise MidiEventError("note-off with ill-typed velocity")
+                raise MidiEventError(errhdr +
+                                     "note-off with ill-typed velocity")
             nv = takt_round(self.nv)
             if not 0 <= nv <= 127:
-                warnings.warn("Out-of-range note-off velocity (nv=%r, ch=%r)" %
-                              (self.nv, self.ch),
-                              MidiEventWarning, stacklevel=2)
+                warnings.warn(
+                    errhdr + ("Out-of-range note-off velocity (nv=%r, ch=%r)" %
+                              (self.nv, self.ch)),
+                    MidiEventWarning, stacklevel=2)
             nv = min(max(nv, 0), 127)
-            return b"%c%c%c" % (0x80 | self._get_ch(), self._get_n(), nv)
+            return b"%c%c%c" % (0x80 | self._get_ch(errhdr),
+                                self._get_n(errhdr), nv)
 
 
 class CtrlEvent(Event):
@@ -597,26 +611,27 @@ class CtrlEvent(Event):
                               self.tk, self.ch, self.dt, **self.__dict__)
     __copy__ = copy
 
-    def to_message(self) -> Union[bytes, bytearray]:
+    def to_message(self, errhdr='') -> Union[bytes, bytearray]:
         if self.ctrlnum == C_PROG:
             low, high = 1, 128
         elif self.ctrlnum == C_BEND:
             low, high = -8192, 8191
         else:
             low, high = 0, 127
-        val = self._get_ctrl_val(low, high)
+        val = self._get_ctrl_val(low, high, errhdr)
         if 0 <= self.ctrlnum <= 127:
-            return b"%c%c%c" % (0xb0 | self._get_ch(), self.ctrlnum, val)
+            return b"%c%c%c" % (0xb0 | self._get_ch(errhdr), self.ctrlnum, val)
         elif self.ctrlnum == C_BEND:
             val += 8192
-            return b"%c%c%c" % (0xe0 | self._get_ch(),
+            return b"%c%c%c" % (0xe0 | self._get_ch(errhdr),
                                 val & 0x7f, (val >> 7) & 0x7f)
         elif self.ctrlnum == C_CPR:
-            return b"%c%c" % (0xd0 | self._get_ch(), val)
+            return b"%c%c" % (0xd0 | self._get_ch(errhdr), val)
         elif self.ctrlnum == C_PROG:
-            return b"%c%c" % (0xc0 | self._get_ch(), val - 1)
+            return b"%c%c" % (0xc0 | self._get_ch(errhdr), val - 1)
         else:
-            raise MidiEventError("event with invalid controller number")
+            raise MidiEventError(errhdr +
+                                 "event with invalid controller number")
 
 
 class KeyPressureEvent(CtrlEvent):
@@ -672,9 +687,10 @@ class KeyPressureEvent(CtrlEvent):
         attrs.remove('ctrlnum')
         return attrs
 
-    def to_message(self) -> Union[bytes, bytearray]:
-        val = self._get_ctrl_val(0, 127)
-        return b"%c%c%c" % (0xa0 | self._get_ch(), self._get_n(), val)
+    def to_message(self, errhdr='') -> Union[bytes, bytearray]:
+        val = self._get_ctrl_val(0, 127, errhdr)
+        return b"%c%c%c" % (0xa0 | self._get_ch(errhdr),
+                            self._get_n(errhdr), val)
 
 
 class SysExEvent(Event):
@@ -728,11 +744,17 @@ class SysExEvent(Event):
                               **self.__dict__)
     __copy__ = copy
 
-    def to_message(self) -> Union[bytes, bytearray]:
+    def to_message(self, errhdr='') -> Union[bytes, bytearray]:
         """ Convert the event to a byte sequence (sequence prefixed with an
             additional 0xf0).
+
+        Args:
+            errhdr(str, optional): header string for error and warning messages
         """
-        """イベントをバイト列(valueの先頭に更に0xf0を加えたもの)に変換します。
+        """ イベントをバイト列(valueの先頭に更に0xf0を加えたもの)に変換します。
+
+        Args:
+            errhdr(str, optional): エラー、警告メッセージの先頭文字列
         """
         result = bytearray((0xf0,))
         result.extend(self.value)
@@ -750,7 +772,7 @@ class MetaEvent(Event):
         value (bytes, bytearray, str, Key, int, float, or iterable of int):
             Data of the meta event. If mtype is from 1 to 15, this attribute
             should be of type str. If mtype is M_KEYSIG (key signature event),
-            this attribute should be of type Key. If mtype is M_TEMPO (tempo
+            this attribute must be of type Key. If mtype is M_TEMPO (tempo
             change event), this attribute must be of type int or float.
             For other meta events, bytes, bytearray, or iterable of int is
             recommended.
@@ -837,11 +859,13 @@ class MetaEvent(Event):
                          self.tk, self.dt, **self.__dict__)
     __copy__ = copy
 
-    def to_message(self, encoding='utf-8') -> Union[bytes, bytearray]:
+    def to_message(self, errhdr='',
+                   encoding='utf-8') -> Union[bytes, bytearray]:
         """ Converts the event to a byte sequence (data in a standard MIDI
         file without length information).
 
         Args:
+            errhdr(str, optional): header string for error and warning messages
             encoding(str): specifies how the text event's string should be
                 encoded in the byte sequence.
         """
@@ -849,13 +873,14 @@ class MetaEvent(Event):
         変換します。
 
         Args:
+            errhdr(str, optional): エラー、警告メッセージの先頭文字列
             encoding(str): テキストイベントが持つ文字列を、バイト列中で
                 どのようにエンコーディングするかを指定します。
         """
         try:
             result = bytearray((0xff, self.mtype))
         except (TypeError, ValueError):
-            raise MidiEventError("invalid meta event type")
+            raise MidiEventError(errhdr + "invalid meta event type")
         data_bytes = self._get_data_bytes(encoding)
         if self.mtype == M_SEQNO and len(data_bytes) != 2 or \
            self.mtype == M_CHPREFIX and len(data_bytes) != 1 or \
@@ -864,7 +889,8 @@ class MetaEvent(Event):
            self.mtype == M_SMPTE and len(data_bytes) != 5 or \
            self.mtype == M_TIMESIG and len(data_bytes) != 4 or \
            self.mtype == M_KEYSIG and len(data_bytes) != 2:
-            raise MidiEventError("meta event with inappropriate data length")
+            raise MidiEventError(errhdr +
+                                 "meta event with inappropriate data length")
         result.extend(data_bytes)
         return result
 
@@ -904,13 +930,8 @@ class KeySignatureEvent(MetaEvent):
         attrs.remove('mtype')
         return attrs
 
-    def to_message(self, encoding='utf-8') -> Union[bytes, bytearray]:
-        """ Convert the event to a byte sequence (data in a standard MIDI file
-        without length information).
-        """
-        """イベントをバイト列(長さ情報を除いた標準MIDIファイル中のデータ)に
-        変換します。
-        """
+    def to_message(self, errhdr='',
+                   encoding='utf-8') -> Union[bytes, bytearray]:
         return b"\xff%c%c%c" % (M_KEYSIG,
                                 self.value.signs & 0xff, self.value.minor)
 
@@ -1076,17 +1097,13 @@ class TempoEvent(MetaEvent):
         attrs.remove('mtype')
         return attrs
 
-    def to_message(self, encoding='utf-8') -> Union[bytes, bytearray]:
-        """ Convert the event to a byte sequence (data in a standard MIDI
-        file without length information).
-        """
-        """イベントをバイト列(長さ情報を除いた標準MIDIファイル中のデータ)に
-        変換します。
-        """
+    def to_message(self, errhdr='',
+                   encoding='utf-8') -> Union[bytes, bytearray]:
         low, high = 4, 1e8
         if not low <= self.value <= high:
-            warnings.warn("Out-of-range tempo value (value=%r)" %
-                          (self.value,), MidiEventWarning, stacklevel=2)
+            warnings.warn(errhdr +
+                          ("Out-of-range tempo value (value=%r)" %
+                           (self.value,)), MidiEventWarning, stacklevel=2)
         val = takt_round(6e+7 / min(max(self.value, low), high))
         return b"\xff%c%c%c%c" % (M_TEMPO, (val >> 16) & 0xff,
                                   (val >> 8) & 0xff, val & 0xff)
@@ -1134,8 +1151,8 @@ class LoopBackEvent(Event):
                               **self.__dict__)
     __copy__ = copy
 
-    def to_message(self) -> Union[bytes, bytearray]:
-        raise Exception("Cannot convert LoopBackEvent to a message")
+    def to_message(self, errhdr='') -> Union[bytes, bytearray]:
+        raise Exception(errhdr + "Cannot convert LoopBackEvent to a message")
 
 
 class XmlEvent(Event):
@@ -1219,8 +1236,8 @@ class XmlEvent(Event):
                               self.tk, self.dt, **self.__dict__)
     __copy__ = copy
 
-    def to_message(self) -> Union[bytes, bytearray]:
-        raise Exception("Cannot convert XmlEvent to a message")
+    def to_message(self, errhdr='') -> Union[bytes, bytearray]:
+        raise Exception(errhdr + "Cannot convert XmlEvent to a message")
 
 
 _msg_size_table = (3, 3, 3, 3, 2, 2, 3, 0)
@@ -1250,7 +1267,7 @@ def midimsg_size(status) -> int:
             1)
 
 
-def message_to_event(msg, time, tk, encoding='utf-8') -> Event:
+def message_to_event(msg, time, tk, encoding='utf-8', errhdr='') -> Event:
     """ Takes a byte sequence in the format returned by the to_message method
     of each class and converts it to an event of the appropriate class (except
     LoopBackEvent).
@@ -1262,6 +1279,7 @@ def message_to_event(msg, time, tk, encoding='utf-8') -> Event:
         encoding(str or None): specifies how the string of the text event is
             encoded in the byte sequence; if this is None, the string is
             copied verbatimly from the byte sequence.
+        errhdr(str, optional): header string for error and warning messages
 
     Returns:
         Event created
@@ -1276,6 +1294,7 @@ def message_to_event(msg, time, tk, encoding='utf-8') -> Event:
         encoding(str or None): テキストイベントの持つ文字列が、バイト列中で
                 どのようにエンコーディングされているかを指定します。None
                 のときは、バイト列のままのテキストイベントを生成します。
+        errhdr(str, optional): エラー、警告メッセージの先頭文字列
 
     Returns:
         作成されたイベント
@@ -1318,12 +1337,15 @@ def message_to_event(msg, time, tk, encoding='utf-8') -> Event:
                 strvalue = msg[2:].decode(encoding, errors='surrogateescape')
             return MetaEvent(time, msg[1], strvalue, tk)
         elif msg[1] == M_KEYSIG:
-            return MetaEvent(time, msg[1],
-                             Key(msg[2] - ((msg[2] & 0x80) << 1), msg[3]), tk)
+            try:
+                key = Key(msg[2] - ((msg[2] & 0x80) << 1), msg[3])
+            except Exception as e:
+                raise e.__class__(errhdr + str(e))
+            return MetaEvent(time, msg[1], key, tk)
         else:
             return MetaEvent(time, msg[1], bytes(msg[2:]), tk)
     else:
-        warnings.warn("unrecognized MIDI message: %r" % bytes(msg),
+        warnings.warn(errhdr + ("unrecognized MIDI message: %r" % bytes(msg)),
                       MidiEventWarning, stacklevel=2)
         return SysExEvent(time, bytes(msg), tk)
 

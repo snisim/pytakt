@@ -158,8 +158,9 @@ class Score(object):
         # self が EventList で other が EventStream以外の場合に限り、追加。
         if isinstance(self, EventList) and not isinstance(other, EventStream):
             if isinstance(other, Tracks):
+                offset = self.duration
                 for evlist in other:
-                    self.merge(evlist.deepcopy(), self.duration)
+                    self.merge(evlist.deepcopy(), offset)
             elif isinstance(other, EventList):
                 self.merge(other.deepcopy(), self.duration)
             else:

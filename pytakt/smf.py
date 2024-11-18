@@ -29,6 +29,9 @@ class SMFError(Exception):
 
 
 class SMFReader(object):
+    def __init__(self, filename):
+        self.filename = filename
+
     def read(self, fp, encoding):
         self.read_header_string(fp, 'MThd')
         try:
@@ -36,7 +39,7 @@ class SMFReader(object):
             assert hdrsize >= 6 and 0 <= fmt <= 2 and ntrks >= 0
             assert resolution >= 1
         except Exception:
-            raise SMFError("Bad file header") from None
+            raise SMFError(f"{self.filename}: Bad file header") from None
         self.ntrks = ntrks
         self.resolution = resolution
         self.encoding = encoding
@@ -54,10 +57,10 @@ class SMFReader(object):
         try:
             (trksize,) = unpack(">L", fp.read(4))
         except Exception:
-            raise SMFError("Bad track header") from None
+            raise SMFError(f"{self.filename}: Bad track header") from None
         buf = fp.read(trksize)
         if len(buf) != trksize:
-            raise SMFError("No sufficient track data")
+            raise SMFError(f"{self.filename}: No sufficient track data")
         inp = iter(buf)
         self.abs_ticks = 0
         try:
@@ -68,7 +71,7 @@ class SMFReader(object):
                 evlist.append(ev)
                 evlist.duration = max(evlist.duration, ev.t)
         except StopIteration:
-            raise SMFError("Unexpected EOF") from None
+            raise SMFError(f"{self.filename}: Unexpected EOF") from None
         return evlist
 
     def read_event(self, inp):
@@ -98,12 +101,13 @@ class SMFReader(object):
                 length = midimsg_size(status) - 1
             else:
                 if not self.run_st:
-                    raise SMFError("No MIDI running status")
+                    raise SMFError(f"{self.filename}: No MIDI running status")
                 msg.extend((self.run_st, status))
                 length = midimsg_size(self.run_st) - 2
         for _ in range(length):
             msg.append(next(inp))
-        return message_to_event(msg, event_time, self.cur_track, self.encoding)
+        return message_to_event(msg, event_time, self.cur_track,
+                                self.encoding, f"{self.filename}: ")
 
     def read_varlen(self, inp):
         value = 0
@@ -120,11 +124,12 @@ class SMFReader(object):
         while state < 4:
             c = fp.read(1)
             if not c:
-                raise SMFError("Could not find header %r" % chunkname)
+                raise SMFError(
+                    f"{self.filename}: Could not find header {chunkname!r}")
             if ord(c) == ord(chunkname[state]):
                 state += 1
             else:
-                warnings.warn("ignoring garbage data",
+                warnings.warn(f"{self.filename}: ignoring garbage data",
                               TaktWarning, stacklevel=2)
                 state = 0
 
@@ -133,6 +138,9 @@ class SMFWriter(object):
     # 下のEPSILONは、例えば、時刻 100/3をresolution=480のSMFに出力する場合に
     # 160すべきところを計算誤差で159になるのを防ぐ。
     EPSILON = 1e-4
+
+    def __init__(self, filename):
+        self.filename = filename
 
     def write(self, fp, tracks, format, resolution, encoding):
         assert 0 <= format <= 2 and resolution >= 1
@@ -163,7 +171,7 @@ class SMFWriter(object):
             self.abs_ticks = event_ticks
             out += self.to_varlen(delta_ticks)
             if isinstance(ev, SysExEvent):
-                msg = ev.to_message()
+                msg = ev.to_message(f"{self.filename}: ")
                 del msg[0]
                 if len(msg) >= 1 and msg[0] == 0xf0:
                     out.append(0xf0)
@@ -174,13 +182,13 @@ class SMFWriter(object):
                 out += msg
                 self.run_st = 0
             elif isinstance(ev, MetaEvent):
-                msg = ev.to_message(self.encoding)
+                msg = ev.to_message(f"{self.filename}: ", self.encoding)
                 out += msg[0:2]
                 out += self.to_varlen(len(msg) - 2)
                 out += msg[2:]
                 self.run_st = 0
             else:
-                msg = ev.to_message()
+                msg = ev.to_message(f"{self.filename}: ")
                 if msg[0] == self.run_st:
                     out += msg[1:]
                 else:
@@ -195,7 +203,7 @@ class SMFWriter(object):
         return result
 
 
-def check_eot(tracks):
+def check_eot(tracks, filename):
     for tk, track in enumerate(tracks):
         hasEOT = False
         for i in reversed(range(len(track))):
@@ -213,8 +221,8 @@ def check_eot(tracks):
                     track[k-1] = eot
                     # 最後のEOTの後にイベントがある場合は警告を出す
                     if k != len(track):
-                        warnings.warn("(Track %d) event(s) exist after "
-                                      "end-of-track" % tk,
+                        warnings.warn(f"{filename}: (Track {tk}) event(s) "
+                                      "exist after end-of-track",
                                       TaktWarning, stacklevel=2)
         if not hasEOT:
             # EOTが無い場合は補う
@@ -272,17 +280,17 @@ def readsmf(filename, supply_tempo=True, pair_note_events=True,
         フォーマット (0, 1, または 2) と分解能が格納されています。
     """
     if filename == '-':
-        tracks = SMFReader().read(sys.stdin.buffer, encoding)
+        tracks = SMFReader(filename).read(sys.stdin.buffer, encoding)
     else:
         with open(filename, "rb") as fp:
-            tracks = SMFReader().read(fp, encoding)
+            tracks = SMFReader(filename).read(fp, encoding)
     if supply_tempo and not tracks.active_events_at(0, TempoEvent):
         if not tracks:
             tracks.append(EventList())
         tracks[0].insert(0, TempoEvent(0, 120 if supply_tempo is True
                                        else supply_tempo))
     if pair_note_events:
-        tracks = tracks.PairNoteEvents()
+        tracks = tracks.PairNoteEvents(errhdr=f"{filename}: ")
     ksmap = KeySignatureMap(tracks)
     for evlist in tracks:
         for ev in evlist:
@@ -371,7 +379,7 @@ def writesmf(score, filename, format=1, resolution=480, ntrks=None,
     if isinstance(score, EventStream) and score.is_consumed():
         warnings.warn('writesmf: Input stream has already been consumed')
 
-    inp = score.stream(limit=limit).ConnectTies()
+    inp = score.stream(limit=limit).ConnectTies(errhdr=f"{filename}: ")
     if render:
         inp = inp.Render()
     inp = inp.UnpairNoteEvents()
@@ -395,10 +403,10 @@ def writesmf(score, filename, format=1, resolution=480, ntrks=None,
             tracks[0].insert(0, TempoEvent(0, 125 if supply_tempo is True
                                            else supply_tempo))
 
-    check_eot(tracks)
+    check_eot(tracks, filename)
     if filename == '-':
-        SMFWriter().write(sys.stdout.buffer,
-                          tracks, format, resolution, encoding)
+        SMFWriter(filename).write(sys.stdout.buffer,
+                                  tracks, format, resolution, encoding)
     else:
         with open(filename, "wb") as fp:
-            SMFWriter().write(fp, tracks, format, resolution, encoding)
+            SMFWriter(filename).write(fp, tracks, format, resolution, encoding)
