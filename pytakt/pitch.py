@@ -12,7 +12,7 @@ and utility functions for note numbers.
 import re
 import numbers
 import math
-from typing import List
+from typing import List, Union
 from pytakt.utils import takt_round
 
 __all__ = ['chroma', 'octave', 'chroma_profile', 'Pitch', 'Interval', 'Key']
@@ -551,15 +551,30 @@ class Pitch(int):
         else:
             raise ValueError("Invalid 'enh' value")
 
-    def freq(self) -> float:
-        """ Returns the frequency assuming A4=440Hz and equal temperament. """
-        """ A4=440Hzおよび平均律を仮定したときの周波数を返します。 """
-        return 440.0 * (2 ** ((self - 69) / 12))
+    def freq(self, afreq=440.0) -> float:
+        """ Returns the frequency assuming equal temperament. 
+
+        Args:
+            self(Pitch, int, or float):
+                A Pitch object or a (fractional) MIDI note number
+            afreq(float, optional):
+                Specifies the frequency (Hz) of the A4 pitch
+        """
+        """ 平均律を仮定したときの周波数を返します。 
+
+        Args:
+            self(Pitch, int, or float):
+                Pitchオブジェクトまたは(実数の)MIDIノート番号
+            afreq(float, optional):
+                A4音の周波数(Hz)を指定します。
+        """
+        return afreq * (2 ** ((self - 69) / 12))
 
     @staticmethod
-    def from_freq(freq, sf=None, key=0) -> 'Pitch':
+    def from_freq(freq, sf=None, key=0,
+                  afreq=440.0, fractional=False) -> Union['Pitch', float]:
         """ Constructs a Pitch object that is closest to the frequency `freq`
-        assuming A4=440Hz and equal temperament.
+        assuming equal temperament.
 
         Args:
             freq(float): frequency
@@ -569,8 +584,13 @@ class Pitch(int):
             key(Key, int, or str, optional):
                 Has the same meaning as the key argument of the Pitch()
                 constructor.
+            afreq(float, optional):
+                Specifies the frequency (Hz) of the A4 pitch
+            fractional(bool, optional):
+                If True, a fractional MIDI note number is returned instead of
+                a Pitch object.
         """
-        """ A4=440Hzおよび平均律を仮定したときの周波数から、それに最も
+        """ 平均律を仮定したときの周波数から、それに最も
         周波数の近いPitchオブジェクトを構築します。
 
         Args:
@@ -579,8 +599,17 @@ class Pitch(int):
                 Pitchコンストラクタのsf引数と同じ意味を持ちます。
             key(Key, int, or str, optional):
                 Pitchコンストラクタのkey引数と同じ意味を持ちます。
+            afreq(float, optional):
+                A4音の周波数(Hz)を指定します。
+            fractional(bool, optional):
+                Trueの場合、Pitchオブジェクトのかわりに、実数のMIDIノート
+                番号を返します。
         """
-        return Pitch(takt_round(math.log2(freq / 440.0) * 12 + 69), sf, key)
+        notenum = math.log2(freq / afreq) * 12 + 69
+        if fractional:
+            return notenum
+        else:
+            return Pitch(takt_round(notenum), sf, key)
 
 
 # define pitch names like 'C4', 'Ds5', and 'Bb6' as constants
