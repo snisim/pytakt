@@ -13,6 +13,7 @@ include pytakt/m21conv.py
 include pytakt/mml.py
 include pytakt/pianoroll.py
 include pytakt/pitch.py
+include pytakt/pmconv.py
 include pytakt/pytaktcmd.py
 include pytakt/sc.py
 include pytakt/scale.py

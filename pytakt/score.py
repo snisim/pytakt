@@ -1163,7 +1163,7 @@ isinstance(ev, (NoteEvent, NoteOnEvent))])
             allow_tuplet(bool, optional): By default, up to tredecuplets
                 (13-tuplets) are automatically recognized, but setting this
                 argument to False disables the use of tuplets altogether.
-            limit(ticks, optional): limits the length of the score
+            limit(ticks, optional): Limits the length of the score
                 (see :meth:`.Score.stream` for details).
         """
         """
@@ -1213,11 +1213,49 @@ isinstance(ev, (NoteEvent, NoteOnEvent))])
         return TaktToMusic21().convert_to_music21(self, min_note, bar0len,
                                                   allow_tuplet, limit)
 
-    @staticmethod
-    def frommusic21(m21score) -> 'Tracks':
+    def pretty_midi(self, render=True,
+                    limit=DEFAULT_LIMIT) -> 'pretty_midi.PrettyMIDI':
         """
-        Converts a music21 Score object (an object of
-        the music21.stream.stream class) to a Pytakt Score object.
+        Converts a Pytakt Score object to pretty_midi's PrettyMIDI object.
+        Information on notes, pitch-bends, control-changes, tempo, time
+        signatures, key signatures, program numbers (via program change),
+        track names, lyrics, and text events is output.
+        In the pretty_midi object, a new Instrument is allocated if any of
+        the track number, MIDI channel number, or program number is different.
+        On the other hand, information of track numbers and channel numbers
+        themselves will be lost.
+
+        Args:
+            render(bool, optional):
+                If True (default), the played time is used.
+                Otherwise, the notated time is used.
+            limit(ticks, optional): Limits the length of the score
+                (see :meth:`.Score.stream` for details).
+        """
+        """
+        Pytakt の Score オブジェクトを pretty_midi のPrettyMIDIオブジェクトへ
+        変換します。音符、ピッチベンド、コントロールチェンジ、テンポ、拍子、
+        調号、(プログラムチェンジによる)プログラム番号、トラック名、歌詞、及び
+        テキストイベントの情報が出力されます。
+        pretty_midi オブジェクトにおいて、トラック番号、MIDIチャネル番号、プロ
+        グラム番号のどれかが異なれば、新しい Instrument が割り当てられます。
+        一方、トラック番号、MIDIチャネル番号そのものの情報は失われます。
+
+        Args:
+            render(bool, optional):
+                デフォルト(True)の場合、演奏上の時間を使用します。
+                Falseの場合は、楽譜上の時間を使用します。
+            limit(ticks, optional): スコアの長さを制限します
+                (詳細については、:meth:`.Score.stream` を参照)。
+        """
+        from pytakt.pmconv import TaktToPrettyMIDI
+        return TaktToPrettyMIDI().convert_to_pretty_midi(self, render, limit)
+
+    @staticmethod
+    def from_music21(m21score) -> 'Tracks':
+        """
+        Converts a music21 score object (an object of
+        the music21.stream.Stream class) to a Pytakt Score object.
         In the conversion, a Pytakt track is assigned to each part of music21,
         and the MIDI channel number is always 1.
         If the music21 score uses the Voice structure, the 'voice' attribute
@@ -1237,6 +1275,26 @@ isinstance(ev, (NoteEvent, NoteOnEvent))])
         """
         from pytakt.m21conv import Music21ToTakt
         return Music21ToTakt().convert_to_takt(m21score)
+
+    @staticmethod
+    def from_pretty_midi(pmscore) -> 'Tracks':
+        """
+        Converts a pretty_midi score object (an object of the
+        pretty_midi.PrettyMIDI class) to a Pytakt Score object.
+        Each instrument in pretty_midi is allocated from Track 1 sequentially.
+        MIDI channels 1-16 except 10 are cyclically assigned to each track.
+        MIDI channel 10 is assigned to instruments flagged as drums.
+        """
+        """
+        pretty_midi のスコアオブジェクト (pretty_midi.PrettyMIDI クラスの
+        オブジェクト）を Pytakt の Score オブジェクトへ変換します。
+        pretty_midi における各 Instrument が、1番以降のトラックに順に割り当て
+        られます。MIDIチャネルは 10を除く 1〜16 が、各トラックに巡回的に
+        割り当てられます。MIDIチャネル10はドラムのフラグのついた Instrument へ
+        割り当てられます。
+        """
+        from pytakt.pmconv import PrettyMIDIToTakt
+        return PrettyMIDIToTakt().convert_to_takt(pmscore)
 
     def dump(self) -> None:
         for ev in self.stream():
