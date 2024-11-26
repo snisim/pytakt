@@ -12,6 +12,8 @@ import tkinter.simpledialog
 import math
 import sys
 import os
+import warnings
+from typing import Tuple, List, Set
 from pytakt.score import EventList, EventStream
 from pytakt.event import NoteEventClass, NoteEvent, NoteOnEvent, \
     NoteOffEvent, MetaEvent, CtrlEvent, TempoEvent, KeyPressureEvent, \
@@ -19,9 +21,11 @@ from pytakt.event import NoteEventClass, NoteEvent, NoteOnEvent, \
 from pytakt.constants import M_TRACKNAME, M_INSTNAME, CONTROLLERS, C_BEND, \
     C_PROG, C_KPR, C_CPR, C_TEMPO, TICKS_PER_QUARTER, EPSILON
 from pytakt.pitch import Pitch
-from pytakt.timemap import TimeSignatureMap, current_tempo
+from pytakt.timemap import TimeMap, KeySignatureMap, current_tempo
 from pytakt.utils import std_time_repr
 from pytakt.effector import Render
+from pytakt.gm import INSTRUMENTS
+from pytakt.gm.drums import DRUMS
 import pytakt.midiio as midiio
 
 __all__ = ['show']
@@ -78,9 +82,10 @@ def setup_globals(mag):
         CL_BLACKKEY='gray20',
         CL_OUTLINE='gray20',
         TRACK_COLORS=('gray60', '#B09060', 'red1', 'orange1', 'yellow1',
-                      'green1', 'cyan1', 'magenta1', 'gray75', 'gray95',
+                      'green1', 'dodgerblue', 'magenta1', 'gray75',
+                      'darkslategray1',
                       '#8080F0', 'pink', 'red3', 'orange3', 'yellow3',
-                      'green3', 'cyan3', 'magenta3', 'gray70', 'gray90'),
+                      'green3', 'blue3', 'magenta3', 'gray70', 'cyan3'),
         CURSOR_COLORS=('green', 'red', 'red'))
 
 
@@ -328,14 +333,14 @@ class ViewPaneBase(tkinter.Frame):
 
     def draw_vertical_lines(self):
         h = self.height - self.ymargin
-        first_meas = self.master.tsigmap.ticks2mbt(0)[0]
+        first_meas = self.master.timemap.ticks2mbt(0)[0]
         for measure in range(first_meas,
-                             first_meas + self.master.tsigmap.num_measures()):
-            time = self.master.tsigmap.mbt2ticks(measure)
+                             first_meas + self.master.timemap.num_measures()):
+            time = self.master.timemap.mbt2ticks(measure)
             x = time * self.pixels_per_tick
             self.canvas.create_line(x, self.ymargin, x, h, fill=CL_VLINE)
-            tsig = self.master.tsigmap.timesig_at(time)
-            measlen = self.master.tsigmap.mbt2ticks(measure + 1) - time
+            tsig = self.master.timemap.timesig_at(time)
+            measlen = self.master.timemap.mbt2ticks(measure + 1) - time
             for beat in range(1, tsig.numerator()):
                 x1 = x + (beat * tsig.beat_length() * self.pixels_per_tick)
                 if x1 > self.width or beat * tsig.beat_length() >= measlen:
@@ -370,11 +375,32 @@ class ViewPaneBase(tkinter.Frame):
                         pane.canvas.move('cursor%d' % i, xnew - xold, 0)
 
     def item_enter_action(self, item, ev):
-        self.master.msgpane.showmsg(0, ev.org_repr if hasattr(ev, 'org_repr')
+        self.master.msgpane.showmsg(-1, ev.org_repr if hasattr(ev, 'org_repr')
                                     else str(ev))
         self.current_ev = ev
+        self.master.msgpane.showmsg(
+            0, f't: {std_time_repr(ev.t)}' +
+            (f'-{std_time_repr(ev.t+ev.L)}' if hasattr(ev, 'L') else ''))
+        tmap = self.master.timemap
+        self.master.msgpane.showmsg(
+            1, f's: {tmap.ticks2sec(ev.t):.6}' +
+            (f'-{tmap.ticks2sec(ev.t+ev.L):.6}' if hasattr(ev, 'L') else ''))
         if hasattr(ev, 'n'):
-            self.master.msgpane.showmsg(1, repr(Pitch(ev.n)))
+            pstr = Pitch(ev.n).tostr(sfn="#b")
+            if ev.ch == 10:
+                pstr = DRUMS.get(ev.n, pstr)
+            self.master.msgpane.showmsg(
+                2, f'{int(ev.n)} ({pstr})')
+        if ev.is_program_change():
+            self.master.msgpane.showmsg(2, INSTRUMENTS.get(ev.value, ''))
+        tsigev = tmap.timesig_at(ev.t)
+        if not hasattr(tsigev, 'default'):
+            self.master.msgpane.showmsg(
+                3, f'{tsigev.numerator()}/{tsigev.denominator()}')
+        ksigev = self.master.keysigmap.key_at(ev.t, ev.tk)
+        if not hasattr(ksigev, 'default'):
+            self.master.msgpane.showmsg(4, f'{ksigev.tostr()}')
+
         for pane in self.master.panelist:
             if hasattr(pane, 'emphasize_item'):
                 pane.emphasize_item('id%x' % id(ev))
@@ -456,6 +482,10 @@ class ViewPaneBase(tkinter.Frame):
         tk = int(next(tg for tg in tags if tg[:2] == 'tk')[2:])
         self.master.trackbuttonpane.button_click_action(tk)
 
+    def item_button2_action(self):
+        if hasattr(self, 'current_ev'):
+            print(self.current_ev)
+
     def bind_item_actions(self, item, ev):
         self.canvas.tag_bind(item, "<Enter>", lambda e:
                              self.item_enter_action(item, ev))
@@ -473,6 +503,8 @@ class ViewPaneBase(tkinter.Frame):
                              lambda e: self.item_shift_release_action())
         self.canvas.tag_bind(item, "<Control-Button-1>",
                              lambda e: self.item_ctrl_click_action())
+        self.canvas.tag_bind(item, "<ButtonPress-2>",
+                             lambda e: self.item_button2_action())
 
 
 class NoteViewPane(ViewPaneBase):
@@ -543,9 +575,16 @@ class NoteViewPane(ViewPaneBase):
         color = TRACK_COLORS[ev.tk % len(TRACK_COLORS)]
 #        stipple = TRACK_STIPPLES[(ev.tk // len(TRACK_COLORS))
 #                                 % len(TRACK_STIPPLES)]
+        try:
+            tracks = self.master.note_hash[(int(ev.t), int(ev.n))]
+            s = tracks.index(ev.tk)  # tab position
+        except (KeyError, ValueError):
+            s = 0
+        w = 2  # tab size
         rect = self.canvas.create_polygon(
-            x1, y1, x1, y2-2, min(x1+2, x2), y2-2, min(x1+4, x2), y2,
-            x2, y2, x2, y1, fill=color, width=1, outline=CL_OUTLINE,
+            x1, y1, x1, y2, min(x1+s*w, x2), y2, min(x1+s*w, x2), y2-2,
+            min(x1+(s+1)*w, x2), y2-2, min(x1+(s+1)*w, x2), y2, x2, y2, x2, y1,
+            fill=color, width=1, outline=CL_OUTLINE,
             tags=('note', 'tk%d' % ev.tk, 'id%x' % id(ev)))
 #        rect = self.canvas.create_rectangle(
 #            x1, y1, x2, y2, fill=color, width=1, outline=CL_OUTLINE,
@@ -719,19 +758,22 @@ class CtrlEventViewPane(CtrlViewPaneBase):
         self.bind_common_item_actions('ctrl')
 
 
-def get_tracklist(evlist):
-    # イベントが全く無いトラックは None, イベントはあるが Track/Inst name が
-    # ないトラックは空文字列になる。
-    tracklist = []
+def get_tracklist(evlist) -> Tuple[List[str], Set[int]]:
+    # 第1戻り値は Track/Inst name のリスト(名前のないトラックは空文字列)。
+    # 第2戻り値はNote/Ctrlイベントの存在する(= トラックボタンを表示すべき)
+    # トラックの番号の集合。
+    track_names = {}
+    tracks_with_notes_ctrls = set()
+    maxtk = -1
     for ev in evlist:
-        for i in range(len(tracklist), ev.tk + 1):
-            tracklist.append(None)
-        if tracklist[ev.tk] is None:
-            tracklist[ev.tk] = ''
-        if not tracklist[ev.tk] and \
+        maxtk = max(maxtk, ev.tk)
+        if isinstance(ev, (NoteEventClass, CtrlEvent)):
+            tracks_with_notes_ctrls.add(ev.tk)
+        if ev.tk not in track_names and \
            isinstance(ev, MetaEvent) and ev.mtype in (M_TRACKNAME, M_INSTNAME):
-            tracklist[ev.tk] = ev.value
-    return tracklist
+            track_names[ev.tk] = ev.value
+    return ([track_names.get(tk, '') for tk in range(maxtk+1)],
+            tracks_with_notes_ctrls)
 
 
 class XRulerPane(ViewPaneBase):
@@ -758,10 +800,10 @@ class XRulerPane(ViewPaneBase):
         super().draw()
         self.yruler.create_line(YRULER_WIDTH - 1, 0, YRULER_WIDTH - 1,
                                 self.height, fill=CL_VLINE_ORG)
-        first_meas = self.master.tsigmap.ticks2mbt(0)[0]
+        first_meas = self.master.timemap.ticks2mbt(0)[0]
         for measure in range(first_meas,
-                             first_meas + self.master.tsigmap.num_measures()):
-            time = self.master.tsigmap.mbt2ticks(measure)
+                             first_meas + self.master.timemap.num_measures()):
+            time = self.master.timemap.mbt2ticks(measure)
             x = time * self.pixels_per_tick
             self.canvas.create_text(x + 4, self.height, font=XRULER_FONT,
                                     text='%d' % measure, anchor='sw')
@@ -774,9 +816,9 @@ class XRulerPane(ViewPaneBase):
         candidates = [ev.t for ev in self.master.evlist
                       if (isinstance(ev, NoteEvent) and
                           abs(ev.t - ticks) <= td)]
-        (m, _, b, _) = self.master.tsigmap.ticks2mbt(ticks)
-        candidates.append(self.master.tsigmap.mbt2ticks(m, b, 0))
-        candidates.append(self.master.tsigmap.mbt2ticks(m, b+1, 0))
+        (m, _, b, _) = self.master.timemap.ticks2mbt(ticks)
+        candidates.append(self.master.timemap.mbt2ticks(m, b, 0))
+        candidates.append(self.master.timemap.mbt2ticks(m, b+1, 0))
         t = min(candidates, key=lambda x: abs(x - ticks))
         return t if abs(t - ticks) <= td else ticks
 
@@ -791,6 +833,18 @@ class XRulerPane(ViewPaneBase):
         return (self.canvas.canvasx(tkevent.x) /
                 (self.pixels_per_tick * self.master.xzoom))
 
+    def xr_showmsg(self, ticks):
+        self.master.msgpane.showmsg(0, f't: {std_time_repr(ticks)}')
+        tmap = self.master.timemap
+        self.master.msgpane.showmsg(1, f's: {tmap.ticks2sec(ticks):.6}')
+        tsigev = tmap.timesig_at(ticks)
+        if not hasattr(tsigev, 'default'):
+            self.master.msgpane.showmsg(
+                3, f'{tsigev.numerator()}/{tsigev.denominator()}')
+        ksigev = self.master.keysigmap.key_at(ticks)
+        if not hasattr(ksigev, 'default'):
+            self.master.msgpane.showmsg(4, f'{ksigev.tostr()}')
+
     def xr_motion_action(self, tkevent, snap=True):
         ticks = self._get_ticks(tkevent)
         if self._intersect(ticks, self.master.playstart):
@@ -804,7 +858,7 @@ class XRulerPane(ViewPaneBase):
             self.master.playstart_tmp = ticks
         self.update_cursors()
         self.master.msgpane.clear()
-        self.master.msgpane.showmsg(0, 't=%s' % std_time_repr(ticks))
+        self.xr_showmsg(ticks)
 
     def xr_leave_action(self, tkevent):
         self.master.playstart_tmp = None
@@ -826,7 +880,7 @@ class XRulerPane(ViewPaneBase):
         setattr(self.master, self.dragging, ticks)
         self.update_cursors()
         self.master.msgpane.clear()
-        self.master.msgpane.showmsg(0, 't=%s' % std_time_repr(ticks))
+        self.xr_showmsg(ticks)
 
     def xr_button1_release_action(self, tkevent, snap=True):
         ticks = self._get_ticks(tkevent)
@@ -875,12 +929,18 @@ class MessagePane(tkinter.Frame):
         super().__init__(master)
         self.master = master
         self.labels = []
-        for i in range(0, 3):
+        self.numcolumns = 7
+        for i in range(self.numcolumns):
             label = tkinter.Label(self, font=MSG_FONT, width=1, anchor='w',
                                   borderwidth=PANE_BORDER_WIDTH,
                                   background=CL_BACK, relief=tkinter.RIDGE)
-            label.grid(row=0, column=i, sticky='ew')
-            self.columnconfigure(i, weight=(8, 1, 6)[i], uniform='a')
+            if i == self.numcolumns-1:
+                label.grid(row=1, column=0, columnspan=self.numcolumns-1,
+                           sticky='ew')
+            else:
+                label.grid(row=0, column=i, sticky='ew')
+                self.columnconfigure(i, weight=(4, 4, 3, 1, 2, 12)[i],
+                                     uniform='a')
             self.labels.append(label)
             label.bind(RIGHTBUTTON,
                        lambda e: self.master.mainmenu.tk_popup(e.x_root,
@@ -895,9 +955,9 @@ class MessagePane(tkinter.Frame):
             s = self.master.tracklist[tk]
             return (' "%s"' % s) if s else ''
         self.showmsg(
-            2, ' '.join(("Track(s): %d%s" % (tk, trkname(tk)) if i == 0
-                         else "+%d" % tk if i == 1 else str(tk))
-                        for i, tk in enumerate(tracks)))
+            -2, ' '.join(("Track(s): %d%s" % (tk, trkname(tk)) if i == 0
+                          else "+%d" % tk if i == 1 else str(tk))
+                         for i, tk in enumerate(tracks)))
 
     def clear(self):
         for label in self.labels:
@@ -916,6 +976,7 @@ class TrackButtonPane(tkinter.Frame):
     def __init__(self, master):
         super().__init__(master, borderwidth=PANE_BORDER_WIDTH,
                          relief=tkinter.RIDGE, background=CL_BACK)
+        self.master = master
         self.tracklist = master.tracklist
         self.currentstate = [True for i in range(len(self.tracklist))]
         self.savedstate = [True for i in range(len(self.tracklist))]
@@ -934,27 +995,29 @@ class TrackButtonPane(tkinter.Frame):
         self.bind_actions(self.allbutton, -1)
         self.buttons = [None for i in range(len(self.tracklist))]
         count = 0
-        for i, trackname in enumerate(self.tracklist):
+        for i in self.master.tracks_with_notes_ctrls:
             color = TRACK_COLORS[i % len(TRACK_COLORS)]
-            if trackname is not None:
-                self.buttons[i] = \
-                    tkinter.Button(self, text="%d" % i,
-                                   background=color, activebackground=color,
-                                   # macの場合、何故かdisabledにしておかないと
-                                   # スリープから復帰したときに色がなくなる。
-                                   **({'highlightbackground': color,
-                                       'highlightthickness': 2,
-                                       'disabledforeground': 'black',
-                                       'state': 'disabled'}
-                                      if sys.platform == 'darwin' else {}),
-                                   font=TRACK_BUTTON_FONT, relief='raised',
-                                   borderwidth=BUTTON_BORDER, width=1,
-                                   padx=BUTTON_BORDER*2, pady=BUTTON_BORDER)
-                self.buttons[i].pack(side=tkinter.LEFT, fill='y')
-                self.bind_actions(self.buttons[i], i)
-                count += 1
-                if count >= MAX_TRACK_BUTTONS:
-                    break
+            self.buttons[i] = \
+                tkinter.Button(self, text="%d" % i,
+                               background=color, activebackground=color,
+                               # macの場合、何故かdisabledにしておかないと
+                               # スリープから復帰したときに色がなくなる。
+                               **({'highlightbackground': color,
+                                   'highlightthickness': 2,
+                                   'disabledforeground': 'black',
+                                   'state': 'disabled'}
+                                  if sys.platform == 'darwin' else {}),
+                               font=TRACK_BUTTON_FONT, relief='raised',
+                               borderwidth=BUTTON_BORDER, width=1,
+                               padx=BUTTON_BORDER*2, pady=BUTTON_BORDER)
+            self.buttons[i].pack(side=tkinter.LEFT, fill='y')
+            self.bind_actions(self.buttons[i], i)
+            count += 1
+            if count >= MAX_TRACK_BUTTONS:
+                warnings.warn(
+                    'Failed to create %d track buttons (only %d are shown)'
+                    % (len(self.master.tracks_with_notes_ctrls), count))
+                break
         #
         self.pausebutton = tkinter.Button(
             self, image=self.master.bitmaps['continue'],
@@ -1041,25 +1104,65 @@ class TrackButtonPane(tkinter.Frame):
 
     def update_panes(self):
         for i, state in enumerate(self.currentstate):
-            if self.tracklist[i] is not None:
-                if self.buttons[i] is not None:
-                    color = TRACK_COLORS[i % len(TRACK_COLORS)]
-                    if sys.platform == 'darwin':
-                        self.buttons[i].configure(
-                            highlightbackground=color if state else 'gray10')
-                    else:
-                        self.buttons[i].configure(
-                            relief='raised' if state else 'flat',
-                            background=color if state else 'gray80')
-                for pane in self.master.panelist:
-                    pane.canvas.itemconfigure(
-                        'tk%d && !nohide' % i,
-                        state='normal' if state else 'hidden')
+            if self.buttons[i] is not None:
+                color = TRACK_COLORS[i % len(TRACK_COLORS)]
+                if sys.platform == 'darwin':
+                    self.buttons[i].configure(
+                        highlightbackground=color if state else 'gray10')
+                else:
+                    self.buttons[i].configure(
+                        relief='raised' if state else 'flat',
+                        background=color if state else 'gray80')
+            for pane in self.master.panelist:
+                pane.canvas.itemconfigure(
+                    'tk%d && !nohide' % i,
+                    state='normal' if state else 'hidden')
 
     def update_pause_button(self):
         self.pausebutton.configure(
             image=self.master.bitmaps['pause' if self.master.status ==
                                       'playing' else 'continue'])
+
+
+class JumpToDialog(tkinter.simpledialog.Dialog):
+    def __init__(self, master):
+        self.master = master
+        super().__init__(master, "Jump To")
+
+    def destroy(self):
+        self.entry = None
+        super().destroy()
+
+    def body(self, frame):
+        w = tkinter.Label(frame, text="Enter time:", justify=tkinter.LEFT)
+        w.grid(row=0, padx=50, columnspan=3, sticky='w')
+
+        self.entry = tkinter.Entry(frame, name="entry")
+        self.entry.grid(row=1, padx=50, columnspan=3, sticky='we')
+
+        self.unit = tkinter.IntVar()
+        unitstr = ['ticks', 'measure[:beat]', 'seconds']
+        for i in range(3):
+            button = tkinter.Radiobutton(frame, value=i, variable=self.unit,
+                                         text=unitstr[i])
+            button.grid(row=2, column=i, sticky='we')
+        return self.entry
+
+    def validate(self):
+        string = self.entry.get()
+        unit = self.unit.get()
+        try:
+            if unit == 1:
+                self.result = self.master.timemap.mbt2ticks(string)
+            else:
+                self.result = float(string)
+        except ValueError as e:
+            tkinter.messagebox.showwarning(
+                "Illegal value", str(e) + "\nPlease try again", parent=self)
+            return 0
+        if unit == 2:
+            self.result = self.master.timemap.sec2ticks(self.result)
+        return 1
 
 
 class ViewerMain(tkinter.Frame):
@@ -1075,10 +1178,13 @@ class ViewerMain(tkinter.Frame):
         else:
             self.evlist = self.evlist_org
         self.save_event_repr()
+        self.create_note_hash()
         if not self.evlist.active_events_at(0, TempoEvent):
             self.evlist.insert(0, TempoEvent(0, current_tempo()))
-        self.tsigmap = TimeSignatureMap(self.evlist, bar0len)
-        self.tracklist = get_tracklist(self.evlist)
+        self.timemap = TimeMap(self.evlist, bar0len=bar0len)
+        self.keysigmap = KeySignatureMap(self.evlist)
+        self.tracklist, self.tracks_with_notes_ctrls = \
+            get_tracklist(self.evlist)
         self.master = master
         self.viewwidth = width
         self.pixels_per_tick = pixels_per_tick
@@ -1162,6 +1268,15 @@ class ViewerMain(tkinter.Frame):
             if ev is not ev_org:
                 ev.org_repr = repr(ev_org)
 
+    def create_note_hash(self):
+        self.note_hash = {}
+        for ev in self.evlist:
+            if isinstance(ev, NoteEvent):
+                key = (int(ev.t), int(ev.n))
+                self.note_hash.setdefault(key, []).append(ev.tk)
+        for tracks in self.note_hash.values():
+            tracks.sort()
+
     def create_widgets(self, notepane_viewheight, velocity, ctrlnums):
         self.msgpane = MessagePane(self)
         self.xscroll = XScrollPane(self).xscroll
@@ -1187,14 +1302,13 @@ class ViewerMain(tkinter.Frame):
                                      font=MENU_FONT)
         self.zoommenu = self.create_zoommenu(self.mainmenu)
         self.midimenu = self.create_midimenu(self.mainmenu)
-        self.viewmenu.add_command(label='Show all actively used controllers',
-                                  accelerator='c',
-                                  command=lambda: self.open_all_ctrlpanes(0))
-        self.viewmenu.add_command(label='Show all used controllers',
-                                  command=lambda: self.open_all_ctrlpanes(1))
-        self.viewmenu.add_command(label='Hide all controllers',
-                                  accelerator='x',
-                                  command=lambda: self.close_all_ctrlpanes())
+        self.viewmenu.add_command(
+            label='Show/Hide all actively used controllers',
+            accelerator='c',
+            command=lambda: self.toggle_all_ctrlpanes(0))
+        self.viewmenu.add_command(
+            label='Show/Hide all used controllers',
+            command=lambda: self.toggle_all_ctrlpanes(1))
         self.viewmenu.add_separator()
         self.viewmenu.add_separator()
         self.viewmenu.add_command(label='Other controller',
@@ -1219,6 +1333,8 @@ class ViewerMain(tkinter.Frame):
                                   command=self.pause)
         self.mainmenu.add_command(label='Reset Cursors', accelerator='r',
                                   command=self.reset_cursors)
+        self.mainmenu.add_command(label='Jump To', accelerator='j',
+                                  command=self.jump_to)
         self.mainmenu.add_separator()
         self.mainmenu.add_command(label='Close Window', accelerator='Ctrl+W',
                                   command=lambda: self.after(0, self.quit))
@@ -1237,7 +1353,8 @@ class ViewerMain(tkinter.Frame):
         self.viewmenuvars[ctrlnum] = tkvar
         self.viewmenu.insert_checkbutton(
             self.viewmenu.index('end') - 1, label=label, variable=tkvar,
-            command=(lambda: self.viewmenu_action(ctrlnum, tkvar)))
+            command=(lambda: self.viewmenu_action(ctrlnum, tkvar)),
+            **({'accelerator': 't'} if ctrlnum == C_TEMPO else {}))
 
     def open_ctrlpane(self, ctrlnum):
         if ctrlnum not in self.ctrlpanedict:
@@ -1247,15 +1364,17 @@ class ViewerMain(tkinter.Frame):
             self.viewmenuvars[ctrlnum].set(True)
             self.trackbuttonpane.update_panes()
 
-    def open_all_ctrlpanes(self, verbose):
+    def toggle_all_ctrlpanes(self, verbose):
         act = False
         for cnum in self.get_auto_ctrlnums()[verbose]:
             if cnum not in self.ctrlpanedict:
                 self.open_ctrlpane(cnum)
                 act = True
         if not act:
-            print("show: All such controllers are already shown",
-                  file=sys.stderr)
+            if list(self.ctrlpanedict.keys()) in ([], [-1]):
+                print("show: No applicable controllers", file=sys.stderr)
+            else:
+                self.close_all_ctrlpanes()
 
     def close_ctrlpane(self, ctrlnum):
         if ctrlnum in self.ctrlpanedict:
@@ -1264,13 +1383,9 @@ class ViewerMain(tkinter.Frame):
             self.viewmenuvars[ctrlnum].set(False)
 
     def close_all_ctrlpanes(self):
-        act = False
         for cnum in list(self.ctrlpanedict):
             if cnum != -1:
                 self.close_ctrlpane(cnum)
-                act = True
-        if not act:
-            print("show: All controllers are already hidden", file=sys.stderr)
 
     def viewmenu_action(self, ctrlnum, tkvar):
         if tkvar.get():
@@ -1291,10 +1406,13 @@ class ViewerMain(tkinter.Frame):
             else:
                 print("show: Controller number out of range", file=sys.stderr)
 
-    def toggle_velocity_pane(self):
-        tkvar = self.viewmenuvars[-1]
+    def toggle_ctrlpane(self, ctrlnum):
+        tkvar = self.viewmenuvars[ctrlnum]
         tkvar.set(not tkvar.get())
-        self.viewmenu_action(-1, tkvar)
+        self.viewmenu_action(ctrlnum, tkvar)
+
+    def toggle_velocity_pane(self):
+        self.toggle_ctrlpane(-1)
 
     def create_zoommenu(self, parentmenu):
         zoommenu = tkinter.Menu(parentmenu, tearoff=False, font=MENU_FONT)
@@ -1368,12 +1486,13 @@ class ViewerMain(tkinter.Frame):
         self.master.bind_class("Frame", 'p', lambda e: self.play())
         self.master.bind_class("Frame", '<space>', lambda e: self.pause())
         self.master.bind_class("Frame", 'r', lambda e: self.reset_cursors())
+        self.master.bind_class("Frame", 'j', lambda e: self.jump_to())
         self.master.bind_class("Frame", 'c',
-                               lambda e: self.open_all_ctrlpanes(0))
-        self.master.bind_class("Frame", 'x',
-                               lambda e: self.close_all_ctrlpanes())
+                               lambda e: self.toggle_all_ctrlpanes(0))
         self.master.bind_class("Frame", 'v',
                                lambda e: self.toggle_velocity_pane())
+        self.master.bind_class("Frame", 't',
+                               lambda e: self.toggle_ctrlpane(C_TEMPO))
         self.master.bind_class("Frame", '<Prior>', lambda e:
                                self.trackbuttonpane.tempo_scale_up())
         self.master.bind_class("Frame", '<Next>', lambda e:
@@ -1445,13 +1564,25 @@ class ViewerMain(tkinter.Frame):
         self.trackbuttonpane.update_pause_button()
 
     def reset_cursors(self):
+        self.jump_to(0)
+
+    def jump_to(self, ticks=None):
         if self.status == 'playing':
             self.stop()
-        self.playstart = 0
+        if ticks is None:
+            dialog = JumpToDialog(self)
+            if dialog.result is None:
+                return
+            ticks = dialog.result
+        ticks = max(0, min(self.evlist.duration, ticks))
+        self.playstart = ticks
         self.playstart_tmp = None
         self.playingpos = None
         self.notepane.update_cursors()
-        self.notepane.xview_moveto_all(0)
+        cx = ticks / self.evlist.duration
+        vrange = self.notepane.canvas.xview()
+        if cx < vrange[0] or cx >= vrange[1]:
+            self.notepane.xview_moveto_all(cx - (vrange[1] - vrange[0]) * 0.5)
 
     def mute_control(self, old_mute_state, new_mute_state):
         if self.status == 'playing':
@@ -1568,6 +1699,8 @@ def show(score, velocity='auto', ctrlnums='auto', limit=SHOW_LIMIT,
       Clicking on each note brings it to the front with playing the note's
       sound. Clicking it with SHIFT sends it to the back.
       Clicking it with CTRL does the same action as pressing the track button.
+      Clicking with the middle mouse button prints event contents to the
+      standard output.
       Dragging in the empty area scrolls the score horizontally (+SHIFT
       scrolls it vertically and horizontally).
       Mouse wheel and SHIFT+mouse wheel scrolls the score (direction is
@@ -1575,12 +1708,13 @@ def show(score, velocity='auto', ctrlnums='auto', limit=SHOW_LIMIT,
       the bar number ruler area, vertically in the keyboard area, and
       both in other area.
     - **Controller Panes**: They can be turn on/off from the right-button menu.
-      Mouse wheel works the same as in the Note Pane.
+      Mouse wheel and the middle button work the same as in the Note Pane.
     - **Status Display**:
-      The line at the bottom of the screen shows information about events.
-      The left part shows the event content, the center part shows the pitch,
-      and the right part shows the track number and track name (if any).
-      If there are multiple overlapping notes, the track number will be
+      The lines at the bottom of the screen show information about ticks,
+      seconds, the pitch (with the MIDI note number in the parentheses),
+      the time signature, the key signature, the track number and track name
+      (if any) as well as event contents.
+      If there are multiple overlapping notes, the track numbers will be
       displayed as "+ 2 3".
     - **Shortcut Keys**:
         - p: Same as Play button
@@ -1588,9 +1722,10 @@ def show(score, velocity='auto', ctrlnums='auto', limit=SHOW_LIMIT,
         - r: Reset cursor potitions
         - a: Same as ALL button
         - c: Display all controller panes with value changes (equivalent
-          to ctrlnums='auto')
-        - x: Hide all controller panes
+          to ctrlnums='auto'). If all are already displayed, hide them.
         - v: Show/hide the velocity pane
+        - t: Show/hide the tempo pane
+        - j: Jump to a specified position
         - 0-9: Same as track number buttons (+ALT for tracks 10-19)
         - Arrow keys: Scroll (+SHIFT for pages)
         - Home/End: Move to the beginning/end of the score
@@ -1659,27 +1794,30 @@ def show(score, velocity='auto', ctrlnums='auto', limit=SHOW_LIMIT,
     - **ノートPane**:
       各ノートをクリックすると、その発音とともに、最前面に移動します。
       SHIFT+クリックなら最背面に移動します。CTRL+クリックの場合は、
-      トラックボタンを押したのと同じ動作になります。何もないところで
+      トラックボタンを押したのと同じ動作になります。中央ボタンでクリックする
+      とイベント内容を標準出力へprintします。何もないところで
       ドラッグすると水平スクロール（+SHIFTで垂直・水平スクロール) します。
       マウスホイール、SHIFT+マウスホイールはスクロール (方向はプラットフォーム
       依存) を行います。CTRL+マウスホイールはズームを行い、小節番号ルーラー部分
       で行うと水平のみズーム、鍵盤表示部分で行うと垂直のみズームになります。
     - **コントローラPane**:
-      右ボタンメニューでon/offできます。マウスホイールの動作はノートPaneと
-      同じです。
+      右ボタンメニューでon/offできます。中央ボタンおよびマウスホイールの動作は
+      ノートPaneと同じです。
     - **ステータス表示**:
-      画面下に表示されている行の左部はイベント内容の表示、中央部はピッチの
-      表示、右部はトラック番号と(あれば)トラック名の表示です。複数のノートが
-      重なっている場合、トラック番号は "+ 2 3" のような表示になります。
+      画面下部には、ティック数、秒、ピッチ(カッコ内はMIDIノート番号)、拍子、
+      調、トラック番号と(あれば)トラック名、及びイベント内容が表示されます。
+      複数の音符が重なっている場合、トラック番号表示は "+ 2 3" のように
+      なります。
     - **ショートカットキー**:
         - p: Playボタンと同じ
         - space: Pause/Continueボタンと同じ
         - r: カーソルのリセット
         - a: ALLボタンと同じ
-        - c: 値に動きのあるすべてのコントローラPaneを表示
-          (ctrlnums='auto'と同等)
-        - x: すべてのコントローラPaneを消去
+        - c: 値に動きのあるすべてのコントローラPaneを表示 (ctrlnums='auto'と
+          同等)。既にすべてが表示済みであれば消去します。
         - v: ベロシティpaneの表示/消去
+        - t: テンポpaneの表示/消去
+        - j: 指定位置にジャンプ
         - 0-9: トラック番号ボタンと同じ (+ALT で トラック10～19)
         - 矢印キー: スクロール (+SHIFT でページ単位)
         - Home/End: 曲の先頭/末尾へ移動

@@ -552,7 +552,7 @@ class Pitch(int):
             raise ValueError("Invalid 'enh' value")
 
     def freq(self, afreq=440.0) -> float:
-        """ Returns the frequency assuming equal temperament. 
+        """ Returns the frequency assuming equal temperament.
 
         Args:
             self(Pitch, int, or float):
@@ -560,7 +560,7 @@ class Pitch(int):
             afreq(float, optional):
                 Specifies the frequency (Hz) of the A4 pitch
         """
-        """ 平均律を仮定したときの周波数を返します。 
+        """ 平均律を仮定したときの周波数を返します。
 
         Args:
             self(Pitch, int, or float):
@@ -985,10 +985,15 @@ class Key(object):
             (self.signs, self.minor) = (k, minor)
 
     def __repr__(self):
-        return "Key('%s')" % _KEY_TAB[self.signs % 24][self.minor + 2]
+        return "Key('%s')" % self.tostr()
 
 #    def __str__(self):
 #        return "Key(%r, %r)" % (self.signs, self.minor)
+
+    def tostr(self) -> str:
+        """ Returns a string representing the key (‘C major’, etc.). """
+        """ 調を表す文字列('C major'など)に変換します。"""
+        return _KEY_TAB[self.signs % 24][self.minor + 2]
 
     def __eq__(self, other):
         if not isinstance(other, Key):

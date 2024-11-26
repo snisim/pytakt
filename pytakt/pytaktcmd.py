@@ -9,6 +9,7 @@ import sys
 import re
 import math
 import pytakt as takt
+from pytakt import *  # required by '-e' and '-a'
 
 
 def StoreAndCheck(valid_modes, append=False, const=None):
@@ -61,15 +62,6 @@ def filter_tracks(args, score):
         if not any(i in x for x in xs):
             score[i] = takt.EventList()
     return score
-
-
-def pytakt_eval(expr, _locals={}):
-    # ここで from pytakt import * は実行できないで、dirを使ってpytaktの
-    # 名前空間を取得し、locals として指定する。
-    tdict = {name: getattr(takt, name) for name in dir(takt)
-             if not name.startswith('_')}
-    tdict.update(**_locals)
-    return eval(expr, globals(), tdict)
 
 
 # SMFを '-t' オプションでテキストに変換したときの可逆性について:
@@ -266,7 +258,7 @@ When invoked with no arguments, it enters interactive mode.""",
         takt.set_tempo(org_score.default_tempo)
     else:
         try:
-            org_score = pytakt_eval(args.python_expr)
+            org_score = eval(args.python_expr)
             if not isinstance(org_score, takt.Score):
                 raise TypeError("not a Score object")
         except Exception as e:
@@ -293,7 +285,7 @@ When invoked with no arguments, it enters interactive mode.""",
     if args.effectors:
         for eff in args.effectors:
             try:
-                score = pytakt_eval("_score.%s" % eff, {'_score': score})
+                score = eval("score.%s" % eff)
                 if not isinstance(score, takt.Score):
                     raise TypeError("not a valid effector")
             except Exception as e:
@@ -338,6 +330,10 @@ When invoked with no arguments, it enters interactive mode.""",
         set_device(args)
         for i, celm in enumerate(args.ctrl):
             if celm not in ('auto', 'verbose'):
+                sign = 1
+                if celm.startswith('-'):
+                    sign = -1
+                    celm = celm[1:]
                 iv = None
                 try:
                     iv = int(celm, 0)
@@ -350,7 +346,9 @@ When invoked with no arguments, it enters interactive mode.""",
                         pass
                 if iv is None:
                     raise Exception('%r: No such controller' % celm)
-                args.ctrl[i] = iv
+                if iv == 0 and sign == -1:
+                    iv = 256
+                args.ctrl[i] = sign * iv
         score.show(velocity=args.velocity, ctrlnums=args.ctrl,
                    bar0len=args.bar0len, **({} if args.INFILE is None
                                             else {'title': args.INFILE}))

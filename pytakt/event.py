@@ -237,12 +237,12 @@ class Event(object):
         """
         return b''
 
-    def _get_ch(self, errhdr):
+    def _get_ch(self, errhdr=''):
         if not isinstance(self.ch, numbers.Integral) or not 1 <= self.ch <= 16:
             raise MidiEventError(errhdr + "event with invalid channel number")
         return min(max(self.ch, 1), 16) - 1
 
-    def _get_n(self, errhdr):
+    def _get_n(self, errhdr=''):
         if not isinstance(self.n, numbers.Real):
             raise MidiEventError(errhdr + "event with ill-typed note number")
         n = takt_round(self.n)
@@ -251,7 +251,7 @@ class Event(object):
                           (self.n, self.ch)), MidiEventWarning, stacklevel=2)
         return min(max(n, 0), 127)
 
-    def _get_ctrl_val(self, low, high, errhdr):
+    def _get_ctrl_val(self, low, high, errhdr=''):
         if not isinstance(self.value, numbers.Real):
             raise MidiEventError(errhdr + "event with ill-typed control value")
         val = takt_round(self.value)

@@ -559,7 +559,9 @@ class KeySignatureMap(object):
     def __init__(self, score):
         self.event_iterator = score.tee().stream()
         self.has_keysig = [False]
-        self.key_list = [[Key(0)]]
+        default_key = Key(0)
+        default_key.default = True
+        self.key_list = [[default_key]]
         self.ticks_list = [[0]]
         self.last_event_time = 0
         if not isinstance(score, EventStream):
