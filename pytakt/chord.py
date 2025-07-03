@@ -5,7 +5,7 @@ This module defines the classes related to chord symbols.
 """
 このモジュールには、コードシンボルに関連するクラスが定義されています。
 """
-# Copyright (C) 2023  Satoshi Nishimura
+# Copyright (C) 2025  Satoshi Nishimura
 
 import re
 import math

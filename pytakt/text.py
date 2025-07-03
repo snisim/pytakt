@@ -7,7 +7,7 @@ can be evaluated in Python.
 このモジュールには、可読かつPythonで評価可能なテキスト形式のスコアに
 ついての関数が定義されています。
 """
-# Copyright (C) 2023  Satoshi Nishimura
+# Copyright (C) 2025  Satoshi Nishimura
 
 import math
 import itertools

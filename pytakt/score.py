@@ -5,7 +5,7 @@ This module defines the Score class and its subclasses.
 """
 このモジュールには、Scoreおよびその派生クラスが定義されています。
 """
-# Copyright (C) 2023  Satoshi Nishimura
+# Copyright (C) 2025  Satoshi Nishimura
 
 import math
 import sys

@@ -5,7 +5,7 @@ This module defines functions for the piano roll viewer.
 """
 このモジュールにはピアノロールビューアのための関数が定義されています。
 """
-# Copyright (C) 2023  Satoshi Nishimura
+# Copyright (C) 2025  Satoshi Nishimura
 
 import tkinter
 import tkinter.simpledialog

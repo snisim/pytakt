@@ -106,7 +106,7 @@ PytaktではMIDIメッセージの送信の対象となるもの（MIDIインタ
 またテンポスケールは :func:`set_tempo_scale` 関数を呼ぶことによって、
 動的に変更できます。
 """
-# Copyright (C) 2023  Satoshi Nishimura
+# Copyright (C) 2025  Satoshi Nishimura
 
 import os
 import itertools

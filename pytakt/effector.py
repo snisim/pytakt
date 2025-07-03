@@ -5,7 +5,7 @@ This module defines classes related to effectors.
 """
 このモジュールには、エフェクタ関連のクラスが定義されています。
 """
-# Copyright (C) 2023  Satoshi Nishimura
+# Copyright (C) 2025  Satoshi Nishimura
 
 import math
 import itertools

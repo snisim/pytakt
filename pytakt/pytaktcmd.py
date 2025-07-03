@@ -1,7 +1,7 @@
 #!/usr/bin/python3
 
 # Driver script for Pytakt
-#  Copyright (C) 2023  Satoshi Nishimura
+#  Copyright (C) 2025  Satoshi Nishimura
 
 import argparse
 import os

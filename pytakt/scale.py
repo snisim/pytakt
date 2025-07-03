@@ -6,7 +6,7 @@ This module defines classes and utility functions related to musical scales.
 このモジュールには、スケール (音階) に関連するクラスとユーティリティ関数が
 定義されています。
 """
-# Copyright (C) 2023  Satoshi Nishimura
+# Copyright (C) 2025  Satoshi Nishimura
 
 import re
 import math

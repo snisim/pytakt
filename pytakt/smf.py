@@ -6,7 +6,7 @@ This module defines functions to read and write standard MIDI files (SMF).
 このモジュールには、標準MIDIファイル(SMF)を読み書きするため関数が
 定義されています。
 """
-# Copyright (C) 2023  Satoshi Nishimura
+# Copyright (C) 2025  Satoshi Nishimura
 
 from struct import unpack, pack
 import warnings

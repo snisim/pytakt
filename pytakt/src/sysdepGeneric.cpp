@@ -7,7 +7,7 @@
  *  programming language.
  */
 
-/* Copyright (C) 2014, 2023  Satoshi Nishimura */
+/* Copyright (C) 2014, 2025  Satoshi Nishimura */
 
 #include "sysdep.h"
 #include <errno.h>

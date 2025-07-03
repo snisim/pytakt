@@ -7,7 +7,7 @@ libraries.
 このモジュールには、pretty_midiへの変換、およびそれからの変換を行うクラスが
 定義されています。
 """
-# Copyright (C) 2024  Satoshi Nishimura
+# Copyright (C) 2025  Satoshi Nishimura
 
 import pretty_midi
 import warnings

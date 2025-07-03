@@ -5,7 +5,7 @@ This module defines classes for piecewise linear or cubic interpolation.
 """
 このモジュールには、折れ線補間や区分3次補間のためのクラスが定義されています。
 """
-# Copyright (C) 2023  Satoshi Nishimura
+# Copyright (C) 2025  Satoshi Nishimura
 
 import numbers
 from bisect import bisect_right

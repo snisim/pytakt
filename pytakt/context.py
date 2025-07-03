@@ -5,7 +5,7 @@ This module defines the Context class and its associated functions.
 """
 このモジュールには、Contextクラスおよびそれに関連した関数が定義されています。
 """
-# Copyright (C) 2023  Satoshi Nishimura
+# Copyright (C) 2025  Satoshi Nishimura
 
 import numbers
 import os

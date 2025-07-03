@@ -8,7 +8,7 @@ numbers.
 このモジュールにはスコア中のテンポ値や拍子を取得したり、
 ティック、秒、小節番号、拍番号間の変換するためのクラスが定義されています。
 """
-# Copyright (C) 2023  Satoshi Nishimura
+# Copyright (C) 2025  Satoshi Nishimura
 
 import math
 import sys

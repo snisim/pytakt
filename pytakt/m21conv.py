@@ -6,7 +6,7 @@ This module defines classes that perform conversions to and from music21.
 このモジュールには、music21への変換、および music21からの変換を行うクラスが
 定義されています。
 """
-# Copyright (C) 2023  Satoshi Nishimura
+# Copyright (C) 2025  Satoshi Nishimura
 
 import music21
 import numbers

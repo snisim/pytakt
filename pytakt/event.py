@@ -8,7 +8,7 @@ Most of these events are based on events defined in Standard MIDI files.
 これらのイベントの多くは、標準MIDIファイルで定義されたイベントを
 基にしています。
 """
-# Copyright (C) 2023  Satoshi Nishimura
+# Copyright (C) 2025  Satoshi Nishimura
 
 import warnings
 import numbers

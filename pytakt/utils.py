@@ -6,7 +6,7 @@ import re
 from fractions import Fraction
 from typing import Union
 
-# Copyright (C) 2023  Satoshi Nishimura
+# Copyright (C) 2025  Satoshi Nishimura
 
 __all__ = ['takt_round', 'takt_roundx', 'int_preferred', 'std_time_repr',
            'frac_time_repr', 'TaktWarning', 'NoteDict', 'get_file_type',

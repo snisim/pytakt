@@ -2,7 +2,7 @@
  * Realtime MIDI I/O Library for Pytakt
  */
 
-/* Copyright (C) 2023  Satoshi Nishimura */
+/* Copyright (C) 2025  Satoshi Nishimura */
 
 
 #include "_cstddefs.h"

@@ -7,7 +7,7 @@
  *  programming language.
  */
 
-/* Copyright (C) 2014, 2023  Satoshi Nishimura */
+/* Copyright (C) 2014, 2025  Satoshi Nishimura */
 
 #ifndef _Takt_MidiOut_
 #define _Takt_MidiOut_

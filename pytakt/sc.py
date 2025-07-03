@@ -11,7 +11,7 @@ names like sc.ctrl.
 noteとrest以外の関数は、上位モジュール（pytaktモジュール）の名前空間に取り
 込まれませんので、sc.ctrl のようにサブモジュール名をつけて呼び出して下さい。
 """
-# Copyright (C) 2023  Satoshi Nishimura
+# Copyright (C) 2025  Satoshi Nishimura
 
 import math
 import numbers

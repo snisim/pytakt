@@ -7,7 +7,7 @@ and utility functions for note numbers.
 このモジュールには、Pitchクラス, Intervalクラス、Keyクラス、
 及びノート番号についてのユーティリティ関数が定義されています。
 """
-# Copyright (C) 2023  Satoshi Nishimura
+# Copyright (C) 2025  Satoshi Nishimura
 
 import re
 import numbers
