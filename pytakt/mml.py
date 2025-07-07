@@ -7,7 +7,7 @@ MML (Music Macro Language).
 このモジュールには、カスタマイズ可能な拡張 MML (Music Macro Language) に
 関連した関数が定義されています。
 """
-# Copyright (C) 2023  Satoshi Nishimura
+# Copyright (C) 2025  Satoshi Nishimura
 
 import re
 import os
@@ -17,13 +17,16 @@ from arpeggio import ZeroOrMore, Optional, RegExMatch, EOF, \
 from fractions import Fraction
 from pytakt.score import Score, EventList
 from pytakt.context import context, newcontext, Context
-from pytakt.pitch import *
-from pytakt.sc import *
-from pytakt.constants import *
-import pytakt.gm as gm
-from pytakt.gm.drums import *
+from pytakt.pitch import Pitch
+from pytakt.constants import L1, L64
+from pytakt.sc import note, rest
 from pytakt.frameutils import outerglobals, outerlocals
 from pytakt.utils import int_preferred, Ticks
+import pytakt.sc
+import pytakt.constants
+import pytakt.pitch
+import pytakt.gm
+import pytakt.gm.drums
 from typing import Optional as _Optional
 from typing import Union, Mapping, Callable
 
@@ -68,8 +71,7 @@ def modifier(): return [suffixchar,
                         "&",
                         ("@", integer),
                         ("@", "@"),
-                        ("(", ZeroOrMore(command), ")"),
-                        (':', balanced_paren)]
+                        ("(", ZeroOrMore(command), ")")]
 def suffixchar(): return RegExMatch('[\x00%s]' % re.escape(MMLConfig.suffixes))
 def prefixchar(): return RegExMatch('[\x00%s]' % re.escape(MMLConfig.prefixes))
 def context_variable(): return ["dt", "tk", "ch", "v", "nv", "L",
@@ -325,7 +327,7 @@ class MMLEvaluator(object):
         pass
 
     def eval_setlength(self, node) -> None:
-        context().L = eval(node.value, self.globals, self.locals)
+        context().L = getattr(pytakt.constants, node.value)
 
     def eval_assignment(self, node) -> None:
         varname = node[0].value
@@ -432,9 +434,6 @@ class MMLEvaluator(object):
             except Exception as e:
                 raise MMLError('effector evaluation', e)
             context()._effectors.append(eff)
-        elif node[0].value == ':':
-            eval("context().update" + self.evalnode(node[1]),
-                 self.globals, self.locals)
         else:
             return self.evalnode(node[0])
 
@@ -450,7 +449,7 @@ class MMLEvaluator(object):
         return getattr(context(), node.value)
 
     def eval_length_constant(self, node) -> Ticks:
-        return eval(node.value, self.globals, self.locals)
+        return getattr(pytakt.constants, node.value)
 
     def eval_python_expression(self, node) -> Union[Score, int, float,
                                                     Ticks, None]:
@@ -717,10 +716,6 @@ commands ``}``
         primary command.
         Primarily used for the purpose of temporarily changing the context.
         Example: ``C(v=30 dt+=10)``
-    ``:(``\\ <Python identifier>\\ ``=``\\ <Python expression>\\ ``,`` \
-... ``)``.
-        Temporarily changes an arbitrary context attribute.
-        Example: ``{CDE}:(user_attr=1)``
     ``|``\\ <Python identifier>\\ ``(``\\ <Python arguments>\\ ``,`` ... ``)``
         Apply effectors.
         Example: ``{CDE}|Transpose('M2')``
@@ -904,9 +899,6 @@ G/!? G/ G/!? G3*").show(True)
         その基本コマンドを実行する前に、列に含まれる各コマンドを実行します。
         主に、一時的にコンテキストを変更する目的に使われます。
         例: ``C(v=30 dt+=10)``
-    ``:(``\\ <Python識別子>\\ ``=``\\ <Python式>\\ ``,`` ... ``)``
-        任意のコンテキスト属性を一時的に変更します。
-        例: ``{CDE}:(user_attr=1)``
     ``|``\\ <Python識別子>\\ ``(``\\ <Python引数>\\ ``,`` ... ``)``
         エフェクタを適用します。
         例: ``{CDE}|Transpose('M2')``
@@ -926,8 +918,7 @@ G/!? G/ G/!? G3*").show(True)
         globals = outerglobals()
     if locals is None:
         locals = outerlocals()
-    evaluator = MMLEvaluator(dict(builtins.globals(), **outerglobals()),
-                             outerlocals())
+    evaluator = MMLEvaluator(dict(_module_globals, **globals), locals)
     effectors = context().effectors
     with newcontext(effectors=[]):
         try:
@@ -940,6 +931,17 @@ G/!? G/ G/!? G3*").show(True)
         for eff in effectors:
             s = eff(s)
     return s
+
+
+# _module_globalsは、MML内で $ に続けて直接利用できる名前の辞書
+_module_globals = {'gm': pytakt.gm, 'mml': mml, 'context': context}
+for module in (pytakt.sc, pytakt.pitch):
+    for var in module.__all__:
+        _module_globals[var] = getattr(module, var)
+for module in (pytakt.constants, pytakt.gm.drums):
+    for var in dir(module):
+        if not var.startswith('_'):
+            _module_globals[var] = getattr(module, var)
 
 
 def _Context_mml(ctxt, *args, **kwargs) -> Score:

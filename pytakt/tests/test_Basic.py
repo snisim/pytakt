@@ -54,8 +54,6 @@ def test_mml():
     assert mml("{C(v+=10)}(v=90)") == note(C4, v=100)
     assert mml("C($bend(100))") == sc.bend(100) & note(C4)
     assert mml("C@2") == note(C4) + note(C4)
-    context().addattr('userattr', 0)
-    assert mml("$note(context().userattr):(userattr=D4)") == note(D4)
     ctx = newcontext(v=90)
     assert mml("{C $ctx:{D}}") == note(C4) + ctx.note(D4)
     assert mml("{C|Transpose(2)G}|Transpose(2)") == mml("EA")

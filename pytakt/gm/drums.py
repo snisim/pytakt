@@ -67,7 +67,7 @@ Examples:
 """
 # Copyright (C) 2023  Satoshi Nishimura
 
-from pytakt.sc import note
+from pytakt.sc import note as _note
 
 #
 # Definitions for note numbers of drum sets
@@ -160,7 +160,7 @@ ALIASES = [
 
 
 for _note_num in DRUMS:
-    exec("%s=lambda *args, **kwargs: note(%d, *args, **kwargs)"
+    exec("%s=lambda *args, **kwargs: _note(%d, *args, **kwargs)"
          % (DRUMS[_note_num], _note_num))
     exec("%s=%d" % ("N_" + DRUMS[_note_num], _note_num))
 for _alias, _inst in ALIASES:

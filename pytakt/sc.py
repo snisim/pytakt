@@ -103,9 +103,6 @@ def note(pitch, L=None, step=None, **kwargs) -> EventList:
         EventList(duration=480, events=[
             NoteEvent(t=0, n=Db5, L=480, v=80, nv=None, tk=1, ch=3, dt=30, \
 du=240)])
-        >>> note(C3, voice=1)  # extra attribute
-        EventList(duration=480, events=[
-            NoteEvent(t=0, n=C3, L=480, v=80, nv=None, tk=1, ch=1, voice=1)])
     """
     """
     1つの音符からなるスコアとして、1つの NoteEvent を含む EventList を生成
@@ -139,9 +136,6 @@ du=240)])
         EventList(duration=480, events=[
             NoteEvent(t=0, n=Db5, L=480, v=80, nv=None, tk=1, ch=3, dt=30, \
 du=240)])
-        >>> note(C3, voice=1)  # extra attribute
-        EventList(duration=480, events=[
-            NoteEvent(t=0, n=C3, L=480, v=80, nv=None, tk=1, ch=1, voice=1)])
     """
     with context().copy().update(**{k: v for k, v in kwargs.items()
                                     if context().has_attribute(k)}):

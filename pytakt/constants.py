@@ -1,5 +1,5 @@
 # coding:utf-8
-from pytakt.utils import int_preferred
+from pytakt.utils import int_preferred as _int_preferred
 
 TICKS_PER_QUARTER = 480
 """
@@ -9,53 +9,53 @@ Constant defining the length of one tick in the pytakt package.
 pytaktパッケージ内における1ティックの長さを定義している定数です。
 """
 
-L1 = int_preferred(TICKS_PER_QUARTER * 4)  # whole note
+L1 = _int_preferred(TICKS_PER_QUARTER * 4)  # whole note
 ""
-L1DOT = int_preferred(TICKS_PER_QUARTER * 4 * 1.5)  # dotted whole note
+L1DOT = _int_preferred(TICKS_PER_QUARTER * 4 * 1.5)  # dotted whole note
 ""
-L1DOTDOT = int_preferred(TICKS_PER_QUARTER * 4 * 1.75)
+L1DOTDOT = _int_preferred(TICKS_PER_QUARTER * 4 * 1.75)
 ""
-L2 = int_preferred(TICKS_PER_QUARTER * 2)
+L2 = _int_preferred(TICKS_PER_QUARTER * 2)
 ""
-L2DOT = int_preferred(TICKS_PER_QUARTER * 2 * 1.5)
+L2DOT = _int_preferred(TICKS_PER_QUARTER * 2 * 1.5)
 ""
-L2DOTDOT = int_preferred(TICKS_PER_QUARTER * 2 * 1.75)
+L2DOTDOT = _int_preferred(TICKS_PER_QUARTER * 2 * 1.75)
 ""
-L4 = int_preferred(TICKS_PER_QUARTER)  # quarter note
+L4 = _int_preferred(TICKS_PER_QUARTER)  # quarter note
 ""
-L4DOT = int_preferred(TICKS_PER_QUARTER * 1.5)
+L4DOT = _int_preferred(TICKS_PER_QUARTER * 1.5)
 ""
-L4DOTDOT = int_preferred(TICKS_PER_QUARTER * 1.75)
+L4DOTDOT = _int_preferred(TICKS_PER_QUARTER * 1.75)
 ""
-L8 = int_preferred(TICKS_PER_QUARTER / 2)
+L8 = _int_preferred(TICKS_PER_QUARTER / 2)
 ""
-L8DOT = int_preferred(TICKS_PER_QUARTER / 2 * 1.5)
+L8DOT = _int_preferred(TICKS_PER_QUARTER / 2 * 1.5)
 ""
-L8DOTDOT = int_preferred(TICKS_PER_QUARTER / 2 * 1.75)
+L8DOTDOT = _int_preferred(TICKS_PER_QUARTER / 2 * 1.75)
 ""
-L16 = int_preferred(TICKS_PER_QUARTER / 4)
+L16 = _int_preferred(TICKS_PER_QUARTER / 4)
 ""
-L16DOT = int_preferred(TICKS_PER_QUARTER / 4 * 1.5)
+L16DOT = _int_preferred(TICKS_PER_QUARTER / 4 * 1.5)
 ""
-L16DOTDOT = int_preferred(TICKS_PER_QUARTER / 4 * 1.75)
+L16DOTDOT = _int_preferred(TICKS_PER_QUARTER / 4 * 1.75)
 ""
-L32 = int_preferred(TICKS_PER_QUARTER / 8)
+L32 = _int_preferred(TICKS_PER_QUARTER / 8)
 ""
-L32DOT = int_preferred(TICKS_PER_QUARTER / 8 * 1.5)
+L32DOT = _int_preferred(TICKS_PER_QUARTER / 8 * 1.5)
 ""
-L32DOTDOT = int_preferred(TICKS_PER_QUARTER / 8 * 1.75)
+L32DOTDOT = _int_preferred(TICKS_PER_QUARTER / 8 * 1.75)
 ""
-L64 = int_preferred(TICKS_PER_QUARTER / 16)
+L64 = _int_preferred(TICKS_PER_QUARTER / 16)
 ""
-L64DOT = int_preferred(TICKS_PER_QUARTER / 16 * 1.5)
+L64DOT = _int_preferred(TICKS_PER_QUARTER / 16 * 1.5)
 ""
-L64DOTDOT = int_preferred(TICKS_PER_QUARTER / 16 * 1.75)
+L64DOTDOT = _int_preferred(TICKS_PER_QUARTER / 16 * 1.75)
 ""
-L128 = int_preferred(TICKS_PER_QUARTER / 32)
+L128 = _int_preferred(TICKS_PER_QUARTER / 32)
 ""
-L128DOT = int_preferred(TICKS_PER_QUARTER / 32 * 1.5)
+L128DOT = _int_preferred(TICKS_PER_QUARTER / 32 * 1.5)
 ""
-L128DOTDOT = int_preferred(TICKS_PER_QUARTER / 32 * 1.75)
+L128DOTDOT = _int_preferred(TICKS_PER_QUARTER / 32 * 1.75)
 """
 Constants that represent the number of ticks for each note value.
 L\\ :math:`n` means :math:`n`-th notes/rests.
