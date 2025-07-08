@@ -99,7 +99,7 @@ When invoked with no arguments, it enters interactive mode.""",
   pytakt -t -T0,3-6 -r100 --start=16 a.mid
   pytakt -o b.mid --start +10000 a.mid
   pytakt -o b.mid -a 'ToTracks(True)' a.mid
-  pytakt -p -e 'mml("{CDE}@@")'""",
+  pytakt -p -m '{CDE}@@'""",
     )
     group1 = parser.add_mutually_exclusive_group()
     group1.add_argument('-s', '--summary', action='store_const',
@@ -179,6 +179,10 @@ When invoked with no arguments, it enters interactive mode.""",
                         action=StoreAndCheck('stgpo'),
                         help="instead of INFILE, use PYTHON_EXPR to generate"
                         " a score (-s/-t/-g/-p/-o)")
+    group2.add_argument('-m', '--mml', dest='mml_string',
+                        action=StoreAndCheck('stgpo'),
+                        help="evaluate the MML string (= --eval "
+                        "'mml(\"MML_STRING\")') (-s/-t/-g/-p/-o)")
     group2.add_argument('--run', dest='pythonfile',
                         action=StoreAndCheck('stgpo'),
                         help="instead of INFILE, run a Python program"
@@ -193,16 +197,16 @@ When invoked with no arguments, it enters interactive mode.""",
         args.mode = 'o'
 
     cnt = (args.INFILE is not None) + (args.python_expr is not None) + \
-          (args.pythonfile is not None)
+          (args.mml_string is not None) + (args.pythonfile is not None)
     if cnt == 0:
         if args.mode is None:
             args.mode = 'i'  # interactive mode
         elif args.mode != 'l':
-            error_exit("pytakt: error: one of INFILE, "
-                       "'-e' option, or '--run' option is required")
+            error_exit("pytakt: error: one of INFILE, '-e' option, "
+                       "'-m' option, or '--run' option is required")
     elif cnt > 1:
-        error_exit("pytakt: error: '-e' option, '--run' option and INFILE "
-                   "are mutually exclusive")
+        error_exit("pytakt: error: '-e' option, '-m' option, '--run' option, "
+                   "and INFILE are mutually exclusive")
     else:
         if args.mode is None:
             args.mode = 'g'
@@ -257,12 +261,18 @@ When invoked with no arguments, it enters interactive mode.""",
             error_exit(e)
         takt.set_tempo(org_score.default_tempo)
     else:
-        try:
-            org_score = eval(args.python_expr)
-            if not isinstance(org_score, takt.Score):
-                raise TypeError("not a Score object")
-        except Exception as e:
-            error_exit(e, '-e/--eval')
+        if args.python_expr is not None:
+            try:
+                org_score = eval(args.python_expr)
+                if not isinstance(org_score, takt.Score):
+                    raise TypeError("not a Score object")
+            except Exception as e:
+                error_exit(e, '-e/--eval')
+        else:
+            try:
+                org_score = mml(args.mml_string)
+            except Exception as e:
+                error_exit(e, '-m/--mml')
         takt.set_tempo(125.0)
 
     # get format & resolution info
