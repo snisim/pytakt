@@ -1,7 +1,8 @@
 [English](README.md) | [日本語](README-ja.md)
 
 # Pytakt
-**A Music Information Processing Library with Realtime MIDI I/O**
+**A Python library for music description, generation, and processing
+with realtime MIDI I/O**
 
 Pytakt is a **Python library** for music information processing based on
 musical events such as notes and MIDI control changes.
@@ -10,8 +11,7 @@ Intended uses of Pytakt include research in the field of
 music information science such as automatic composition,
 as well as simple text-based music production or building music applications.
 
-* [Slides: Introduction to Pytakt](http://u-aizu.ac.jp/~nisim/PtU7c5Hy7f/Introduction_to_Pytakt.pdf)
-* [Pytakt API Documents](http://u-aizu.ac.jp/~nisim/PtU7c5Hy7f/index.html)
+* [Pytakt API Documents](http://u-aizu.ac.jp/~nisim/pytakt/index.html)
 
 
 ## Main Features
@@ -174,8 +174,26 @@ staff notation can be displayed by the following:
 
 
 ## Licence
-It is currently private.
+
+The Pytakt package is released under the 3-Clause BSD License.
+See the LICENSE.txt file for details.
+
+
+## CAVEAT
+
+Running Python programs obtained from untrusted sources poses serious
+security risks.  This also applies to Python programs that generate or
+process music, including those converted using the -t option of the
+pytakt command.  Similarly, evaluating MML strings obtained from
+external sources carries a similar risk due to the ability to embed
+Python code within MML.
 
 
 ## Author
+
 Satoshi Nishimura (University of Aizu)
+
+
+## Collaborator
+
+Atsushi Marui (Tokyo University of the Arts)

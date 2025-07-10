@@ -72,6 +72,7 @@ def modifier(): return [suffixchar,
                         ("@", integer),
                         ("@", "@"),
                         ("(", ZeroOrMore(command), ")")]
+# \x00はsuffixes/prefixesが空のときにエラーになるのを防ぐ
 def suffixchar(): return RegExMatch('[\x00%s]' % re.escape(MMLConfig.suffixes))
 def prefixchar(): return RegExMatch('[\x00%s]' % re.escape(MMLConfig.prefixes))
 def context_variable(): return ["dt", "tk", "ch", "v", "nv", "L",

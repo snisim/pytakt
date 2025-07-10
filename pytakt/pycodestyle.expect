@@ -7,20 +7,19 @@ event.py:207:5: E301 expected 1 blank line, found 0
 event.py:214:5: E301 expected 1 blank line, found 0
 event.py:218:5: E301 expected 1 blank line, found 0
 event.py:222:5: E301 expected 1 blank line, found 0
-mml.py:45:1: E302 expected 2 blank lines, found 0
-mml.py:49:1: E302 expected 2 blank lines, found 0
+mml.py:48:1: E302 expected 2 blank lines, found 0
 mml.py:52:1: E302 expected 2 blank lines, found 0
-mml.py:54:1: E302 expected 2 blank lines, found 0
-mml.py:60:1: E302 expected 2 blank lines, found 0
-mml.py:64:1: E302 expected 2 blank lines, found 0
-mml.py:73:1: E302 expected 2 blank lines, found 0
-mml.py:77:1: E302 expected 2 blank lines, found 0
-mml.py:81:1: E302 expected 2 blank lines, found 1
-mml.py:85:1: E302 expected 2 blank lines, found 0
-mml.py:86:1: E302 expected 2 blank lines, found 0
-mml.py:92:1: E302 expected 2 blank lines, found 1
-mml.py:95:1: E302 expected 2 blank lines, found 0
+mml.py:55:1: E302 expected 2 blank lines, found 0
+mml.py:57:1: E302 expected 2 blank lines, found 0
+mml.py:63:1: E302 expected 2 blank lines, found 0
+mml.py:67:1: E302 expected 2 blank lines, found 0
+mml.py:80:1: E302 expected 2 blank lines, found 0
+mml.py:84:1: E302 expected 2 blank lines, found 1
+mml.py:88:1: E302 expected 2 blank lines, found 0
+mml.py:89:1: E302 expected 2 blank lines, found 0
+mml.py:95:1: E302 expected 2 blank lines, found 1
 mml.py:98:1: E302 expected 2 blank lines, found 0
+mml.py:101:1: E302 expected 2 blank lines, found 0
 pitch.py:111:6: E201 whitespace after '('
 pitch.py:112:6: E201 whitespace after '('
 pitch.py:113:6: E201 whitespace after '('

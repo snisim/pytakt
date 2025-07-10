@@ -1,8 +1,7 @@
 [English](README.md) | [日本語](README-ja.md)
 
 # Pytakt
-**リアルタイムMIDI入出力を備えた音楽情報処理ライブラリ**   
-**A Music Information Processing Library with Realtime MIDI I/O**
+**音楽記述、生成、処理のためのリアルタイムMIDI入出力を備えたPythonライブラリ**
 
 Pytakt は、音符やMIDIコントロールチェンジといった**イベント単位での音楽
 情報処理**を行うための**Python ライブラリ**です。リアルタイム処理、非リアル
@@ -10,8 +9,7 @@ Pytakt は、音符やMIDIコントロールチェンジといった**イベン�
 る音楽情報科学分野における研究のほか、テキストベースの簡易的な音楽制作
 や、このライブラリを使用した音楽アプリケーションの構築を想定しています。
 
-* [スライド: Pytaktの紹介](http://u-aizu.ac.jp/~nisim/PtU7c5Hy7f/Introduction_to_Pytakt.pdf)
-* [Pytakt API ドキュメント](http://u-aizu.ac.jp/~nisim/PtU7c5Hy7f/index.html)
+* [Pytakt API ドキュメント](http://u-aizu.ac.jp/~nisim/pytakt-ja/index.html)
 
 
 ## 主な機能
@@ -165,8 +163,23 @@ music21 がインストールされていて、さらに music21 において Mu
 
 
 ## ライセンス
-現在のところ非公開です。
+
+Pytaktパッケージは、3条項BSDライセンスの下で提供されています。
+詳しくは LICENSE.txt ファイルをご覧ください。
+
+
+## 注意点
+
+信頼できない情報源から入手したPythonプログラムを実行することは、セキュ
+リティ上の重大なリスクを伴います。これは曲を生成・処理するPythonプログ
+ラム(pytaktコマンドの-tオプションによって変換されたものを含む)にも当て
+はまります。また、MMLにPythonコードを埋め込む機能があるため、外部から
+取得したMML文字列を評価する場合にも同等のリスクがあります。
 
 
 ## 開発者
-西村　憲 (会津大学コンピュータ理工学部）
+西村　憲 (会津大学)
+
+
+## 協力者
+丸井　淳史 (東京藝術大学)

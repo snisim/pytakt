@@ -11,7 +11,7 @@ sys.path.insert(0, os.path.abspath('../'))
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#project-information
 
 project = 'pytakt'
-copyright = '2023, Satoshi Nishimura'
+copyright = '2025, Satoshi Nishimura'
 author = 'Satoshi Nishimura'
 
 # -- General configuration ---------------------------------------------------
