@@ -69,10 +69,9 @@ as well as simple text-based music production or building music applications.
 
 ## How To Install
 
-Download a released package (`pytakt-<version>.tar.gz`)
-from https://github.com/snisim/pytakt and install it with pip as below.
+The Pytakt library can be installed via pip as below.
 
-    pip install pytakt-<version>.tar.gz
+    pip install pytakt
 
 If you need conversion to/from music21, music21 (version 6.7.1 or later)
 also needs to be installed (it is not installed automatically).

@@ -32,6 +32,7 @@ setup(
     name="pytakt",
     version=__version__,
     author="Satoshi Nishimura",
+    author_email='nisim@u-aizu.ac.jp',
     description="A Python library for music description, generation, and processing with realtime MIDI I/O",
     url="http://github.com/snisim/pytakt/",
     license="BSD-3-Clause",
@@ -43,5 +44,13 @@ setup(
         "console_scripts": [
             "pytakt = pytakt.pytaktcmd:main",
         ],
-    }
+    },
+    classifiers=[
+        'Development Status :: 4 - Beta',
+        'License :: OSI Approved :: BSD License',
+        'Operating System :: MacOS :: MacOS X',
+        'Operating System :: Microsoft :: Windows',
+        'Operating System :: POSIX :: Linux',
+        'Topic :: Multimedia :: Sound/Audio :: MIDI',
+    ],
 )

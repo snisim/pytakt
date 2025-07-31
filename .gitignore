@@ -3,6 +3,7 @@ __pycache__
 .pytest_cache/
 untracked/
 /dist/
+/build/
 /docs/_build/
 /pytakt.egg-info/
 /pytakt/old/

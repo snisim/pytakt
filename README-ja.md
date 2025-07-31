@@ -63,11 +63,17 @@ Pytakt は、音符やMIDIコントロールチェンジといった**イベン�
 
 ## インストール方法
 
-https://github.com/snisim/pytakt から release されたパッケージ
-(`pytakt-<バージョン番号>.tar.gz`) をダウンロードし、pip によって下のように
-インストールしてください。
+英語版Pytaktライブラリは、pip によって下のようにインストールできます。
 
-    pip install pytakt-<バージョン番号>.tar.gz
+    pip install pytakt
+
+もし、ヘルプドキュメントが日本語のPytaktをインストールしたい場合は、
+https://github.com/snisim/pytakt の Releases から
+`pytakt-<バージョン番号>-jp.tar.gz` という名のパッケージをダウンロードし、
+pip によって下のようにインストールしてください（help組み込み関数を呼んだときに
+表示される文字列が日本語になるだけで、それ以外の挙動は英語版と同じです）。
+
+    pip install pytakt-<バージョン番号>-jp.tar.gz
 
 もしmusic21との変換が必要であれば、music21 (version 6.7.1以降) も
 インストールしてください (自動ではインストールされません)。
