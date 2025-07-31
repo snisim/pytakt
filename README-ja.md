@@ -69,11 +69,11 @@ Pytakt は、音符やMIDIコントロールチェンジといった**イベン�
 
 もし、ヘルプドキュメントが日本語のPytaktをインストールしたい場合は、
 https://github.com/snisim/pytakt の Releases から
-`pytakt-<バージョン番号>-jp.tar.gz` という名のパッケージをダウンロードし、
+`pytakt-<バージョン番号>-ja.tar.gz` という名のパッケージをダウンロードし、
 pip によって下のようにインストールしてください（help組み込み関数を呼んだときに
 表示される文字列が日本語になるだけで、それ以外の挙動は英語版と同じです）。
 
-    pip install pytakt-<バージョン番号>-jp.tar.gz
+    pip install pytakt-<バージョン番号>-ja.tar.gz
 
 もしmusic21との変換が必要であれば、music21 (version 6.7.1以降) も
 インストールしてください (自動ではインストールされません)。
