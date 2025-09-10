@@ -11,6 +11,7 @@ Intended uses of Pytakt include research in the field of
 music information science such as automatic composition,
 as well as simple text-based music production or building music applications.
 
+* [Paper](https://doi.org/10.1080/09298215.2025.2540434)
 * [Pytakt API Documents](http://u-aizu.ac.jp/~nisim/pytakt/index.html)
 
 
@@ -59,8 +60,8 @@ as well as simple text-based music production or building music applications.
   (XX is the version number of Python) already installed for Cygwin.
   X-Window is required for piano roll display.
 * **Mac**  
-  Works. As stated below, a software synthesizer such as SimpleSynth is
-  required to produce sounds on a PC alone.
+  Works. To produce sounds on a PC alone, it is necessary to connect Pytakt
+  output to a DAW such as GarageBand via IAC.
 * **Linux**
   It will work if you have the ALSA development module (libasound2-dev)
   installed on your OS. As mentioned below, a software synthesizer
@@ -121,7 +122,8 @@ If you have a MIDI keyboard that produces sound,
 you can use it by connecting it to your PC via MIDI.
 To produce sound on your PC by itself, a software synthesizer is required.
 For Windows, a built-in software synthesizer is available.
-For Mac, SimpleSynth or other software synthesizer needs to be installed.
+For Mac, it is necessary to connect Pytakt output to a DAW such as GarageBand
+via IAC.
 For Linux, TiMidity++ or other synthesizing software needs to be installed.
 
 The MIDI devices available for output can be checked with show_devices()
@@ -186,6 +188,13 @@ process music, including those converted using the -t option of the
 pytakt command.  Similarly, evaluating MML strings obtained from
 external sources carries a similar risk due to the ability to embed
 Python code within MML.
+
+
+## Publication
+
+* Satoshi Nishimura and Atsushi Marui, "Pytakt: a Python library for
+symbolic music description, generation, and real-time processing,"
+Journal of New Music Research, doi: [10.1080/09298215.2025.2540434](https://doi.org/10.1080/09298215.2025.2540434), 2025.
 
 
 ## Author

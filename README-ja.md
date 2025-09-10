@@ -9,6 +9,8 @@ Pytakt は、音符やMIDIコントロールチェンジといった**イベン�
 る音楽情報科学分野における研究のほか、テキストベースの簡易的な音楽制作
 や、このライブラリを使用した音楽アプリケーションの構築を想定しています。
 
+* [短い論文](https://ipsj.ixsq.nii.ac.jp/record/235875/files/IPSJ-Z86-2C-02.pdf)
+* [論文(英文)](https://doi.org/10.1080/09298215.2025.2540434)
 * [Pytakt API ドキュメント](http://u-aizu.ac.jp/~nisim/pytakt-ja/index.html)
 
 
@@ -53,8 +55,8 @@ Pytakt は、音符やMIDIコントロールチェンジといった**イベン�
   ２つのCygwinパッケージがインストール済みであれば動作します。Cygwin の場合、
   ピアノロールを表示するには X-Window が必要です。
 * **Mac**  
-  動作します。下に述べられているようにPC単体で音を出すためには SimpleSynth
-  などのソフトウェアシンセサイザが必要です。
+  動作します。PC単体で音を出すためには GarageBand等のDAWとIACで接続する必要が
+  あります。
 * **Linux**  
   OS に ALSA 開発モジュール (libasound2-dev) がインストール済みであれば
   動作します。下に述べられているようにPC単体で音を出すためには TiMidity++
@@ -119,9 +121,9 @@ MIDI入出力に対する操作を行わないのであれば2行目は不要で
 次に、スコアを再生してみます。再生には何らかのシンセサイザ（MIDIメッセージを
 音の波形に変換する手段）が必要です。音の出るMIDIキーボードがあればそれを
 PCに接続して使用できますが、PC単体で音を出すにはソフトウェア・シンセサイザが
-必要です。Windowsでは最初から組み入れられていますが、Mac の場合は
-SimpleSynthなど、Linuxの場合は TiMidity++ などを予めインストール
-して使える状態にしておく必要があります。
+必要です。Windowsでは最初から組み入れられていますが、Linuxの場合は TiMidity++
+などを予めインストールして使える状態にしておく必要があります。
+Mac の場合は、GarageBandなどのDAWにIACで接続することで音を出すことができます。
 
 出力可能なMIDIデバイスは下のように show_devices() で確認できます（下は
 外部MIDIインターフェースを接続したWindows PCでの例）。
@@ -181,6 +183,17 @@ Pytaktパッケージは、3条項BSDライセンスの下で提供されてい�
 ラム(pytaktコマンドの-tオプションによって変換されたものを含む)にも当て
 はまります。また、MMLにPythonコードを埋め込む機能があるため、外部から
 取得したMML文字列を評価する場合にも同等のリスクがあります。
+
+
+## 出版物
+
+* Satoshi Nishimura and Atsushi Marui, "Pytakt: a Python library for
+symbolic music description, generation, and real-time processing,"
+Journal of New Music Research, doi: [10.1080/09298215.2025.2540434](https://doi.org/10.1080/09298215.2025.2540434), 2025.
+
+* 西村, 憲, 丸井, 淳史, [音楽情報処理ライブラリ Pytakt の設計](https://ipsj.ixsq.nii.ac.jp/records/235875), 第86回全国大会講演論文集, pp. 55-56, 情報処理学会, 2024.
+
+* 西村, 憲, 丸井, 淳史, 音楽情報処理ライブラリPytaktの紹介とその活用事例, 音楽音響研究会資料, 43巻4号, pp. 19-24, 2024.
 
 
 ## 開発者

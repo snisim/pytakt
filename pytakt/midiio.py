@@ -440,6 +440,7 @@ def is_opened_input_device(dev) -> bool:
 def show_devices() -> None:
     """ Show the list of all the available devices. """
     """ 利用可能なデバイスの一覧を表示します。 """
+    print("MIDI Output Devices:")
     odev = output_devices()
     for i, devname in enumerate(odev):
         print(" %c %c[%d] %s" % ('>' if i == _output_devnum else ' ',
