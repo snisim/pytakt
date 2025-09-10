@@ -182,12 +182,11 @@ See the LICENSE.txt file for details.
 
 ## CAVEAT
 
-Running Python programs obtained from untrusted sources poses serious
-security risks.  This also applies to Python programs that generate or
-process music, including those converted using the -t option of the
-pytakt command.  Similarly, evaluating MML strings obtained from
-external sources carries a similar risk due to the ability to embed
-Python code within MML.
+Running Python programs that generate or process music, including those
+converted using the -t option of the pytakt command,
+obtained from untrusted sources poses serious security risks.
+Similarly, evaluating MML strings obtained from external sources carries
+a similar risk due to the ability to embed Python code within MML.
 
 
 ## Publication
