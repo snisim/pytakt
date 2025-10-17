@@ -654,6 +654,7 @@ class Interval(int):
                 * 'AA1' -- double-argmented 1st degree, ...
                 * 'dd3' -- double-diminished 3rd degree, ...
                 * 'A' and 'd' can be further increased.
+                * Negative intervals can be represented like '-P5'.
 
             When it is an integer, it specifies the interval by semitones.
         ds(int, optional): When `value` is an integer, the value of the ds
@@ -719,6 +720,7 @@ class Interval(int):
                 * 'AA1' -- 重増1度, 'AA2' -- 重増2度, …
                 * 'dd3' -- 重減3度, 'dd4' -- 重減4度, …
                 * 'A' や 'd' は更に増やすこともできます。
+                * 負の音程は '-P5' のように表します。
 
             int型のときは、半音数で音程を指定します。
         ds(int, optional): `value` がint型のときは、この引数によって
@@ -771,11 +773,12 @@ class Interval(int):
             return Interval._parse_str(value)
 
     def _parse_str(string):
-        m = re.match("([PpMm]|[Aa]+|[Dd]+)([0-9]+)$", string)
+        m = re.match("(-?)([PpMm]|[Aa]+|[Dd]+)([0-9]+)$", string)
         if not m:
             raise ValueError("Invalid interval name")
-        quality = m.group(1)
-        ds = int(m.group(2)) - 1
+        sign = -1 if m.group(1) == '-' else 1
+        quality = m.group(2)
+        ds = int(m.group(3)) - 1
         (oc, i) = divmod(ds, 7)
         semi = _MAJOR_TONES[i] + oc * 12
         perf = _IS_PERFECT[i]
@@ -788,12 +791,12 @@ class Interval(int):
             semi += len(quality)
         elif quality[0] in "Dd":
             semi -= len(quality) + (1 - perf)
-        return Interval(semi, ds)
+        return Interval(semi * sign, ds * sign)
 
     def __repr__(self):
         if self < 0 or \
            (self == 0 and self.ds < 0):  # use -'d2' rather than 'A0'
-            return '-' + repr(Interval(-self, -self.ds))
+            return "Interval('-" + repr(Interval(-self, -self.ds))[10:]
         (oc, i) = divmod(self.ds, 7)
         semi = _MAJOR_TONES[i] + oc * 12
         perf = _IS_PERFECT[i]
