@@ -288,10 +288,11 @@ When invoked with no arguments, it enters interactive mode.""",
         resolution = {}
 
     # transform the score
-    score = filter_tracks(args, org_score)
+    score = org_score
     if args.start is not None or args.end is not None:
         score = score.Clip(0 if args.start is None else args.start,
                            math.inf if args.end is None else args.end)
+    score = filter_tracks(args, score)
     if args.effectors:
         for eff in args.effectors:
             try:

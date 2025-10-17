@@ -34,3 +34,5 @@ def test_events_at():
         while t <= s.get_duration():
             assert s.active_events_at(t) == s.active_events_at(t, cache=False)
             t += random.randrange(10000)
+
+    assert mml('c@@').active_events_at(480, (CtrlEvent,)) == []

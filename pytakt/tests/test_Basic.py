@@ -131,6 +131,7 @@ def test_effectors():
     assert mml("$vol(50)C$vol(60)DEF").Clip(960, 1440) == mml("$vol(60)E")
     assert mml("[C{EF}/G]").UnpairNoteEvents().PairNoteEvents() == \
         EventList(mml("[C{EF}/G]"))
+    assert mml("[{rE}C*]").Clip(0, 480) == mml("C")
     assert s.UnpairNoteEvents().PairNoteEvents() == s
     with pytest.warns(TaktWarning):
         assert mml("CE").UnpairNoteEvents().Filter(NoteOnEvent). \

@@ -1406,6 +1406,7 @@ class _EventFinder(object):
             while (self.last_event_time != math.inf and
                    self.last_event_time <= ticks):
                 ev = next(self.stream)
+                self.last_event_time = ev.t
                 if not self.cache and ev.t > ticks:
                     break
                 if not (isinstance(ev, self.event_type) or
@@ -1458,7 +1459,6 @@ class _EventFinder(object):
                     self.ctrldict.setdefault(ev.mtype, []) \
                                  .append((self.seqno, ev))
                 self.seqno += 1
-                self.last_event_time = ev.t
         except StopIteration:
             self.last_event_time = math.inf
 

@@ -1034,9 +1034,11 @@ class Clip(Effector):
 
     def _clip(self, ev):
         if ev.t >= self.e:
-            exc = StopIteration()
-            exc.value = self.e
-            raise exc
+            if self.isstream:
+                exc = StopIteration()
+                exc.value = self.e
+                raise exc
+            return None
         if self.split_notes and isinstance(ev, NoteEvent):
             if ev.t < self.s and ev.t + ev.L > self.s:  # start境界を跨ぐ音符
                 cut = self.s - ev.t
@@ -1074,6 +1076,7 @@ class Clip(Effector):
         if self.initializer:
             self.iset = set(score.active_events_at(self.s,
                                                    (CtrlEvent, MetaEvent)))
+        self.isstream = isinstance(score, EventStream)
         return score.mapev(self._clip, durfunc=self._durfunc)
 
 
