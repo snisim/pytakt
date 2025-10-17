@@ -116,7 +116,8 @@ class Effector(ABC):
     def __init_subclass__(cls):
         # Scoreのメソッドとしても利用できるようにする。
         if '__SPHINX_AUTODOC__' not in os.environ:
-            if not hasattr(Score, cls.__name__) and cls.__name__[0] != '_':
+            if cls.__module__ == __name__ and \
+               not hasattr(Score, cls.__name__) and cls.__name__[0] != '_':
                 print("Internal error: %s is not registerred in Score"
                       % cls.__name__)
             setattr(Score, cls.__name__,
