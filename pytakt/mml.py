@@ -31,7 +31,7 @@ from typing import Optional as _Optional
 from typing import Union, Mapping, Callable
 
 
-__all__ = ['mml', 'mmlconfig', 'MMLAction']
+__all__ = ['mml', 'safe_mml', 'mmlconfig', 'MMLAction', 'MMLError']
 
 
 Char = str
@@ -283,9 +283,10 @@ class MMLConfig(object):
 
 
 class MMLEvaluator(object):
-    def __init__(self, globals, locals):
+    def __init__(self, globals, locals, safe_mode):
         self.globals = globals
         self.locals = locals
+        self.safe_mode = safe_mode
 
     def evalnode(self, node) -> Union[Score, int, float, Ticks, str, None]:
         method_name = "eval_" + node.rule_name
@@ -355,6 +356,8 @@ class MMLEvaluator(object):
         while node[com].rule_name == 'prefixchar':
             com += 1
         if node[com][0].value == '$':
+            if self.safe_mode:
+                self.safety_error()
             nc = eval(self.evalnode(node[com][1]),
                       self.globals, self.locals).copy()
         else:
@@ -430,6 +433,8 @@ class MMLEvaluator(object):
                 result = self.merge_scores(result, self.evalnode(node[i]))
             return result
         elif node[0].value == '|':
+            if self.safe_mode:
+                self.safety_error()
             try:
                 eff = eval(self.evalnode(node[1]), self.globals, self.locals)
             except Exception as e:
@@ -454,6 +459,8 @@ class MMLEvaluator(object):
 
     def eval_python_expression(self, node) -> Union[Score, int, float,
                                                     Ticks, None]:
+        if self.safe_mode:
+            self.safety_error()
         try:
             return eval(self.evalnode(node[-1]), self.globals, self.locals)
         except Exception as e:
@@ -508,11 +515,15 @@ class MMLEvaluator(object):
     def eval_floating(self, node) -> float:
         return float(node.value)
 
+    def safety_error(self) -> None:
+        raise MMLError('Cannot use Python functions/expressions '
+                       '("$..." and "|...") in the safe-mode MML')
+
 
 parser = None
 
 
-def mml(text, globals=None, locals=None) -> Score:
+def mml(text, globals=None, locals=None, _safe_mode=False) -> Score:
     """
     Returns a score described in `text` with an extended MML (Music Macro
     Language).
@@ -919,7 +930,8 @@ G/!? G/ G/!? G3*").show(True)
         globals = outerglobals()
     if locals is None:
         locals = outerlocals()
-    evaluator = MMLEvaluator(dict(_module_globals, **globals), locals)
+    evaluator = MMLEvaluator(dict(_module_globals, **globals), locals,
+                             _safe_mode)
     effectors = context().effectors
     with newcontext(effectors=[]):
         try:
@@ -945,13 +957,41 @@ for module in (pytakt.constants, pytakt.gm.drums):
             _module_globals[var] = getattr(module, var)
 
 
-def _Context_mml(ctxt, *args, **kwargs) -> Score:
+def _Context_mml(ctxt,
+                 text, globals=None, locals=None, *args, **kwargs) -> Score:
+    if globals is None:
+        globals = outerglobals()
+    if locals is None:
+        locals = outerlocals()
     with ctxt:
-        return mml(*args, **kwargs)
+        return mml(text, globals, locals, *args, **kwargs)
 
 
 if '__SPHINX_AUTODOC__' not in os.environ:
     Context.mml = _Context_mml
+
+
+def safe_mml(text) -> Score:
+    """
+    This is a security-aware version of :func:`mml`. It prohibits the use of
+    Python expressions and Python functions (i.e., syntax beginning with
+    ``$`` or ``|``) within MML.
+    It is suitable for evaluating MML strings obtained from untrusted sources
+    or interactively entered by users.
+
+    Args:
+        text(str): MML string
+    """
+    """
+    セキュリティ面を考慮したバージョンの :func:`mml` です。MML中における
+    Python式、Python関数（すなわち、``$`` および ``|`` で始まる構文）の使用を
+    禁止しています。信頼できないソースから入手したMML文字列や対話的にユーザが
+    入力したMML文字列を評価するのに適しています。
+
+    Args:
+        text(str): MML文字列
+    """
+    return mml(text, _safe_mode=True)
 
 
 def mmlconfig(translate=("", ""), *,

@@ -153,6 +153,11 @@ _loopback_events = {}  # 送出されてから受信されるまでLoopBackEvent
 _loopback_count = itertools.count()
 
 
+# _play_rec の callback の中で stop() が呼ばれたときに _play_rec を抜ける
+# ために設定されるフラグ
+_stop_request = False
+
+
 def current_output_device() -> int:
     """ Returns the device number of the currently selected output device. """
     """ 現在選択されている出力デバイスの番号を返します。 """
@@ -743,8 +748,10 @@ def stop() -> None:
     このモジュールをインポートした状態でキーボードインタラプトを受けた
     ときにはこの関数が自動的に呼ばれます。
     """
+    global _stop_request
     _cmidiio.stop()
     _loopback_events.clear()
+    _stop_request = True
 
 
 # もたつきを防ぐため先読みする時間幅。少なくとも MAX_DELTA_TIME*2 より大きい
@@ -755,7 +762,8 @@ _METRONOME_TRACK = 65536
 
 
 def _play_rec(score, rec=False, outdev=None, indev=None, metro=None,
-              monitor=False):
+              monitor=False, callback=None):
+    global _stop_request
     # score が EventStream である場合、playやrecordがリターンするのは
     # Keybordinterruptのみ。
     devnum = _output_devnum if outdev is None else find_output_device(outdev)
@@ -764,6 +772,7 @@ def _play_rec(score, rec=False, outdev=None, indev=None, metro=None,
         indevnum = _input_devnum if indev is None else find_input_device(indev)
     open_output_device(devnum)  # may take some seconds
     open_input_device(indevnum)
+    _stop_request = False
     if score is None:
         score = EventList()
         isstream = False
@@ -799,6 +808,9 @@ def _play_rec(score, rec=False, outdev=None, indev=None, metro=None,
             pass  # スレッドが切り替わって tempo-scale が更新されるまで待つ
         toffset = current_time()
 
+    if callback is not None:
+        queue_event(LoopBackEvent(toffset, 'callback'))
+
     try:
         while True:
             try:
@@ -828,6 +840,12 @@ def _play_rec(score, rec=False, outdev=None, indev=None, metro=None,
                                 cancel_events(_METRONOME_TRACK, devnum)
                                 done = True
                                 break
+                            elif rev.value == 'callback':
+                                callback(rev)
+                                if _stop_request:
+                                    recevlist.duration = rev.t
+                                    done = True
+                                    break
                         elif rec:
                             if monitor:
                                 queue_event(rev, devnum=devnum)
@@ -853,7 +871,7 @@ def _play_rec(score, rec=False, outdev=None, indev=None, metro=None,
         return recevlist
 
 
-def play(score, dev=None) -> None:
+def play(score, dev=None, callback=None) -> None:
     """
     Plays a score. Messages are sent to the output device in sequence
     according to the events contained in the score. This function does not
@@ -867,6 +885,13 @@ def play(score, dev=None) -> None:
             calling :func:`find_output_device` with this as argument.
             If the specified device is not opened, it will be opened
             automatically.
+        callback(function, optional):
+            Given a function taking a single argument (a callback function),
+            it will be called at the beginning of the playback.
+            A loopback event is passed as the argument. By updating the time
+            of the event and inserting it to the output queue using
+            :func:`queue_event` within the callback function, it is possible
+            to schedule the callback function to be called again at that time.
     """
     """
     スコアを再生します。スコアに含まれるイベントに従って順にメッセージを出力
@@ -881,14 +906,20 @@ def play(score, dev=None) -> None:
             となります。
             指定したデバイスがオープンされていないときは、自動的にオープン
             されます。
+        callback(function, optional):
+            単一の引数を取る関数(コールバック関数)を指定すると、再生開始時に
+            それが呼び出されます。引数にはループバックイベントが渡され、
+            そのイベントをコールバック関数内で時刻を更新して
+            :func:`queue_event` で出力キューに挿入すれば、その時刻に再び
+            コールバック関数が呼ばれるようにスケジュールすることができます。
     """
     # scoreにMML文字列を渡せるようにしないのは、MML中でPython関数を
     # 呼んだときに関数スコープの問題を生じやすいから。
-    _play_rec(score, False, dev)
+    _play_rec(score, False, dev, callback=callback)
 
 
 def record(indev=None, play=None, outdev=None,
-           metro=None, monitor=False) -> EventList:
+           metro=None, monitor=False, callback=None) -> EventList:
     """
     Records a performance from an input device and returns an event list.
     It is also possible to record with a score being played back.
@@ -920,6 +951,13 @@ def record(indev=None, play=None, outdev=None,
             (e.g., ``record(metro=mml("ch=10 {A5 {Ab5* Ab5}/3 }@@"))``).
         monitor(bool, optional):
             If True, sends messages from the input device to the output device.
+        callback(function, optional):
+            Given a function taking a single argument (a callback function),
+            it will be called at the beginning of recording.
+            A loopback event is passed as the argument. By updating the time
+            of the event and inserting it to the output queue using
+            :func:`queue_event` within the callback function, it is possible
+            to schedule the callback function to be called again at that time.
 
     Returns:
         Recorded score
@@ -956,6 +994,12 @@ def record(indev=None, play=None, outdev=None,
             (例: ``record(metro=mml("ch=10 {A5 {Ab5* Ab5}/3}@@"))``)。
         monitor(bool, optional):
             Trueの場合、入力デバイスからのメッセージを出力デバイスへ送ります。
+        callback(function, optional):
+            単一の引数を取る関数(コールバック関数)を指定すると、録音開始時に
+            それが呼び出されます。引数にはループバックイベントが渡され、
+            そのイベントをコールバック関数内で時刻を更新して
+            :func:`queue_event` で出力キューに挿入すれば、その時刻に再び
+            コールバック関数が呼ばれるようにスケジュールすることができます。
 
     Returns:
         録音されたスコア
@@ -975,7 +1019,7 @@ def record(indev=None, play=None, outdev=None,
     except ValueError:
         raise ValueError("Unrecognized 'metro' argument") from None
 
-    return _play_rec(play, True, outdev, indev, metro, monitor)
+    return _play_rec(play, True, outdev, indev, metro, monitor, callback)
 
 
 def listen(dev=None) -> RealTimeStream:
