@@ -24,7 +24,7 @@ from pytakt.utils import int_preferred, std_time_repr, NoteDict, Ticks
 from pytakt.context import context
 
 __all__ = ['Score', 'EventList', 'Tracks', 'EventStream', 'RealTimeStream',
-           'seq', 'par', 'genseq']
+           'seq', 'par', 'genseq', 'empty']
 
 
 DEFAULT_LIMIT = 2e6
@@ -580,6 +580,29 @@ durfunc=lambda d: d*2)``
             return self.__class__(func(self), **self.__dict__)
         else:
             raise Exception("%r is not a score" % self.__class__.__name__)
+
+    def evlist(self, *, limit=DEFAULT_LIMIT) -> 'EventList':
+        """
+        Converts a score to a new event list where events are sorted in
+        chronological order.
+        ``score.evlist()`` is equivalent to ``EventList(score)``.
+
+        Args:
+            limit (ticks, optional):
+                If the score is an EventStream, it limits its length.
+                See the `limit` argument of :meth:`Score.stream` for details.
+        """
+        """
+        スコアを、イベントが時刻順にソートされた新たなイベントリストへ
+        変換します。``score.evlist()`` は ``EventList(score)`` と等価です。
+
+        Args:
+            limit (ticks, optional):
+                スコアが EventStream であるときにスコアの長さを制限します。
+                詳細については、:meth:`Score.stream` の同名の引数の項目を
+                ご覧ください。
+        """
+        return EventList(self, limit=limit)
 
     def stream(self, copy=False, *, limit=None) -> 'EventStream':
         """
@@ -2330,3 +2353,9 @@ def genseq(elms=[], **kwargs) -> 'EventStream':
         return duration
 
     return EventStream(_generator(), **kwargs)
+
+
+def empty() -> 'EventList':
+    """ Returns an empty EventList as an empty score. """
+    """ 空のスコアとして、空のEventListを返します。"""
+    return EventList()

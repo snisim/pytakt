@@ -5,4 +5,4 @@ pytakt.score module
    :members:
    :undoc-members:
    :show-inheritance:
-   :exclude-members: starttime, endtime, lowerbound, evlist, duration, iterator
+   :exclude-members: duration, iterator
