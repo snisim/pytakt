@@ -25,7 +25,6 @@ from pytakt.utils import int_preferred, TaktWarning, NoteDict
 from pytakt.context import context, newcontext
 from pytakt.score import Score, EventList, EventStream, Tracks, \
     DEFAULT_LIMIT, genseq, RealTimeStream
-from pytakt.mml import mml
 from pytakt.interpolator import Interpolator
 from pytakt.sc import note
 from pytakt.constants import L32, L1, MAX_DELTA_TIME, EPSILON, LOG_EPSILON, \
@@ -1953,7 +1952,8 @@ class Product(Effector):
 
     def _get_score(self, arg):
         if isinstance(arg, str):
-            return mml(arg)
+            from pytakt.mml import safe_mml
+            return safe_mml(arg)
         else:
             return arg()
 
@@ -2144,7 +2144,8 @@ class Apply(Effector):
     """
     def __init__(self, pattern):
         if isinstance(pattern, str):
-            pattern = mml(pattern)
+            from pytakt.mml import safe_mml
+            pattern = safe_mml(pattern)
         self.pattern = pattern
 
     def _apply(self, stream):

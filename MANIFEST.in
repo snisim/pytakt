@@ -12,6 +12,7 @@ include pytakt/interpolator.py
 include pytakt/midiio.py
 include pytakt/m21conv.py
 include pytakt/mml.py
+include pytakt/mml_evalexp.py
 include pytakt/pianoroll.py
 include pytakt/pitch.py
 include pytakt/pmconv.py

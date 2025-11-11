@@ -12,6 +12,7 @@ MML (Music Macro Language).
 import re
 import os
 import builtins
+import sys
 from arpeggio import ZeroOrMore, Optional, RegExMatch, EOF, \
                      NonTerminal, ParserPython, NoMatch, Sequence
 from fractions import Fraction
@@ -22,11 +23,14 @@ from pytakt.constants import L1, L64
 from pytakt.sc import note, rest
 from pytakt.frameutils import outerglobals, outerlocals
 from pytakt.utils import int_preferred, Ticks
+from pytakt.mml_evalexp import safe_eval
 import pytakt.sc
 import pytakt.constants
 import pytakt.pitch
 import pytakt.gm
 import pytakt.gm.drums
+import pytakt.effector
+import pytakt.scale
 from typing import Optional as _Optional
 from typing import Union, Mapping, Callable
 
@@ -51,7 +55,7 @@ def command(): return [setlength,
                        comment_string]
 def comment_string(): return RegExMatch(';[^\n]*')
 def setlength(): return length_constant()
-def assignment(): return (context_variable_lhs, assign_op, expression),
+def assignment(): return context_variable_lhs, assign_op, expression
 def modified_command(): return (ZeroOrMore(prefixchar),
                                 primary_command, ZeroOrMore(modifier))
 def primary_command(): return [cmdchar,
@@ -357,9 +361,11 @@ class MMLEvaluator(object):
             com += 1
         if node[com][0].value == '$':
             if self.safe_mode:
-                self.safety_error()
-            nc = eval(self.evalnode(node[com][1]),
-                      self.globals, self.locals).copy()
+                nc = safe_eval(self.evalnode(node[com][1]),
+                               _safe_globals).copy()
+            else:
+                nc = eval(self.evalnode(node[com][1]),
+                          self.globals, self.locals).copy()
         else:
             nc = newcontext()
         nc.addattr('_accidentals', '')
@@ -433,12 +439,16 @@ class MMLEvaluator(object):
                 result = self.merge_scores(result, self.evalnode(node[i]))
             return result
         elif node[0].value == '|':
-            if self.safe_mode:
-                self.safety_error()
+            evaltext = self.evalnode(node[1])
             try:
-                eff = eval(self.evalnode(node[1]), self.globals, self.locals)
+                if self.safe_mode:
+                    eff = safe_eval(evaltext, _safe_globals)
+                else:
+                    eff = eval(evaltext, self.globals, self.locals)
             except Exception as e:
-                raise MMLError('effector evaluation', e)
+                raise MMLError(
+                    "Error occurred during effector evaluation "
+                    "at position %d: '%s'" % (node[1].position, evaltext), e)
             context()._effectors.append(eff)
         else:
             return self.evalnode(node[0])
@@ -459,12 +469,16 @@ class MMLEvaluator(object):
 
     def eval_python_expression(self, node) -> Union[Score, int, float,
                                                     Ticks, None]:
-        if self.safe_mode:
-            self.safety_error()
+        evaltext = self.evalnode(node[-1])
         try:
-            return eval(self.evalnode(node[-1]), self.globals, self.locals)
+            if self.safe_mode:
+                return safe_eval(evaltext, _safe_globals)
+            else:
+                return eval(evaltext, self.globals, self.locals)
         except Exception as e:
-            raise MMLError('python expression', e)
+            raise MMLError(
+                "Error occurred within the Python expression "
+                "at position %d: '%s'" % (node[-1].position, evaltext), e)
 
     def eval_python_funcall(self, node) -> str:
         return ''.join([self.evalnode(n) for n in node])
@@ -514,10 +528,6 @@ class MMLEvaluator(object):
 
     def eval_floating(self, node) -> float:
         return float(node.value)
-
-    def safety_error(self) -> None:
-        raise MMLError('Cannot use Python functions/expressions '
-                       '("$..." and "|...") in the safe-mode MML')
 
 
 parser = None
@@ -636,7 +646,8 @@ commands ``}``
         The <Python function name> may contain dots ('.').
         Note that the names defined in the following modules can be used in
         the MML string without specifying the package or module name:
-        pytakt.pitch, pytakt.sc, pytakt.constants, pytakt.gm.drums.
+        pytakt.pitch, pytakt.sc, pytakt.constants, pytakt.gm.drums,
+        pytakt.scale.
 
     .. rubric:: Simple Expressions
 
@@ -834,7 +845,7 @@ G/!? G/ G/!? G3*").show(True)
         <Python関数名> はドット('.')を含んでいても構いません。
         なお、次のモジュールで定義されている名前は、MML文字列の中では
         パッケージ名やモジュール名を指定せずに使えます: pytakt.pitch,
-        pytakt.sc, pytakt.constants, pytakt.gm.drums。
+        pytakt.sc, pytakt.constants, pytakt.gm.drums, pytakt.scale。
 
     .. rubric:: 単純式
 
@@ -930,7 +941,7 @@ G/!? G/ G/!? G3*").show(True)
         globals = outerglobals()
     if locals is None:
         locals = outerlocals()
-    evaluator = MMLEvaluator(dict(_module_globals, **globals), locals,
+    evaluator = MMLEvaluator(dict(_mml_globals, **globals), locals,
                              _safe_mode)
     effectors = context().effectors
     with newcontext(effectors=[]):
@@ -938,23 +949,13 @@ G/!? G/ G/!? G3*").show(True)
             s = evaluator.evalnode(parse_tree)
         except MMLError as e:
             if e.source is not None:
+                print(str(e), file=sys.stderr)
                 raise e.source from None
             else:
                 raise MMLError(str(e)) from None
         for eff in effectors:
             s = eff(s)
     return s
-
-
-# _module_globalsは、MML内で $ に続けて直接利用できる名前の辞書
-_module_globals = {'gm': pytakt.gm, 'mml': mml, 'context': context}
-for module in (pytakt.sc, pytakt.pitch):
-    for var in module.__all__:
-        _module_globals[var] = getattr(module, var)
-for module in (pytakt.constants, pytakt.gm.drums):
-    for var in dir(module):
-        if not var.startswith('_'):
-            _module_globals[var] = getattr(module, var)
 
 
 def _Context_mml(ctxt,
@@ -973,25 +974,97 @@ if '__SPHINX_AUTODOC__' not in os.environ:
 
 def safe_mml(text) -> Score:
     """
-    This is a security-aware version of :func:`mml`. It prohibits the use of
-    Python expressions and Python functions (i.e., syntax beginning with
-    ``$`` or ``|``) within MML.
+    This is a security-aware version of :func:`mml`.
     It is suitable for evaluating MML strings obtained from untrusted sources
     or interactively entered by users.
+
+    In safe_mml, Python variable/function names within MML are restricted to
+    the followings:
+
+    * Names registered in pytakt.pitch, pytakt.sc, pytakt.constants,
+      pytakt.gm.drums, and pytakt.scale
+    * Names registered in pytakt.gm (These need to be used with the module
+      name such as 'gm.Piano1'.)
+    * Some builtin functions (abs, len, etc.)
+    * Some Effector names (Transpose, Product, etc.)
+
+    Furthermore, the '.’ operator, lambda expressions, starred expressions,
+    comprehension, prefixed strings (such as r'abc'), and triple-quote
+    strings can not be used in Python expressions within MML ('.' that is a
+    part of a pre-registered name such as gm.Piano1 is not an operator and
+    therefore usable).
 
     Args:
         text(str): MML string
     """
     """
-    セキュリティ面を考慮したバージョンの :func:`mml` です。MML中における
-    Python式、Python関数（すなわち、``$`` および ``|`` で始まる構文）の使用を
-    禁止しています。信頼できないソースから入手したMML文字列や対話的にユーザが
-    入力したMML文字列を評価するのに適しています。
+    セキュリティ面を考慮したバージョンの :func:`mml` です。これは、信頼でき
+    ないソースから入手したMML文字列や対話的にユーザが入力したMML文字列を
+    評価するのに適しています。
+
+    safe_mmlでは、MML中で使用できる Python変数名やPython関数名を、下のものだけ
+    に限定しています。
+
+    * pytakt.pitch, pytakt.sc, pytakt.constants, pytakt.gm.drums, pytakt.scale
+      に登録されている名前
+    * pytakt.gm に登録されている名前 (gm.Piano1 のようにモジュール名をつけて
+      使用する必要があります)
+    * 一部の組み込み関数名 (abs, len など)
+    * 一部のエフェクタ名 (Transpose, Product など)
+
+    さらに、MML中のPython式において、'.' 演算子、lambda式、``*``、``**`` を
+    前置した式, 内包表記, プレフィックスつき文字列 (r'abc' など), 3重クオート
+    文字列は使用できません（gm.Piano1 のように予め登録された名前に含まれる
+    '.' は演算子ではないため、使用できます)。
 
     Args:
         text(str): MML文字列
     """
     return mml(text, _safe_mode=True)
+
+
+# _mml_globalsは、mml()内で $, | に続けて直接利用できる名前の辞書
+# _safe_globalsは、safe_mml() 用
+_common_globals = {'mml': mml, 'safe_mml': safe_mml, 'context': context,
+                   'newcontext': newcontext}
+for module in (pytakt.sc, pytakt.pitch, pytakt.scale):
+    for var in module.__all__:
+        _common_globals[var] = getattr(module, var)
+for module in (pytakt.constants, pytakt.gm.drums):
+    for var in dir(module):
+        if not var.startswith('_'):
+            _common_globals[var] = getattr(module, var)
+_mml_globals = {**_common_globals, 'gm': pytakt.gm}
+_safe_globals = {
+    **_common_globals,
+    'mml': safe_mml,  # override 'mml'
+    'abs': abs,
+    'len': len,
+    'bool': bool,
+    'int': int,
+    'float': float,
+    'round': round,
+    'Transpose': pytakt.effector.Transpose,
+    'Invert': pytakt.effector.Invert,
+    'ApplyScale': pytakt.effector.ApplyScale,
+    'ConvertScale': pytakt.effector.ConvertScale,
+    'ScaleVelocity': pytakt.effector.ScaleVelocity,
+    'TimeStretch': pytakt.effector.TimeStretch,
+    'Retrograde': pytakt.effector.Retrograde,
+    'TimeDeform': pytakt.effector.TimeDeform,
+    'Swing': pytakt.effector.Swing,
+    'Randomize': pytakt.effector.Randomize,
+    'Arpeggio': pytakt.effector.Arpeggio,
+    'Product': pytakt.effector.Product,
+    'Apply': pytakt.effector.Apply,
+    'Tie': pytakt.effector.Tie,
+    'EndTie': pytakt.effector.EndTie,
+    'Voice': pytakt.effector.Voice,
+    'Mark': pytakt.effector.Mark,
+}
+for var in dir(pytakt.gm):
+    if not var.startswith('_'):
+        _safe_globals['gm.' + var] = getattr(pytakt.gm, var)
 
 
 def mmlconfig(translate=("", ""), *,

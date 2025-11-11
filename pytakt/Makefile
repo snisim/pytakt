@@ -1,7 +1,7 @@
 PYFILES = __init__.py chord.py constants.py context.py effector.py \
 event.py frameutils.py interpolator.py m21conv.py midiio.py mml.py \
 pianoroll.py pitch.py pmconv.py pytaktcmd.py sc.py scale.py score.py smf.py \
-text.py timemap.py utils.py gm/__init__.py gm/drums.py
+text.py timemap.py utils.py gm/__init__.py gm/drums.py mml_evalexp.py
 
 pycodestyle:
 	pycodestyle $(PYFILES) | grep -v 'E402 module level' | \

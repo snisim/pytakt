@@ -60,6 +60,20 @@ def test_mml():
     assert mml("C|Modify('v+=10')") == note(C4, v=90)
     def f(x, y):
         return y + x
+    assert safe_mml("$prog(gm.Piano1) cd/|Transpose(DEG(2), scale=Scale(C4))")\
+        == mml("$prog(gm.Piano1) cd/|Transpose(DEG(2), scale=Scale(C4))")
+    try:
+        safe_mml("$(x)")
+    except NameError:
+        pass
+    else:
+        assert False
+    try:
+        safe_mml("$open('file')")
+    except NameError:
+        pass
+    else:
+        assert False
 
 
 def test_effectors():
@@ -191,7 +205,7 @@ def test_product():
         EventList(mml("{CDEF}//{EFGARRRR}//{GA}//"))
     assert EventList(mml("CE*G/").Product("L32 C@@")) == \
         EventList(mml("L32CCCCCCCCEEEEEEEEEEEEEEEEGGGG"))
-    assert EventList(mml("CG/").Product("L32 {CD}|Repeat()",
+    assert EventList(mml("CG/").Product("L32 {CD}@@",
                                         tail="L=L8/5 CDC_BC")) == \
         EventList(mml("L32CDCD{L=L8/5CDC_BC}{L=L8/5GAGF#G}"))
     assert EventList(mml("CG").Product("L8 {CDEF}&")) == \
