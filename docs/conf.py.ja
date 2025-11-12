@@ -7,12 +7,18 @@ import os
 import sys
 sys.path.insert(0, os.path.abspath('../'))
 
+with open('../pytakt/_version.py') as f:
+    for line in f.readlines():
+        if '__version__ =' in line:
+            exec(line)
+
 # -- Project information -----------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#project-information
 
 project = 'pytakt'
 copyright = '2025, Satoshi Nishimura'
 author = 'Satoshi Nishimura'
+release = __version__
 
 # -- General configuration ---------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#general-configuration
