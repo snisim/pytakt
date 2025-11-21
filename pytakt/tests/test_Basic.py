@@ -74,6 +74,12 @@ def test_mml():
         pass
     else:
         assert False
+    try:
+        safe_mml("$eval('note(C4)')")
+    except NameError:
+        pass
+    else:
+        assert False
 
 
 def test_effectors():

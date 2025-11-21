@@ -13,6 +13,7 @@ import re
 import os
 import builtins
 import sys
+import numbers
 from arpeggio import ZeroOrMore, Optional, RegExMatch, EOF, \
                      NonTerminal, ParserPython, NoMatch, Sequence
 from fractions import Fraction
@@ -51,8 +52,8 @@ class MMLError(Exception):
 def score(): return ZeroOrMore(command), EOF
 def command(): return [setlength,
                        assignment,
-                       modified_command,
-                       comment_string]
+                       modified_command]
+#                       comment_string]
 def comment_string(): return RegExMatch(';[^\n]*')
 def setlength(): return length_constant()
 def assignment(): return context_variable_lhs, assign_op, expression
@@ -94,6 +95,8 @@ def balanced_paren(): return Sequence(RegExMatch(r'\s*\('),
                                       ZeroOrMore(balanced_paren_body),
                                       ")", skipws=False)
 def balanced_paren_body(): return [balanced_paren,
+                                   RegExMatch(r'"([^"\n\\]|\\.)*"'),
+                                   RegExMatch(r"'([^'\n\\]|\\.)*'"),
                                    RegExMatch(r'[^()]')]
 
 def expression(): return term, ZeroOrMore(["+", "-"], term)
@@ -287,10 +290,11 @@ class MMLConfig(object):
 
 
 class MMLEvaluator(object):
-    def __init__(self, globals, locals, safe_mode):
+    def __init__(self, globals, locals, safe_mode, linecol):
         self.globals = globals
         self.locals = locals
         self.safe_mode = safe_mode
+        self.linecol = linecol
 
     def evalnode(self, node) -> Union[Score, int, float, Ticks, str, None]:
         method_name = "eval_" + node.rule_name
@@ -362,7 +366,7 @@ class MMLEvaluator(object):
         if node[com][0].value == '$':
             if self.safe_mode:
                 nc = safe_eval(self.evalnode(node[com][1]),
-                               _safe_globals).copy()
+                               self.globals, self.locals).copy()
             else:
                 nc = eval(self.evalnode(node[com][1]),
                           self.globals, self.locals).copy()
@@ -404,8 +408,8 @@ class MMLEvaluator(object):
             try:
                 action = MMLConfig.char_actions[node.value[0]]
             except KeyError:
-                raise MMLError("Unknown command `%c' at position %d"
-                               % (node.value, node.position))
+                raise MMLError("Unknown command `%c' at %s"
+                               % (node.value, self.linecol(node.position)))
             for flat_sign in node.value[1:]:
                 if flat_sign == 'b':
                     MMLAction.mod_flat()
@@ -442,13 +446,13 @@ class MMLEvaluator(object):
             evaltext = self.evalnode(node[1])
             try:
                 if self.safe_mode:
-                    eff = safe_eval(evaltext, _safe_globals)
+                    eff = safe_eval(evaltext, self.globals, self.locals)
                 else:
                     eff = eval(evaltext, self.globals, self.locals)
             except Exception as e:
                 raise MMLError(
-                    "Error occurred during effector evaluation "
-                    "at position %d: '%s'" % (node[1].position, evaltext), e)
+                    "Error occurred during effector evaluation at %s: '%s'" %
+                    (self.linecol(node[1].position), evaltext), e)
             context()._effectors.append(eff)
         else:
             return self.evalnode(node[0])
@@ -472,13 +476,13 @@ class MMLEvaluator(object):
         evaltext = self.evalnode(node[-1])
         try:
             if self.safe_mode:
-                return safe_eval(evaltext, _safe_globals)
+                return safe_eval(evaltext, self.globals, self.locals)
             else:
                 return eval(evaltext, self.globals, self.locals)
         except Exception as e:
             raise MMLError(
-                "Error occurred within the Python expression "
-                "at position %d: '%s'" % (node[-1].position, evaltext), e)
+                "Error occurred within the Python expression at %s: '%s'" %
+                (self.linecol(node[-1].position), evaltext), e)
 
     def eval_python_funcall(self, node) -> str:
         return ''.join([self.evalnode(n) for n in node])
@@ -589,7 +593,7 @@ G/!? G/ G/!? G3*").show(True)
     in the middle of identifiers, numbers, and multi-character operators or
     before `b` meaning a flat.
     From a semicolon (';') to the end of the line is considered as a comment
-    and may be inserted freely between commands.
+    and equivalent to a whitespace.
 
     .. rubric:: List of Primary Commands
 
@@ -628,7 +632,7 @@ G/!? G/ G/!? G3*").show(True)
         This can be used to temporarily change the context attribute values,
         e.g., in ``L4 C {L8 D E} F``, the D and E notes will be eighth notes,
         but the F note will return to a quarter note.
-    ``[``A sequence of zero or more commands ``]``
+    ``[`` a sequence of zero or more commands ``]``
         Executes the commands in the brackets using another context copied,
         and merges the results of scores to be played simultaneously.
         For example, it can be used to represent chords, as in ``[CEG]``,
@@ -792,8 +796,8 @@ G/!? G/ G/!? G3*").show(True)
 
     空白文字(スペース、タブ、改行)は、識別子、数値、2文字以上からなる
     演算子の途中、およびフラットを表す `b` の前を除き、自由に挿入できます。
-    セミコロン (';') から行の終わりまではコメントとみなされ、コマンドと
-    コマンドの間に自由に挿入できます。
+    セミコロン (';') から行の終わりまではコメントとみなされ、空白文字と同等に
+    扱われます。
 
     .. rubric:: 基本コマンド一覧
 
@@ -927,30 +931,54 @@ G/!? G/ G/!? G3*").show(True)
         例: ``{CDE}|Transpose('M2')``
     """
     global parser
+
+    def linecol(pos):
+        if text.find('\n') == -1:
+            return 'position %d' % (pos,)
+        else:
+            line = text.count('\n', 0, pos) + 1
+            col = pos - text.rfind('\n', 0, pos)
+            return 'line %d, column %d' % (line, col)
+
     if not parser:
-        parser = ParserPython(score, ws="\t\n\r 　")  # 全角スペースを加えた
+        parser = ParserPython(score, comment_string,
+                              ws="\t\n\r 　")  # 全角スペースを加えた
     try:
         parse_tree = parser.parse(text)
     except NoMatch as e:
-        raise MMLError("Syntax error at position %d\n    %s ===> %s <==="
-                       % (e.position, (text + '.')[:e.position],
-                          (text + '.')[e.position:])) from None
+        pos = e.position
+        linestart = text.rfind('\n', 0, pos) + 1
+        if text[linestart:pos].strip() == '':  # 行先頭でのエラー
+            linestart = text.rfind('\n', 0, linestart - 1) + 1
+        lineend = text.find('\n', pos)
+        if lineend == -1:
+            lineend = len(text)
+        raise MMLError(
+            "Syntax error at %s:\n    %s ===> %s <==="
+            % (linecol(pos), (text + '.')[linestart:pos],
+               (text + '.')[pos:lineend])) from None
     # outerglobals(), outerlocals()は mml関数を呼び出した元の環境を取得する。
     #  (これを行わないと、mmlモジュールの中の名前しかアクセスできない)
     if globals is None:
         globals = outerglobals()
     if locals is None:
         locals = outerlocals()
-    evaluator = MMLEvaluator(dict(_mml_globals, **globals), locals,
-                             _safe_mode)
+    if _safe_mode:
+        newglobals = {**_safe_globals, **globals}
+    else:
+        newglobals = {**_mml_globals, **globals}
+    evaluator = MMLEvaluator(newglobals, locals, _safe_mode, linecol)
     effectors = context().effectors
     with newcontext(effectors=[]):
         try:
             s = evaluator.evalnode(parse_tree)
         except MMLError as e:
             if e.source is not None:
-                print(str(e), file=sys.stderr)
-                raise e.source from None
+                while isinstance(e.source, MMLError) and \
+                      e.source.source is not None:
+                    e = e.source
+                print(str(e) + '\n', file=sys.stderr)
+                raise e.source.__class__(str(e.source)) from None
             else:
                 raise MMLError(str(e)) from None
         for eff in effectors:
@@ -1020,13 +1048,12 @@ def safe_mml(text) -> Score:
     Args:
         text(str): MML文字列
     """
-    return mml(text, _safe_mode=True)
+    return mml(text, {}, {}, _safe_mode=True)
 
 
 # _mml_globalsは、mml()内で $, | に続けて直接利用できる名前の辞書
 # _safe_globalsは、safe_mml() 用
-_common_globals = {'mml': mml, 'safe_mml': safe_mml, 'context': context,
-                   'newcontext': newcontext}
+_common_globals = {'context': context, 'newcontext': newcontext}
 for module in (pytakt.sc, pytakt.pitch, pytakt.scale):
     for var in module.__all__:
         _common_globals[var] = getattr(module, var)
@@ -1034,10 +1061,15 @@ for module in (pytakt.constants, pytakt.gm.drums):
     for var in dir(module):
         if not var.startswith('_'):
             _common_globals[var] = getattr(module, var)
-_mml_globals = {**_common_globals, 'gm': pytakt.gm}
+_mml_globals = {**_common_globals, 'gm': pytakt.gm, 'mml': mml}
 _safe_globals = {
     **_common_globals,
-    'mml': safe_mml,  # override 'mml'
+    'mml': safe_mml,
+    # 次のような関数をここに登録してはいけない。
+    #   1. 引数次第でシステムに危害を与える可能性がある関数(危険な関数)
+    #   2. 危険な関数、またはそれを含むコンテナを返す関数
+    #   3. 危険な関数が演算子に割り当てられているオブジェクト（またはそれを
+    #      含むコンテナ）を返す関数
     'abs': abs,
     'len': len,
     'bool': bool,
@@ -1256,8 +1288,8 @@ def mmlconfig(translate=("", ""), *,
 
     """
     global parser
-    if translate == ("", "") and not add_prefixes and not add_suffixes \
-       and not del_prefixes and not del_suffixes and not actions \
+    if translate == ("", "") and add_prefixes == "" and add_suffixes == "" \
+       and del_prefixes == "" and del_suffixes == "" and actions == {} \
        and octave_number_suffix is None and accent_amount is None \
        and timeshift_amount is None and staccato_amount is None:
         MMLConfig.show_config()
@@ -1280,6 +1312,9 @@ def mmlconfig(translate=("", ""), *,
         MMLConfig.suffixes = MMLConfig.suffixes.replace(ch, '')
         parser = None
 
+    if not (isinstance(translate, tuple) and len(translate) == 2 and
+            isinstance(translate[0], str) and isinstance(translate[1], str)):
+        raise TypeError("`translate' must be a 2-tuple of strings")
     if len(translate[0]) != len(translate[1]):
         raise ValueError("legnth mismatch in translation strings")
     translate_dict = {}
@@ -1299,12 +1334,20 @@ def mmlconfig(translate=("", ""), *,
     MMLConfig.char_actions.update(actions)
 
     if octave_number_suffix is not None:
+        if not isinstance(octave_number_suffix, bool):
+            raise TypeError("octave_number_suffix must be a truth value")
         MMLConfig.octave_number_suffix = octave_number_suffix
     if accent_amount is not None:
+        if not isinstance(accent_amount, numbers.Real):
+            raise TypeError("accent_amount must be a number")
         MMLConfig.accent_amount = accent_amount
     if timeshift_amount is not None:
+        if not isinstance(timeshift_amount, numbers.Real):
+            raise TypeError("timeshift_amount must be a number")
         MMLConfig.timeshift_amount = timeshift_amount
     if staccato_amount is not None:
+        if not isinstance(staccato_amount, numbers.Real):
+            raise TypeError("staccato_amount must be a number")
         MMLConfig.staccato_amount = staccato_amount
 
 

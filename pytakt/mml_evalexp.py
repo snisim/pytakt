@@ -6,12 +6,12 @@ in safe_mml().
 safe_eval() below evaluates a Python expression with the following
 restrictions:
  - Function calls are possible only when the '()' operators are directly
-   applied to the names listed in a given dictionary ('namedict').
+   applied to the names listed in a given dictionary (globals and locals).
    (Thus, name[0]() fails even if 'name' is contained in the dictionary.)
  - The '.' operator cannot be used. (However, by including names with dots
-   in 'namedict', you can simulate some of its behavior.
- - lambda expressions, starred expressions, comprehension, prefixed strings
-   (such as r'abc'), and triple-quote strings are not available.
+   in the dictionary, you can simulate some of its behavior.
+ - lambda expressions, starred expressions, comprehension, and f-strings
+   are not available.
 """
 # Copyright (C) 2025  Satoshi Nishimura
 
@@ -54,7 +54,8 @@ def slice_(): return [(Optional(expression), ":", Optional(expression),
 def atom(): return [floating, hexinteger, integer, funcall, identifiers,
                     tuple_, list_, set_, dict_, strings,
                     ("(", expression, ")")]
-def identifier(): return RegExMatch(r'[^\d\W]\w*')
+def identifier(): return RegExMatch(r'[^\d\W]\w*'), Not(RegExMatch('["\']'))
+# 上のNotは文字列プレフィックスと混同しないようにするために必要。
 def identifiers(): return identifier, ZeroOrMore(".", identifier)
 def funcall(): return (identifiers,
                        "(", Optional(arguments, Optional(",")), ")")
@@ -78,17 +79,24 @@ def dict_(): return "{", Optional(kvpairs), "}"
 def kvpairs(): return kvpair, ZeroOrMore(",", kvpair), Optional(",")
 def kvpair(): return expression, ":", expression
 def strings(): return string, ZeroOrMore(string)
-def string(): return [RegExMatch(r'"([^"\n\\]|\\.)*"'),
-                      RegExMatch(r"'([^'\n\\]|\\.)*'")]
+def string():
+    strprefix = '(r|R|b|B|br|Br|bR|BR|rb|rB|Rb|RB)?'
+    return [RegExMatch(strprefix + r'"""("{,2}([^"\\]|\\.))*"""'),
+            # triple quote の正規表現は DFA から出発すると上のようになる
+            RegExMatch(strprefix + r"'''('{,2}([^'\\]|\\.))*'''"),
+            # 下のNotがないと、"""" が2つの空文字列の結合とみなされてしまう
+            (Not('"""'), RegExMatch(strprefix + r'"([^"\n\\]|\\.)*"')),
+            (Not("'''"), RegExMatch(strprefix + r"'([^'\n\\]|\\.)*'"))]
 # grammar end
 
 
+_CONSTANTS = {'True': True, 'False': False, 'None': None}
+
+
 class Evaluator(object):
-    def __init__(self, namedict={}):
-        namedict['True'] = True
-        namedict['False'] = False
-        namedict['None'] = None
-        self.namedict = namedict
+    def __init__(self, globals, locals):
+        self.globals = globals  # None is not allowed
+        self.locals = locals  # None is not allowed
 
     def visit(self, node):
         method_name = "visit_" + node.rule_name
@@ -270,9 +278,15 @@ class Evaluator(object):
     def visit_identifiers(self, node):
         ids = ''.join(self.visit(n) for n in node)
         try:
-            return self.namedict[ids]
+            return _CONSTANTS[ids]
         except KeyError:
-            raise NameError("name '" + ids + "' is not defined")
+            try:
+                return self.locals[ids]
+            except KeyError:
+                try:
+                    return self.globals[ids]
+                except KeyError:
+                    raise NameError("name '" + ids + "' is not defined")
 
     def visit_funcall(self, node):
         func = self.visit(node[0])
@@ -349,20 +363,17 @@ class Evaluator(object):
         return ast.literal_eval(node.value)
 
 
-parser = ParserPython(top, ws="\t\n\r ")
+parser = ParserPython(top, ws="\t\n\r ", memoization=True)
 
 
-def safe_eval(text, namedict={}):
+def safe_eval(text, globals={}, locals={}):
     try:
         parse_tree = parser.parse(text)
     except NoMatch as e:
         raise SyntaxError("Syntax error within Python expression: "
                           "%s ==> %s <==" %
                           ((text+'.')[:e.position], (text+'.')[e.position:]))
-    try:
-        return Evaluator(namedict).visit(parse_tree)
-    except Exception as e:
-        raise e.__class__(str(e))
+    return Evaluator(globals, locals).visit(parse_tree)
 
 
 if __name__ == '__main__':
