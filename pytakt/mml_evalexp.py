@@ -15,13 +15,14 @@ restrictions:
 """
 # Copyright (C) 2025  Satoshi Nishimura
 
-from arpeggio import ZeroOrMore, Optional, RegExMatch, EOF, \
-                     NonTerminal, ParserPython, NoMatch, Not
+from arpeggio import ZeroOrMore, OneOrMore, Optional, RegExMatch, EOF, \
+                     NonTerminal, ParserPython, NoMatch, Not, And
 from typing import List, Tuple, Set, Dict
 import ast
+import inspect
 
 
-__all__ = ['safe_eval']
+__all__ = ['safe_eval', 'parse_parameters', 'bind_arguments']
 
 
 # grammar begin
@@ -87,6 +88,15 @@ def string():
             # 下のNotがないと、"""" が2つの空文字列の結合とみなされてしまう
             (Not('"""'), RegExMatch(strprefix + r'"([^"\n\\]|\\.)*"')),
             (Not("'''"), RegExMatch(strprefix + r"'([^'\n\\]|\\.)*'"))]
+# additional grammar for parsing function paramters
+def parameters(): return '(', Optional(parambody), ')', EOF
+def parambody(): return [(OneOrMore(param_no_default),
+                          ZeroOrMore(param_with_default)),
+                         OneOrMore(param_with_default)]
+def param_no_default(): return [(identifier, ","),
+                                (identifier, And(")"))]
+def param_with_default(): return [(identifier, "=", expression, ","),
+                                  (identifier, "=", expression, And(")"))]
 # grammar end
 
 
@@ -289,12 +299,25 @@ class Evaluator(object):
                     raise NameError("name '" + ids + "' is not defined")
 
     def visit_funcall(self, node):
-        func = self.visit(node[0])
         if len(node) >= 4:
             args, kwargs = self.visit(node[2])
         else:
             args, kwargs = [], {}
-        return func(*args, **kwargs)
+        if node[0].value == 'mml':
+            from pytakt.mml import mml
+            # safe_mml()の中でmml()が呼ばれたきは、safeモードにするとともに、
+            # MML内で定義した名前を参照するようにglobals, localsを引き継ぐ。
+            if len(args) != 1 or kwargs:
+                raise TypeError("Invalid argument for mml()")
+            return mml(args[0], globals=self.globals,
+                       locals=self.locals, _safe_mode=True)
+        else:
+            func = self.visit(node[0])
+            if isinstance(func, tuple):  # ('set_globals_locals', func)
+                return func[1](*args, **kwargs,
+                               globals=self.globals, locals=self.locals)
+            else:
+                return func(*args, **kwargs)
 
     def visit_arguments(self, node) -> Tuple[Tuple, Dict]:
         args = self.visit(node[0])
@@ -362,8 +385,24 @@ class Evaluator(object):
     def visit_string(self, node) -> str:
         return ast.literal_eval(node.value)
 
+    def visit_parameters(self, node) -> List:
+        if len(node) == 3:
+            return []
+        else:
+            return self.visit(node[1])
+
+    def visit_parambody(self, node) -> List:
+        return [self.visit(n) for n in node]
+
+    def visit_param_no_default(self, node) -> str:
+        return node[0].value
+
+    def visit_param_with_default(self, node) -> Tuple:
+        return (node[0].value, self.visit(node[2]))
+
 
 parser = ParserPython(top, ws="\t\n\r ", memoization=True)
+param_parser = ParserPython(parameters, ws="\t\n\r ")
 
 
 def safe_eval(text, globals={}, locals={}):
@@ -374,6 +413,32 @@ def safe_eval(text, globals={}, locals={}):
                           "%s ==> %s <==" %
                           ((text+'.')[:e.position], (text+'.')[e.position:]))
     return Evaluator(globals, locals).visit(parse_tree)
+
+
+# MML内で定義された関数の仮引数をパースする
+def parse_parameters(text, globals={}, locals={}):
+    try:
+        param_parse_tree = param_parser.parse(text)
+    except NoMatch as e:
+        raise SyntaxError("Syntax error within function parameter: "
+                          "%s ==> %s <==" %
+                          ((text+'.')[:e.position], (text+'.')[e.position:]))
+    paramlist = Evaluator(globals, locals).visit(param_parse_tree)
+
+    parameters = [
+        inspect.Parameter(param[0], inspect.Parameter.POSITIONAL_OR_KEYWORD,
+                          default=param[1]) if isinstance(param, tuple) else
+        inspect.Parameter(param, inspect.Parameter.POSITIONAL_OR_KEYWORD)
+        for param in paramlist
+    ]
+    return inspect.Signature(parameters)
+
+
+# MML内で定義された関数が呼ばれたとき、引数の対応づけを行う
+def bind_arguments(signature, args, kwargs):
+    ba = signature.bind(*args, **kwargs)
+    ba.apply_defaults()
+    return ba.arguments
 
 
 if __name__ == '__main__':

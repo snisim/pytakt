@@ -1829,6 +1829,12 @@ class Product(Effector):
             (see :class:`.Scale`). Specifically, the tone number of the output
             note is the tone number of the note in the input score plus the
             tone number of the pitch in the pattern.
+        globals(dict, optional):
+            Specifies a dictionary of the global symbol table used when the
+            MML string is evaluated.
+        locals(dict, optional):
+            Specifies a dictionary of the local symbol table used when the
+            MML string is evaluated.
 
     Examples:
         ``Product("[C ^C]")``.
@@ -1913,6 +1919,10 @@ class Product(Effector):
             します。具体的には、出力される音符のトーン番号は、
             入力スコアでの音符のトーン番号に、パターン中のピッチのトーン番号を
             加えたものとなります。
+        globals(dict, optional):
+            MML文字列を評価する際の大域変数の辞書を指定します。
+        locals(dict, optional):
+            MML文字列を評価する際の局所変数の辞書を指定します。
 
     Examples:
         ``Product("[C ^C]")``
@@ -1944,16 +1954,21 @@ class Product(Effector):
             演奏 (いわゆるトリル演奏) を行います。音符の終わりの部分には
             `tail` で指定した演奏が挿入されます。
     """
-    def __init__(self, pattern, *, tail=None, scale=None):
+    def __init__(self, pattern, *, tail=None, scale=None,
+                 globals=None, locals=None):
         self.pattern = pattern
         self.tail = tail
         self.scale = scale
         self.root = C4 if scale is None else scale.tonic
+        self.globals = (pytakt.frameutils.outerglobals()
+                        if globals is None else globals)
+        self.locals = (pytakt.frameutils.outerlocals()
+                       if locals is None else locals)
 
     def _get_score(self, arg):
         if isinstance(arg, str):
-            from pytakt.mml import safe_mml
-            return safe_mml(arg)
+            from pytakt.mml import mml
+            return mml(arg, self.globals, self.locals, _safe_mode=True)
         else:
             return arg()
 
@@ -2085,6 +2100,12 @@ class Apply(Effector):
         pattern(Score or str): Specifies a score to be used as the pattern.
             If it is a string, it is assumed to be MML. May be infinite in
             length.
+        globals(dict, optional):
+            Specifies a dictionary of the global symbol table used when the
+            MML string is evaluated.
+        locals(dict, optional):
+            Specifies a dictionary of the local symbol table used when the
+            MML string is evaluated.
 
     Examples:
         ``mml("CDEF`").Apply("{C!C`>C/C/}")``
@@ -2132,6 +2153,10 @@ class Apply(Effector):
         pattern(Score or str):
             パターンとなるスコアを指定します。文字列の場合は MMLだと
             見なされます。無限長であっても構いません。
+        globals(dict, optional):
+            MML文字列を評価する際の大域変数の辞書を指定します。
+        locals(dict, optional):
+            MML文字列を評価する際の局所変数の辞書を指定します。
 
     Examples:
         ``mml("CDEF`").Apply("{C!C`>C/C/}")``
@@ -2142,10 +2167,14 @@ class Apply(Effector):
         ``mml("[CE] [EG] [EGB]").Apply("C [C? C] [C? C]")``
             ``mml("[CE] [E? G] [E? G? B]")`` と等価なスコアを生成します。
     """
-    def __init__(self, pattern):
+    def __init__(self, pattern, globals=None, locals=None):
         if isinstance(pattern, str):
-            from pytakt.mml import safe_mml
-            pattern = safe_mml(pattern)
+            from pytakt.mml import mml
+            if globals is None:
+                globals = pytakt.frameutils.outerglobals()
+            if locals is None:
+                locals = pytakt.frameutils.outerlocals()
+            pattern = mml(pattern, globals, locals, _safe_mode=True)
         self.pattern = pattern
 
     def _apply(self, stream):

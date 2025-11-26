@@ -26,7 +26,7 @@ from pytakt.constants import L1, L64
 from pytakt.sc import note, rest
 from pytakt.frameutils import outerglobals, outerlocals
 from pytakt.utils import int_preferred, Ticks
-from pytakt.mml_evalexp import safe_eval
+from pytakt.mml_evalexp import safe_eval, parse_parameters, bind_arguments
 import pytakt.sc
 import pytakt.constants
 import pytakt.pitch
@@ -64,6 +64,10 @@ _context_variables = ["dt", "tk", "ch", "v", "nv", "L",
 def score(): return ZeroOrMore(command), EOF
 def command(): return [setlength,
                        assignment,
+                       python_assignment,
+                       python_defun,
+                       if_command,
+                       for_command,
                        modified_command]
 #                       comment_string]
 def comment_string(): return RegExMatch(';[^\n]*')
@@ -120,6 +124,19 @@ def integer(): return RegExMatch(r'\d+')
 # "v=0x10ceg" のような曖昧なケースが発生するので廃止。必要なら $(0x..) を使う。
 # def hexinteger(): return RegExMatch(r'0[xX][\da-fA-F]+')
 def floating(): return RegExMatch(r'\d+\.\d*|\d*\.\d+')
+
+def python_assignment(): return ("$", python_id, "=",
+                                 [python_funcall, balanced_paren])
+def python_defun(): return ("$", python_id, balanced_paren, "=",
+                            [python_funcall, balanced_paren])
+def if_command(): return ("$", "if", balanced_paren, block,
+                          ZeroOrMore("$", "elif", balanced_paren, block),
+                          Optional("$", "else", block))
+def for_command(): return ("$", "for", "(", python_id, "in",
+                           balanced_paren_noleft, block)
+def block(): return "{", ZeroOrMore(command), "}"
+def balanced_paren_noleft(): return Sequence(ZeroOrMore(balanced_paren_body),
+                                             ")", skipws=False)
 # MML grammar end
 
 
@@ -575,6 +592,79 @@ class MMLEvaluator(object):
     def eval_floating(self, node) -> float:
         return float(node.value)
 
+    def eval_python_assignment(self, node) -> None:
+        varname = node[1].value
+        if varname in ('True', 'False', 'None', 'mml'):
+            raise MMLError("Can not redefine `%s'" % (varname,))
+        if varname in _context_variables:
+            raise MMLError("Can not use the context variable name `%s' for "
+                           "a Python variable" % (varname,))
+        rhs = self.eval_python_expression([node[3]])
+        if callable(rhs):
+            raise MMLError("Can not assign a callable object "
+                           "to a variable: '%s'" % (varname,))
+        # globals と locals 両方に入れているのは、globals に入れない関数内から
+        # 参照できないし、localsに入れないと同名の変数が既に localsに
+        # 入っていた場合にそちらが優先されてしまうから。
+        self.globals[varname] = self.locals[varname] = rhs
+
+    def eval_python_defun(self, node) -> None:
+        funcname = node[1].value
+        if funcname in ('True', 'False', 'None', 'mml'):
+            raise MMLError("Can not redefine `%s'" % (funcname,))
+        if funcname in _context_variables:
+            raise MMLError("Can not use the context variable name `%s' for "
+                           "a Python function" % (funcname,))
+        try:
+            signature = parse_parameters(self.evalnode(node[2]),
+                                         self.globals, self.locals)
+        except Exception as e:
+            raise MMLError(
+                "Error occurred within the function parameter at %s: '%s'" %
+                (self.linecol(node[2].position), node[2].flat_str()), e)
+        bodynode = node[-1]
+        self.globals[funcname] = self.locals[funcname] = \
+            lambda *args, **kwargs: \
+            self.call_function(bodynode, signature, args, kwargs)
+
+    def call_function(self, node, signature, args, kwargs):
+        locals_org = self.locals
+        self.locals = bind_arguments(signature, args, kwargs)
+        retval = self.eval_python_expression([node])
+        self.locals = locals_org
+        return retval
+
+    def eval_if_command(self, node) -> _Optional[Score]:
+        for i in range(0, len(node), 4):
+            if i+3 >= len(node):
+                return self.evalnode(node[-1])  # else clause
+            cond = self.eval_python_expression([node[i+2]])
+            if cond:
+                return self.evalnode(node[i+3])
+        return None
+
+    def eval_for_command(self, node) -> _Optional[Score]:
+        varname = node[3].value
+        rhs = self.eval_python_expression([node[5]])
+        result = EventList()
+        try:
+            for i in rhs:
+                self.locals[varname] = i
+                result = self.concat_scores(result, self.evalnode(node[6]))
+        except TypeError as e:
+            raise MMLError("Error occurred within the 'for' command at %s:" %
+                           (self.linecol(node[0].position)), e)
+        return result
+
+    def eval_block(self, node) -> _Optional[Score]:
+        result = EventList()
+        for i in range(1, len(node) - 1):
+            result = self.concat_scores(result, self.evalnode(node[i]))
+        return result
+
+    def eval_balanced_paren_noleft(self, node) -> str:
+        return '(' + ''.join([self.evalnode(n) for n in node])
+
 
 parser = None
 
@@ -625,7 +715,8 @@ G/!? G/ G/!? G3*").show(True)
     .. rubric:: Language Specification of This MML
 
     The entire score described in this MML consists of a sequence of
-    **commands**. Each command contains one **primary command**, preceded by
+    **commands**. Each command is either a **primary command** or
+    a **control command**. A **primary command** is preceded by
     optional **premodifiers** and followed by optional **postmodifiers**.
     For example, ``CD#4^E`` consists of three commands, where ``C``, ``D``,
     and ``E`` are the primary commands, ``#`` and ``4`` are postmodifiers
@@ -652,22 +743,6 @@ G/!? G/ G/!? G3*").show(True)
         The octave number is taken from the 'o' attribute of the context.
     ``r`` or ``R``
         A rest is inserted using the :func:`.rest` function.
-    ``L``\\ <integer>, ``L``\\ <integer>\\ ``DOT``, \
-``L``\\ <integer>\\ ``DOTDOT``
-        Sets the note value (note length). <integer> can be 1, 2, 4, 8, 16,
-        32, 64, or 128.
-        Execution of this command will set the L attribute value in the context
-        to the value of the constant of the same name defined in the
-        :mod:`pytakt.constants` module. For example, ``L8`` makes
-        subsequent notes and rests eighth-note length.
-    <context attribute name> ``=`` <simple expression>
-        Changes the value of a context attribute (limited to those available
-        in simple expressions) (e.g. ``v=100``).
-        See below for simple expressions.
-    <context attribute name> op\\ ``=`` <simple expression>
-        Equivalent to <context attribute name> ``=`` <context attribute name>
-        op <simple expression>, where op is one of the operators that can be
-        used in simple expressions.
     ``{`` a sequence of zero or more commands ``}``
         Executes the commands in the braces using another context copied,
         and sequentially concatenates the results of scores.
@@ -697,6 +772,50 @@ commands ``}``
         available in simple expressions can be referenced as variables
         within the Python code.
 
+    .. rubric:: List of Control Commands
+
+    ``L``\\ <integer>, ``L``\\ <integer>\\ ``DOT``, \
+``L``\\ <integer>\\ ``DOTDOT``
+        Sets the note value (note length). <integer> can be 1, 2, 4, 8, 16,
+        32, 64, or 128.
+        Execution of this command will set the L attribute value in the context
+        to the value of the constant of the same name defined in the
+        :mod:`pytakt.constants` module. For example, ``L8`` makes
+        subsequent notes and rests eighth-note length.
+    <context attribute name> ``=`` <simple expression>
+        Changes the value of a context attribute (limited to those available
+        in simple expressions) (e.g. ``v=100``).
+        See below for simple expressions.
+    <context attribute name> op\\ ``=`` <simple expression>
+        Equivalent to <context attribute name> ``=`` <context attribute name>
+        op <simple expression>, where op is one of the operators that can be
+        used in simple expressions.
+    ``$``\\ <Python variable name>\\ ``=(``\\ <Python expression>\\ ``)`` and \
+    ``$``\\ <Python variable name>\\ ``=``\\ \
+<Python function name>\\ ``(``\\ <Python argument>\\ ``,`` ... ``)``
+        Defines a Python variable with its value being the right-hand side
+        value. Defined variables are valid only within the MML string.
+    ``$``\\ <Python function name 1>\\ ``(``\\ <Python parameter list>\\ \
+``)=(``\\ <Python expression>\\ ``)`` and \
+    ``$``\\ <Python function name 1>\\ ``(``\\ <Python parameter list>\\ \
+``)=``\\ <Python function name 2>\\ ``(``\\ <Python argument>\\ ``,`` ... ``)``
+        Defines a function named <Python function name 1> that returns the
+        value on the right side.  <Python parameter list> can contain default
+        values following ``=``, but can not contain ``*`` or ``**``.
+        Defined functions are valid only within the MML string.
+    ``$if(``\\ <Python expression 1>\\ ``)`` ``{`` <commands 1> ``}`` \
+[ ``$elif(``\\ <Python expression 2>\\ ``)`` ``{`` <commands 2> ``}`` ... ] \
+[ ``$else`` ``{`` <commands N> ``}`` ]
+        If <Python expression 1> is true, execute <commands 1>. If not, but
+        <Python expression 2> is true, execute <commands 2> (and similarly
+        for any subsequent $elif clauses). If all Python expressions are false,
+        <commands N> is executed.  The $elif and $else clauses are optional.
+    ``$for(``\\ <Python variable name> ``in`` <Python expression>\\ ``)`` \
+``{`` <commands> ``}``
+        For each value sequentially retrieved from the iterable specified by
+        <Python expression>, assign it to <Python variable name> and execute
+        <commands> once for each value.
+
     .. rubric:: Simple Expressions
 
     <simple expression> is either an integer, a floating-point number,
@@ -711,8 +830,6 @@ commands ``}``
     .. rubric:: Premodifiers
 
     The following premodifiers are available in the default configuration.
-    They can be used in commands other than note-value specification (e.g. L4)
-    and assignment commands.
     Modification of context attribute values by modifiers is only valid for
     the command being qualified, and does not affect the execution of
     subsequent commands.
@@ -727,8 +844,6 @@ commands ``}``
     .. rubric:: Postmodifiers
 
     The following postmodifiers are available by default.
-    They can be used in commands other than note-value specification (e.g. L4)
-    and assignment commands.
     Modification of context attribute values by modifiers is only valid for
     the command being qualified, and does not affect the execution of
     subsequent commands.
@@ -834,10 +949,11 @@ G/!? G/ G/!? G3*").show(True)
 
     .. rubric:: 本MMLの言語仕様
 
-    本MMLの記述全体は、**コマンド** の列から成ります。各コマンドは、1つの
-    **基本コマンド** を含み、その前には任意個の **前置修飾子**、その後には
-    任意個の **後置修飾子** が置かれます。たとえば、``CD#4^E`` は3つの
-    コマンドから成り、``C``, ``D``, ``E`` がそれぞれ基本コマンド、``#`` と
+    本MMLの記述全体は、**コマンド** の列から成ります。各コマンドは、
+    **基本コマンド** か **制御コマンド** のいずれかです。
+    **基本コマンド** は、その前に任意個の **前置修飾子**、およびその後に
+    任意個の **後置修飾子** を置くことができます。たとえば、``CD#4^E`` は3つの
+    基本コマンドから成り、``C``, ``D``, ``E`` がそれぞれ基本コマンド、``#`` と
     ``4`` は ``D`` に対する後置修飾子、``^`` は ``E`` に対する前置修飾子です。
 
     空白文字(スペース、タブ、改行)は、識別子、数値、2文字以上からなる
@@ -859,18 +975,6 @@ G/!? G/ G/!? G3*").show(True)
         オクターブ番号はコンテキストのo属性から取得されます。
     ``r`` または ``R``
         :func:`.rest` 関数によって休符を生成します。
-    ``L``\\ <整数>, ``L``\\ <整数>\\ ``DOT``, ``L``\\ <整数>\\ ``DOTDOT``
-        音価を設定します。<整数>は 1, 2, 4, 8, 16, 32, 64, 128 のいずれかです。
-        このコマンドの実行により、コンテキストのL属性の値が
-        :mod:`pytakt.constants` モジュールに定義されている同名の定数の値に
-        なります。たとえば、``L8`` は以降の音符・休符を8分音符の長さに設定
-        します。
-    <コンテキスト属性名> ``=`` <単純式>
-        コンテキスト属性（単純式で利用できるものに限る）の値を変更します
-        (例: ``v=100``)。単純式については下を見てください。
-    <コンテキスト属性名> op\\ ``=`` <単純式>
-        <コンテキスト属性名> ``=`` <コンテキスト属性名> op <単純式> と
-        等価です。opは単純式の中で使える演算子のいずれかです。
     ``{`` 0個以上のコマンドの列 ``}``
         コピーされた別のコンテキストを用いて中括弧内のコマンドを実行し、
         その結果のスコア群を逐次的に結合します。
@@ -898,6 +1002,45 @@ G/!? G/ G/!? G3*").show(True)
         pytakt.effector。また、単純式で利用できるコンテキスト属性はPython
         コードの中で変数として参照可能です。
 
+    .. rubric:: 制御コマンド一覧
+
+    ``L``\\ <整数>, ``L``\\ <整数>\\ ``DOT``, ``L``\\ <整数>\\ ``DOTDOT``
+        音価を設定します。<整数>は 1, 2, 4, 8, 16, 32, 64, 128 のいずれかです。
+        このコマンドの実行により、コンテキストのL属性の値が
+        :mod:`pytakt.constants` モジュールに定義されている同名の定数の値に
+        なります。たとえば、``L8`` は以降の音符・休符を8分音符の長さに設定
+        します。
+    <コンテキスト属性名> ``=`` <単純式>
+        コンテキスト属性（単純式で利用できるものに限る）の値を変更します
+        (例: ``v=100``)。単純式については下を見てください。
+    <コンテキスト属性名> op\\ ``=`` <単純式>
+        <コンテキスト属性名> ``=`` <コンテキスト属性名> op <単純式> と
+        等価です。opは単純式の中で使える演算子のいずれかです。
+    ``$``\\ <Python変数名>\\ ``=(``\\ <Python式>\\ ``)`` および \
+    ``$``\\ <Python変数名>\\ ``=``\\ \
+<Python関数名>\\ ``(``\\ <Python引数>\\ ``,`` ... ``)``
+        <Python変数名>を、右辺の値を持つ変数として定義します。定義された
+        変数は MML 文字列の中でのみで有効です。
+    ``$``\\ <Python関数名1>\\ ``(``\\ <Python仮引数リスト>\\ ``)=(``\\ \
+<Python式>\\ ``)`` および \
+    ``$``\\ <Python関数名1>\\ ``(``\\ <Python仮引数リスト>\\ ``)=``\\ \
+<Python関数名2>\\ ``(``\\ <Python引数>\\ ``,`` ... ``)``
+        右辺の値を戻り値とする関数を、<Python関数名1>の名前で定義します。
+        <Python仮引数リスト>において、``=`` に続けられたデフォルト値を含める
+        ことは可能ですが、``*`` や ``**`` は使用できません。定義された関数は
+        MML 文字列の中でのみで有効です。
+    ``$if(``\\ <Python式1>\\ ``)`` ``{`` コマンド列1 ``}`` \
+[ ``$elif(``\\ <Python式2>\\ ``)`` ``{`` コマンド列2 ``}`` ... ] \
+[ ``$else`` ``{`` コマンド列N ``}`` ]
+        <Python式1> が真であればコマンド列1を実行し、そうでなくて <Python式2>
+        が真であればコマンド列2を実行し（<Python式3>以降があればそれも同様)、
+        どのPython式も偽であればコマンド列Nを実行します。``$elif`` および
+        ``$else`` 以降は省略可能です。
+    ``$for(``\\ <Python変数名> ``in`` <Python式>\\ ``)`` \
+``{`` コマンド列 ``}``
+        <Python式> で指定されたイテラブルから順に値を取り出して <Python変数名>
+        に代入しながら、各値について１回ずつコマンド列を実行します。
+
     .. rubric:: 単純式
 
     <単純式> は、整数、浮動小数点数、音価定数(L4など)、コンテキスト属性名、
@@ -909,7 +1052,6 @@ G/!? G/ G/!? G3*").show(True)
     .. rubric:: 前置修飾子
 
     デフォルト設定で使用可能な前置修飾子は以下の通りです。
-    これらは、音価指定、代入コマンドを除くコマンドにおいて使用可能です。
     修飾子によるコンテキスト属性値の変更は、修飾されるコマンドにのみ有効で、
     後続のコマンドの実行には影響を与えません。
 
@@ -921,7 +1063,6 @@ G/!? G/ G/!? G3*").show(True)
     .. rubric:: 後置修飾子
 
     デフォルト設定で使用可能な後置修飾子は以下の通りです。
-    これらは、音価指定、代入コマンドを除くコマンドにおいて使用可能です。
     修飾子によるコンテキスト属性値の変更は、修飾されるコマンドにのみ有効で、
     後続のコマンドの実行には影響を与えません。
 
@@ -1004,10 +1145,16 @@ G/!? G/ G/!? G3*").show(True)
         globals = outerglobals()
     if locals is None:
         locals = outerlocals()
+    # newglobals が新しい dict であるおかげで、MML内での名前定義は
+    # MML内ローカルになっている。
     if _safe_mode:
         newglobals = {**_safe_globals, **globals}
     else:
         newglobals = {**_mml_globals, **globals}
+    if globals is locals:
+        newlocals = newglobals
+    else:
+        newlocals = locals.copy()
 
     retry_count = 100
     while True:
@@ -1020,7 +1167,7 @@ G/!? G/ G/!? G3*").show(True)
             raise MMLError(
                 "Syntax error at " + linecol(e.position, True)) from None
 
-        evaluator = MMLEvaluator(newglobals, locals, _safe_mode, linecol)
+        evaluator = MMLEvaluator(newglobals, newlocals, _safe_mode, linecol)
         effectors = context().effectors
         with newcontext(effectors=[]):
             try:
