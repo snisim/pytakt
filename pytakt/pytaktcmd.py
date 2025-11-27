@@ -86,7 +86,8 @@ def main():
 Processing Library with Realtime MIDI I/O
 Version {takt.__version__}
 
-INFILE/OUTFILE is either a standard MIDI file or a Pytakt JSON file.
+INFILE is either a standard MIDI file, a Pytakt JSON file, or a Pytakt MML \
+file.
 When invoked with no arguments, it enters interactive mode.""",
         usage='%(prog)s [options] [INFILE]',
         formatter_class=argparse.RawDescriptionHelpFormatter,
@@ -118,7 +119,8 @@ When invoked with no arguments, it enters interactive mode.""",
                         dest='mode', const='p',
                         help="play INFILE")
     group1.add_argument('-o', '--output', action='store', dest='outfile',
-                        help="write output to OUTFILE")
+                        help="write output to OUTFILE (standard MIDI file "
+                        "or Pytakt JSON file)")
     parser.add_argument('--version', action='version',
                         version='pytakt ' + takt.__version__)
 
@@ -243,12 +245,15 @@ When invoked with no arguments, it enters interactive mode.""",
     # read INFILE, eval PYTHON_EXPR, or read PYTHONFILE
     if args.INFILE is not None:
         try:
-            ext = takt.get_file_type(args.INFILE, ('smf', 'json'))
+            ext = takt.get_file_type(args.INFILE, ('smf', 'json', 'mml'))
             if ext == 'smf':
                 org_score = takt.readsmf(
                     args.INFILE, supply_tempo=False, encoding=args.encoding,
                     pair_note_events=args.mode != 't' or args.raw is None)
                 takt.set_tempo(120.0)
+            elif ext == 'mml':
+                org_score = takt.readmml(args.INFILE)
+                takt.set_tempo(125.0)
             else:
                 org_score = takt.readjson(args.INFILE)
                 takt.set_tempo(125.0)

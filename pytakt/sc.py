@@ -137,7 +137,7 @@ du=240)])
             NoteEvent(t=0, n=Db5, L=480, v=80, nv=None, tk=1, ch=3, dt=30, \
 du=240)])
     """
-    if not isinstance(pitch, numbers.Real):
+    if not isinstance(pitch, numbers.Real) and pitch is not None:
         raise TypeError("`pitch' must be a Pitch object or a MIDI note number")
     if not isinstance(step, (numbers.Real, type(None))):
         raise TypeError("`step' must be a number.")

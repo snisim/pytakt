@@ -295,10 +295,11 @@ class NoteDict:
                 return k, lst.pop(0)
 
 
-def get_file_type(path, types=('smf', 'json', 'mxl'), guess=True) -> str:
+def get_file_type(path, types=('smf', 'json', 'mxl', 'mml'),
+                  guess=True) -> str:
     """
     Determines whether the file specified by `path` is a standard MIDI file,
-    a JSON file, or a MusicXML file.
+    a JSON file, a MusicXML file, or an MML file.
     First, the extension in the pathname is examined to determine the file
     type.  If it cannot be determined from the pathname, it is inferred from
     the file content (only if guess=True). If it still cannot be determined,
@@ -311,12 +312,12 @@ def get_file_type(path, types=('smf', 'json', 'mxl'), guess=True) -> str:
             addition to the extension in the pathname.
 
     Returns:
-        'smf' for standard MIDI files, 'json' for JSON files, or 'mxl' for
-        MusicXML files.
+        'smf' for standard MIDI files, 'json' for JSON files, 'mxl' for
+        MusicXML files, or 'mml' for MML files.
     """
     """
     `path` で指定されたファイルが、標準MIDIファイル、JSONファイル、
-    MusicXMLファイルのうちのどれであるかを判別します。
+    MusicXMLファイル, MMLファイルのうちのどれであるかを判別します。
     まず、パス名に含まれる拡張子を調べて判別します。パス名から判別できない
     場合は、ファイル内容から推測します (guess=Trueの場合)。それでも決定
     できなければ例外を送出します。
@@ -329,7 +330,7 @@ def get_file_type(path, types=('smf', 'json', 'mxl'), guess=True) -> str:
 
     Returns:
         標準MIDIファイルなら 'smf', jsonファイルなら 'json',
-        MusicXMLファイルなら 'mxl'
+        MusicXMLファイルなら 'mxl', MMLファイルなら 'mml'
     """
     _, ext = os.path.splitext(path)
     ext = ext.lower()
@@ -337,8 +338,8 @@ def get_file_type(path, types=('smf', 'json', 'mxl'), guess=True) -> str:
     for typ in types:
         elist = ('.mid', '.midi', '.smf') if typ == 'smf' else \
                 ('.json',) if typ == 'json' else \
-                ('.mxl', '.musicxml', '.xml') if typ == 'mxl' \
-                else ()
+                ('.mxl', '.musicxml', '.xml') if typ == 'mxl' else \
+                ('.mml',) if typ == 'mml' else ()
         for x in elist:
             extdict[x] = typ
     try:

@@ -14,6 +14,8 @@ import os
 import builtins
 import sys
 import numbers
+import math
+import random
 from arpeggio import ZeroOrMore, Optional, RegExMatch, EOF, \
                      NonTerminal, ParserPython, NoMatch, Sequence
 from fractions import Fraction
@@ -36,7 +38,7 @@ from typing import Optional as _Optional
 from typing import Union, Mapping, Callable
 
 
-__all__ = ['mml', 'safe_mml', 'mmlconfig', 'MMLAction', 'MMLError']
+__all__ = ['mml', 'safe_mml', 'mmlconfig', 'readmml', 'MMLAction', 'MMLError']
 
 
 Char = str
@@ -46,6 +48,12 @@ class MMLError(Exception):
     def __init__(self, message, source=None):
         super().__init__(message)
         self.source = source
+
+
+class MMLConfigError(MMLError):
+    def __init__(self, message, nextpos):
+        super().__init__(message)
+        self.nextpos = nextpos
 
 
 # MML grammar begin
@@ -67,8 +75,8 @@ def primary_command(): return [cmdchar,
                                python_expression]
 def cmdchar(): return RegExMatch('[^%s%s%s]((?<=[A-Z])bb*)?' %
                                  (_RESERVED_CHARS,
-                                  re.escape(MMLConfig.prefixes),
-                                  re.escape(MMLConfig.suffixes)))
+                                  re.escape(config.prefixes),
+                                  re.escape(config.suffixes)))
 def modifier(): return [suffixchar,
                         ("/", Optional(integer)),
                         ("|", python_funcall),
@@ -78,8 +86,8 @@ def modifier(): return [suffixchar,
                         ("@", "@"),
                         ("(", ZeroOrMore(command), ")")]
 # \x00はsuffixes/prefixesが空のときにエラーになるのを防ぐ
-def suffixchar(): return RegExMatch('[\x00%s]' % re.escape(MMLConfig.suffixes))
-def prefixchar(): return RegExMatch('[\x00%s]' % re.escape(MMLConfig.prefixes))
+def suffixchar(): return RegExMatch('[\x00%s]' % re.escape(config.suffixes))
+def prefixchar(): return RegExMatch('[\x00%s]' % re.escape(config.prefixes))
 def context_variable(): return ["dt", "tk", "ch", "v", "nv", "L",
                                 "duoffset", "du", "durate", "dr", "o", "key"]
 def length_constant(): return RegExMatch(r'L\d+(DOT){0,2}')
@@ -160,23 +168,23 @@ class MMLAction(object):
 
     @staticmethod
     def mod_increase_velocity():
-        context().v += MMLConfig.accent_amount
+        context().v += config.accent_amount
 
     @staticmethod
     def mod_decrease_velocity():
-        context().v -= MMLConfig.accent_amount
+        context().v -= config.accent_amount
 
     @staticmethod
     def mod_increase_dt():
-        context().dt += MMLConfig.timeshift_amount
+        context().dt += config.timeshift_amount
 
     @staticmethod
     def mod_decrease_dt():
-        context().dt -= MMLConfig.timeshift_amount
+        context().dt -= config.timeshift_amount
 
     @staticmethod
     def mod_staccato():
-        context().dr *= MMLConfig.staccato_amount
+        context().dr *= config.staccato_amount
 
     @staticmethod
     def mod_addlength():
@@ -229,9 +237,7 @@ class MMLAction(object):
 
 
 class MMLConfig(object):
-    prefixes: str = '^_'
-    suffixes: str = '\',#%*.+-!?`~><\\"'
-    char_actions: Mapping[Char, Callable[[], _Optional[Score]]] = {
+    default_char_actions: Mapping[Char, Callable[[], _Optional[Score]]] = {
         '^': MMLAction.mod_octaveup,
         '_': MMLAction.mod_octavedown,
         "'": MMLAction.mod_octaveup,
@@ -271,22 +277,48 @@ class MMLConfig(object):
         # '_': MMLAction.cmd_octavedown,
         ' ': MMLAction.no_op,
     }
-    octave_number_suffix: bool = True
-    accent_amount: Ticks = 10
-    timeshift_amount: Ticks = L64
-    staccato_amount: float = 0.5
 
-    @staticmethod
-    def show_config():
-        print("prefixes=%r" % MMLConfig.prefixes)
-        print("suffixes=%r" % MMLConfig.suffixes)
+    def __init__(self,
+                 prefixes: str = '^_',
+                 suffixes: str = '\',#%*.+-!?`~><\\"',
+                 char_actions=None,
+                 octave_number_suffix: bool = True,
+                 accent_amount: Ticks = 10,
+                 timeshift_amount: Ticks = L64,
+                 staccato_amount: float = 0.5):
+        if char_actions is None:
+            char_actions = MMLConfig.default_char_actions.copy()
+        self.prefixes = prefixes
+        self.suffixes = suffixes
+        self.char_actions = char_actions
+        self.octave_number_suffix = octave_number_suffix
+        self.accent_amount = accent_amount
+        self.timeshift_amount = timeshift_amount
+        self.staccato_amount = staccato_amount
+
+    def copy(self):
+        return self.__class__(
+            self.prefixes,
+            self.suffixes,
+            self.char_actions.copy(),
+            self.octave_number_suffix,
+            self.accent_amount,
+            self.timeshift_amount,
+            self.staccato_amount)
+
+    def show_config(self):
+        print("prefixes=%r" % self.prefixes)
+        print("suffixes=%r" % self.suffixes)
         print("char_actions:")
-        for item in MMLConfig.char_actions.items():
+        for item in self.char_actions.items():
             print("    %r: %r" % item)
-        print("octave_number_suffix=%r" % MMLConfig.octave_number_suffix)
-        print("accent_amount=%r" % MMLConfig.accent_amount)
-        print("timeshift_amount=%r" % MMLConfig.timeshift_amount)
-        print("staccato_amount=%r" % MMLConfig.staccato_amount)
+        print("octave_number_suffix=%r" % self.octave_number_suffix)
+        print("accent_amount=%r" % self.accent_amount)
+        print("timeshift_amount=%r" % self.timeshift_amount)
+        print("staccato_amount=%r" % self.staccato_amount)
+
+
+config = MMLConfig()
 
 
 class MMLEvaluator(object):
@@ -331,6 +363,9 @@ class MMLEvaluator(object):
         result = EventList()
         for child in node:
             result = self.concat_scores(result, self.evalnode(child))
+            if parser is None:
+                raise MMLConfigError("parser is invalidated by mmlconfig()",
+                                     child.position_end)
         return result
 
     def eval_comment_string(self, node) -> None:
@@ -410,7 +445,7 @@ class MMLEvaluator(object):
             result = self.evalnode(node[0])
         else:
             try:
-                action = MMLConfig.char_actions[node.value[0]]
+                action = config.char_actions[node.value[0]]
             except KeyError:
                 raise MMLError("Unknown command `%c' at %s"
                                % (node.value, self.linecol(node.position)))
@@ -422,7 +457,7 @@ class MMLEvaluator(object):
 
     def eval_modifier(self, node) -> _Optional[Score]:
         if node[0].rule_name == 'integer':
-            if MMLConfig.octave_number_suffix:
+            if config.octave_number_suffix:
                 context().o = self.evalnode(node[0])
             else:
                 context().L = int_preferred(Fraction(L1,
@@ -463,7 +498,7 @@ class MMLEvaluator(object):
 
     def eval_prefixchar(self, node) -> _Optional[Score]:
         try:
-            return MMLConfig.char_actions[node.value]()
+            return config.char_actions[node.value]()
         except KeyError:
             MMLAction.mod_undefined(node.value)()
 
@@ -655,7 +690,7 @@ commands ``}``
         Note that the names defined in the following modules can be used in
         the MML string without specifying the package or module name:
         pytakt.pitch, pytakt.sc, pytakt.constants, pytakt.gm.drums,
-        pytakt.scale.
+        pytakt.scale, pytakt.effector.
 
     .. rubric:: Simple Expressions
 
@@ -853,7 +888,8 @@ G/!? G/ G/!? G3*").show(True)
         <Python関数名> はドット('.')を含んでいても構いません。
         なお、次のモジュールで定義されている名前は、MML文字列の中では
         パッケージ名やモジュール名を指定せずに使えます: pytakt.pitch,
-        pytakt.sc, pytakt.constants, pytakt.gm.drums, pytakt.scale。
+        pytakt.sc, pytakt.constants, pytakt.gm.drums, pytakt.scale,
+        pytakt.effector
 
     .. rubric:: 単純式
 
@@ -944,23 +980,6 @@ G/!? G/ G/!? G3*").show(True)
             col = pos - text.rfind('\n', 0, pos)
             return 'line %d, column %d' % (line, col)
 
-    if not parser:
-        parser = ParserPython(score, comment_string,
-                              ws="\t\n\r 　")  # 全角スペースを加えた
-    try:
-        parse_tree = parser.parse(text)
-    except NoMatch as e:
-        pos = e.position
-        linestart = text.rfind('\n', 0, pos) + 1
-        if text[linestart:pos].strip() == '':  # 行先頭でのエラー
-            linestart = text.rfind('\n', 0, linestart - 1) + 1
-        lineend = text.find('\n', pos)
-        if lineend == -1:
-            lineend = len(text)
-        raise MMLError(
-            "Syntax error at %s:\n    %s ===> %s <==="
-            % (linecol(pos), (text + '.')[linestart:pos],
-               (text + '.')[pos:lineend])) from None
     # outerglobals(), outerlocals()は mml関数を呼び出した元の環境を取得する。
     #  (これを行わないと、mmlモジュールの中の名前しかアクセスできない)
     if globals is None:
@@ -971,22 +990,52 @@ G/!? G/ G/!? G3*").show(True)
         newglobals = {**_safe_globals, **globals}
     else:
         newglobals = {**_mml_globals, **globals}
-    evaluator = MMLEvaluator(newglobals, locals, _safe_mode, linecol)
-    effectors = context().effectors
-    with newcontext(effectors=[]):
+
+    retry_count = 100
+    while True:
+        if not parser:
+            parser = ParserPython(score, comment_string,
+                                  ws="\t\n\r 　")  # 全角スペースを加えた
         try:
-            s = evaluator.evalnode(parse_tree)
-        except MMLError as e:
-            if e.source is not None:
-                while isinstance(e.source, MMLError) and \
-                      e.source.source is not None:
-                    e = e.source
-                print(str(e) + '\n', file=sys.stderr)
-                raise e.source.__class__(str(e.source)) from None
-            else:
-                raise MMLError(str(e)) from None
-        for eff in effectors:
-            s = eff(s)
+            parse_tree = parser.parse(text)
+        except NoMatch as e:
+            pos = e.position
+            linestart = text.rfind('\n', 0, pos) + 1
+            if text[linestart:pos].strip() == '':  # 行先頭でのエラー
+                linestart = text.rfind('\n', 0, linestart - 1) + 1
+            lineend = text.find('\n', pos)
+            if lineend == -1:
+                lineend = len(text)
+            raise MMLError(
+                "Syntax error at %s:\n    %s ===> %s <==="
+                % (linecol(pos), (text + '.')[linestart:pos],
+                   (text + '.')[pos:lineend])) from None
+
+        evaluator = MMLEvaluator(newglobals, locals, _safe_mode, linecol)
+        effectors = context().effectors
+        with newcontext(effectors=[]):
+            try:
+                s = evaluator.evalnode(parse_tree)
+            except MMLConfigError as e:
+                text = (' ' * e.nextpos) + text[e.nextpos:]
+                if retry_count > 0:
+                    retry_count -= 1
+                    continue
+                else:
+                    raise MMLError(
+                        "Too many mmlconfig() with prefix/suffix modification")
+            except MMLError as e:
+                if e.source is not None:
+                    while isinstance(e.source, MMLError) and \
+                          e.source.source is not None:
+                        e = e.source
+                    print(str(e) + '\n', file=sys.stderr)
+                    raise e.source.__class__(str(e.source)) from None
+                else:
+                    raise MMLError(str(e)) from None
+            for eff in effectors:
+                s = eff(s)
+        break
     return s
 
 
@@ -1055,54 +1104,6 @@ def safe_mml(text) -> Score:
     return mml(text, {}, {}, _safe_mode=True)
 
 
-# _mml_globalsは、mml()内で $, | に続けて直接利用できる名前の辞書
-# _safe_globalsは、safe_mml() 用
-_common_globals = {'context': context, 'newcontext': newcontext}
-for module in (pytakt.sc, pytakt.pitch, pytakt.scale):
-    for var in module.__all__:
-        _common_globals[var] = getattr(module, var)
-for module in (pytakt.constants, pytakt.gm.drums):
-    for var in dir(module):
-        if not var.startswith('_'):
-            _common_globals[var] = getattr(module, var)
-_mml_globals = {**_common_globals, 'gm': pytakt.gm, 'mml': mml}
-_safe_globals = {
-    **_common_globals,
-    'mml': safe_mml,
-    # 次のような関数をここに登録してはいけない。
-    #   1. 引数次第でシステムに危害を与える可能性がある関数(危険な関数)
-    #   2. 危険な関数、またはそれを含むコンテナを返す関数
-    #   3. 危険な関数が演算子に割り当てられているオブジェクト（またはそれを
-    #      含むコンテナ）を返す関数
-    'abs': abs,
-    'len': len,
-    'bool': bool,
-    'int': int,
-    'float': float,
-    'round': round,
-    'Transpose': pytakt.effector.Transpose,
-    'Invert': pytakt.effector.Invert,
-    'ApplyScale': pytakt.effector.ApplyScale,
-    'ConvertScale': pytakt.effector.ConvertScale,
-    'ScaleVelocity': pytakt.effector.ScaleVelocity,
-    'TimeStretch': pytakt.effector.TimeStretch,
-    'Retrograde': pytakt.effector.Retrograde,
-    'TimeDeform': pytakt.effector.TimeDeform,
-    'Swing': pytakt.effector.Swing,
-    'Randomize': pytakt.effector.Randomize,
-    'Arpeggio': pytakt.effector.Arpeggio,
-    'Product': pytakt.effector.Product,
-    'Apply': pytakt.effector.Apply,
-    'Tie': pytakt.effector.Tie,
-    'EndTie': pytakt.effector.EndTie,
-    'Voice': pytakt.effector.Voice,
-    'Mark': pytakt.effector.Mark,
-}
-for var in dir(pytakt.gm):
-    if not var.startswith('_'):
-        _safe_globals['gm.' + var] = getattr(pytakt.gm, var)
-
-
 def mmlconfig(translate=("", ""), *,
               add_prefixes="",
               add_suffixes="",
@@ -1146,6 +1147,10 @@ def mmlconfig(translate=("", ""), *,
     * Change the amount of parameter change
         See the entries for accent_amount, timeshift_amount, and
         staccato_amount below.
+
+    When `mmlconfig` is called within an MML string to change the character
+    class, the change takes effect starting from the next command at the top
+    level.
 
     Args:
         translate((str, str), optional):
@@ -1240,6 +1245,9 @@ def mmlconfig(translate=("", ""), *,
     * パラメータ変化量の変更
         下の accent_amount, timeshift_amount, staccato_amount の項目を参照。
 
+    MML文字列の中でmmlconfigを呼び出して文字クラスの変更を行った場合、それが
+    有効になるのは、トップレベルの次のコマンドからです。
+
     Args:
         translate((str, str), optional):
             長さの等しい2つの文字列からなるタプルを指定し、
@@ -1296,24 +1304,26 @@ def mmlconfig(translate=("", ""), *,
        and del_prefixes == "" and del_suffixes == "" and actions == {} \
        and octave_number_suffix is None and accent_amount is None \
        and timeshift_amount is None and staccato_amount is None:
-        MMLConfig.show_config()
+        config.show_config()
         return
 
     for ch in add_prefixes:
         check_reserved(ch)
-        MMLConfig.prefixes += ch
+        if ch not in config.prefixes:
+            config.prefixes += ch
         del_suffixes += ch
         parser = None
     for ch in add_suffixes:
         check_reserved(ch)
-        MMLConfig.suffixes += ch
+        if ch not in config.suffixes:
+            config.suffixes += ch
         del_prefixes += ch
         parser = None
     for ch in del_prefixes:
-        MMLConfig.prefixes = MMLConfig.prefixes.replace(ch, '')
+        config.prefixes = config.prefixes.replace(ch, '')
         parser = None
     for ch in del_suffixes:
-        MMLConfig.suffixes = MMLConfig.suffixes.replace(ch, '')
+        config.suffixes = config.suffixes.replace(ch, '')
         parser = None
 
     if not (isinstance(translate, tuple) and len(translate) == 2 and
@@ -1326,33 +1336,33 @@ def mmlconfig(translate=("", ""), *,
         check_reserved(cs)
         if cd != ' ':
             check_reserved(cd)
-        translate_dict[cs] = (MMLConfig.char_actions[cd] if cd in
-                              MMLConfig.char_actions else
+        translate_dict[cs] = (config.char_actions[cd] if cd in
+                              config.char_actions else
                               MMLAction.cmd_undefined(cs))
-    MMLConfig.char_actions.update(translate_dict)
+    config.char_actions.update(translate_dict)
 
     for ca in actions.keys():
         if len(ca) != 1:
             raise ValueError("`%s': Must be a single charactor" % (ca,))
         check_reserved(ca)
-    MMLConfig.char_actions.update(actions)
+    config.char_actions.update(actions)
 
     if octave_number_suffix is not None:
         if not isinstance(octave_number_suffix, bool):
             raise TypeError("octave_number_suffix must be a truth value")
-        MMLConfig.octave_number_suffix = octave_number_suffix
+        config.octave_number_suffix = octave_number_suffix
     if accent_amount is not None:
         if not isinstance(accent_amount, numbers.Real):
             raise TypeError("accent_amount must be a number")
-        MMLConfig.accent_amount = accent_amount
+        config.accent_amount = accent_amount
     if timeshift_amount is not None:
         if not isinstance(timeshift_amount, numbers.Real):
             raise TypeError("timeshift_amount must be a number")
-        MMLConfig.timeshift_amount = timeshift_amount
+        config.timeshift_amount = timeshift_amount
     if staccato_amount is not None:
         if not isinstance(staccato_amount, numbers.Real):
             raise TypeError("staccato_amount must be a number")
-        MMLConfig.staccato_amount = staccato_amount
+        config.staccato_amount = staccato_amount
 
 
 # mmlconfig(translate=(u"どれみふぁそらしっんドレミファソラシッンー＃♯♭♮",
@@ -1363,3 +1373,152 @@ def mmlconfig(translate=("", ""), *,
 #           actions={'>': MMLAction.cmd_octaveup,
 #                    '<': MMLAction.cmd_octavedown},
 #           octave_number_suffix=False)
+
+
+def _max(*args, **kwargs):
+    if 'key' in kwargs:
+        raise TypeError("Can not use max() with `key' in safe_mml()")
+    return max(*args, **kwargs)
+
+
+def _min(*args, **kwargs):
+    if 'key' in kwargs:
+        raise TypeError("Can not use min() with `key' in safe_mml()")
+    return min(*args, **kwargs)
+
+
+def _sorted(*args, **kwargs):
+    if 'key' in kwargs:
+        raise TypeError("Can not use sorted() with `key' in safe_mml()")
+    return sorted(*args, **kwargs)
+
+
+# _mml_globalsは、mml()内で $, | に続けて直接利用できる名前の辞書
+# _safe_globalsは、safe_mml() 用
+_common_globals = {'context': context, 'newcontext': newcontext,
+                   'mmlconfig': mmlconfig}
+for module in (pytakt.sc, pytakt.pitch, pytakt.scale):
+    for var in module.__all__:
+        _common_globals[var] = getattr(module, var)
+for module in (pytakt.constants, pytakt.gm.drums):
+    for var in dir(module):
+        if not var.startswith('_'):
+            _common_globals[var] = getattr(module, var)
+_mml_globals = {**_common_globals, 'gm': pytakt.gm, 'mml': mml}
+for var in dir(pytakt.effector):
+    if not var.startswith('_'):
+        _mml_globals[var] = getattr(pytakt.effector, var)
+_safe_globals = {
+    **_common_globals,
+    # 次のような関数をここに登録してはいけない。
+    #   1. 引数次第でシステムに危害を与える可能性がある関数(危険な関数)
+    #   2. 危険な関数、またはそれを含むコンテナを返す関数
+    #   3. 危険な関数が演算子に割り当てられているオブジェクト（またはそれを
+    #      含むコンテナ）を返す関数
+    'abs': abs,
+    'len': len,
+    'bool': bool,
+    'int': int,
+    'float': float,
+    'max': _max,
+    'min': _min,
+    'ord': ord,
+    'print': print,
+    'range': range,
+    'reversed': reversed,
+    'round': round,
+    'sorted': _sorted,
+    'sum': sum,
+    'MMLAction.cmd_octaveup': MMLAction.cmd_octaveup,
+    'MMLAction.cmd_octavedown': MMLAction.cmd_octavedown,
+    'Transpose': pytakt.effector.Transpose,
+    'Invert': pytakt.effector.Invert,
+    'ApplyScale': pytakt.effector.ApplyScale,
+    'ConvertScale': pytakt.effector.ConvertScale,
+    'ScaleVelocity': pytakt.effector.ScaleVelocity,
+    'TimeStretch': pytakt.effector.TimeStretch,
+    'Retrograde': pytakt.effector.Retrograde,
+    'TimeDeform': pytakt.effector.TimeDeform,
+    'Swing': pytakt.effector.Swing,
+    'Randomize': pytakt.effector.Randomize,
+    'Clip': pytakt.effector.Clip,
+    'Arpeggio': pytakt.effector.Arpeggio,
+    'Product': ('set_globals_locals', pytakt.effector.Product),
+    'Apply': ('set_globals_locals', pytakt.effector.Apply),
+    'Tie': pytakt.effector.Tie,
+    'EndTie': pytakt.effector.EndTie,
+    'Voice': pytakt.effector.Voice,
+    'Mark': pytakt.effector.Mark,
+    'math.ceil': math.ceil,
+    'math.floor': math.floor,
+    'math.exp': math.exp,
+    'math.log': math.log,
+    'math.sqrt': math.sqrt,
+    'math.acos': math.acos,
+    'math.asin': math.asin,
+    'math.atan': math.atan,
+    'math.atan2': math.atan2,
+    'math.cos': math.cos,
+    'math.sin': math.sin,
+    'math.tan': math.tan,
+    'math.erf': math.erf,
+    'math.gamma': math.gamma,
+    'math.pi': math.pi,
+    'math.e': math.e,
+    'str.count': str.count,
+    'str.find': str.find,
+    'str.join': str.join,
+    'str.replace': str.replace,
+    'str.rfind': str.rfind,
+    'str.split': str.split,
+    'random.seed': random.seed,
+    'random.randrange': random.randrange,
+    'random.choice': random.choice,
+    'random.choices': random.choices,
+    'random.sample': random.sample,
+    'random.random': random.random,
+    'random.gauss': random.gauss,
+}
+for var in dir(pytakt.gm):
+    if not var.startswith('_'):
+        _safe_globals['gm.' + var] = getattr(pytakt.gm, var)
+
+
+def readmml(filename, safe_mode=True) -> Score:
+    """
+    Reads an MML string from a file and returns the corresponding score.
+    If the file contains $mmlconfig, its settings are only valid within
+    that file.
+
+    Args:
+        filename(str): file name
+        safe_mode(bool):
+            If True, :func:`.safe_mml` is used for MML evaluation; if False,
+            :func:`.mml` is used.
+    """
+    """
+    ファイルからMML文字列を読み、それに従ったスコアを返します。
+    ファイルに $mmlconfig が含まれている場合、その設定はファイル内だけで
+    有効になります。
+
+    Args:
+        filename(str): ファイル名
+        safe_mode(bool):
+            Trueの場合 :func:`.safe_mml`、Falseの場合 :func:`.mml` がMMLの
+            評価に使われます。
+    """
+    global config
+    with open(filename, "r") as f:
+        text = f.read()
+
+    config_org = config
+    config = config.copy()
+    try:
+        score = mml(text, {}, {}, safe_mode)
+    except Exception:
+        print("Exception raised during reading a file: %s\n" % filename,
+              file=sys.stderr)
+        raise
+    finally:
+        config = config_org
+    return score

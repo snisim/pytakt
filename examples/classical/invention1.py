@@ -96,7 +96,6 @@ rh += motive.Transpose(DEG(10), c_scale) + mml("^f*~//")
 rh += motive_inv.Transpose(DEG(12), c_scale) + mml("^f*~//")
 rh += motive.Transpose(DEG(9), c_scale) + mml("^e*~//")
 
-s = motive_inv.Transpose(DEG(3), c_scale)
 lh += mml("_a/ __a/ r r//") + \
     motive_inv.Transpose(DEG(3), c_scale).Clip(0, L16*3) + \
     motive_inv.Transpose(DEG(2), c_scale).\
