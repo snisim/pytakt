@@ -376,6 +376,8 @@ class MMLEvaluator(object):
         nc.addattr('_lorg', nc.L)
         nc.addattr('_effectors', [])
         nc.addattr('_ampersand', False)
+        effectors_org = nc.effectors
+        nc.effectors = []
         with nc:
             result = None
             # evaluate prefixes (pre-modifiers)
@@ -391,6 +393,8 @@ class MMLEvaluator(object):
                 result = context()._effectors.pop(0)(result)
             if context()._ampersand and result is not None:
                 result = EventList(result, duration=0)
+            for eff in effectors_org:
+                result = eff(result)
             return result
 
     def eval_primary_command(self, node) -> _Optional[Score]:
