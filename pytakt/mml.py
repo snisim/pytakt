@@ -14,6 +14,7 @@ import os
 import builtins
 import sys
 import numbers
+import ast
 import math
 import random
 from arpeggio import ZeroOrMore, Optional, RegExMatch, EOF, \
@@ -117,18 +118,18 @@ def balanced_paren_body(): return [balanced_paren,
 def expression(): return term, ZeroOrMore(["+", "-"], term)
 def term(): return factor, ZeroOrMore(["*", "//", "/", "%"], factor)
 def factor(): return Optional("-"), primary
-def primary(): return [floating, integer,
-                       length_constant, context_variable,
-                       python_expression, ("(", expression, ")")]
+def primary(): return [floating, integer, length_constant, context_variable,
+                       python_expression, ("(", expression, ")"), string,
+                       ("$", block)]
 def integer(): return RegExMatch(r'\d+')
 # "v=0x10ceg" のような曖昧なケースが発生するので廃止。必要なら $(0x..) を使う。
 # def hexinteger(): return RegExMatch(r'0[xX][\da-fA-F]+')
 def floating(): return RegExMatch(r'\d+\.\d*|\d*\.\d+')
+def string(): return [RegExMatch(r'"([^"\n\\]|\\.)*"'),
+                      RegExMatch(r"'([^'\n\\]|\\.)*'")]
 
-def python_assignment(): return ("$", python_id, "=",
-                                 [python_funcall, balanced_paren])
-def python_defun(): return ("$", python_id, balanced_paren, "=",
-                            [python_funcall, balanced_paren])
+def python_assignment(): return ("$", python_id, "=", expression)
+def python_defun(): return ("$", python_id, balanced_paren, "=", expression)
 def if_command(): return ("$", "if", balanced_paren, block,
                           ZeroOrMore("$", "elif", balanced_paren, block),
                           Optional("$", "else", block))
@@ -580,8 +581,12 @@ class MMLEvaluator(object):
             else -self.evalnode(node[1])
 
     def eval_primary(self, node) -> Union[int, float, Ticks, None]:
-        return self.evalnode(node[0]) if len(node) == 1 \
-            else self.evalnode(node[1])
+        if node[0].value == '(':
+            return self.evalnode(node[1])
+        elif node[0].value == '$':
+            return self.eval_modified_command([node[1]])
+        else:
+            return self.evalnode(node[0])
 
     def eval_integer(self, node) -> int:
         return int(node.value)
@@ -592,6 +597,9 @@ class MMLEvaluator(object):
     def eval_floating(self, node) -> float:
         return float(node.value)
 
+    def eval_string(self, node) -> str:
+        return ast.literal_eval(node.value)
+
     def eval_python_assignment(self, node) -> None:
         varname = node[1].value
         if varname in ('True', 'False', 'None', 'mml'):
@@ -599,7 +607,7 @@ class MMLEvaluator(object):
         if varname in _context_variables:
             raise MMLError("Can not use the context variable name `%s' for "
                            "a Python variable" % (varname,))
-        rhs = self.eval_python_expression([node[3]])
+        rhs = self.evalnode(node[3])
         if callable(rhs):
             raise MMLError("Can not assign a callable object "
                            "to a variable: '%s'" % (varname,))
@@ -630,7 +638,7 @@ class MMLEvaluator(object):
     def call_function(self, node, signature, args, kwargs):
         locals_org = self.locals
         self.locals = bind_arguments(signature, args, kwargs)
-        retval = self.eval_python_expression([node])
+        retval = self.evalnode(node)
         self.locals = locals_org
         return retval
 
@@ -790,17 +798,13 @@ commands ``}``
         Equivalent to <context attribute name> ``=`` <context attribute name>
         op <simple expression>, where op is one of the operators that can be
         used in simple expressions.
-    ``$``\\ <Python variable name>\\ ``=(``\\ <Python expression>\\ ``)`` and \
-    ``$``\\ <Python variable name>\\ ``=``\\ \
-<Python function name>\\ ``(``\\ <Python argument>\\ ``,`` ... ``)``
-        Defines a Python variable with its value being the right-hand side
-        value. Defined variables are valid only within the MML string.
-    ``$``\\ <Python function name 1>\\ ``(``\\ <Python parameter list>\\ \
-``)=(``\\ <Python expression>\\ ``)`` and \
-    ``$``\\ <Python function name 1>\\ ``(``\\ <Python parameter list>\\ \
-``)=``\\ <Python function name 2>\\ ``(``\\ <Python argument>\\ ``,`` ... ``)``
-        Defines a function named <Python function name 1> that returns the
-        value on the right side.  <Python parameter list> can contain default
+    ``$``\\ <Python variable name> ``=`` <simple expression>
+        Defines a Python variable with the value of <simple expression>.
+        Defined variables are valid only within the MML string.
+    ``$``\\ <Python function name>\\ ``(``\\ <Python parameter list>\\ \
+``)`` ``=`` <simple expression>
+        Defines a function named <Python function name> that returns the value
+        of <simple expression>.  <Python parameter list> can contain default
         values following ``=``, but can not contain ``*`` or ``**``.
         Defined functions are valid only within the MML string.
     ``$if(``\\ <Python expression 1>\\ ``)`` ``{`` <commands 1> ``}`` \
@@ -819,13 +823,17 @@ commands ``}``
     .. rubric:: Simple Expressions
 
     <simple expression> is either an integer, a floating-point number,
-    a note-value constant (such as L4), a context attribute name, a simple
-    expression enclosed in parentheses, a Python expression enclosed in ``$(``
-    and ``)``, a Python function call following ``$``, or an expression that
-    combines these with the following operators: ``+``, ``-``, ``*``, ``/``,
-    ``//``, and ``%``.
+    a note-value constant (such as L4), a context attribute name,
+    a string enclosed by ``"`` or ``'``, a simple expression enclosed in
+    parentheses, a Python expression enclosed in ``$(`` and ``)``, a Python
+    function call following ``$``, a sequence of commands enclosed in
+    ``${`` and ``}``, or an expression that combines these with the following
+    operators: ``+``, ``-``, ``*``, ``/``, ``//``, and ``%``.
     Only dt, tk, ch, v, nv, L, duoffset, du, durate, dr, o, and key are
     available as the context attribute names.
+    A sequence of commands enclosed in ``${`` and ``}`` executes the commands
+    using a copied separate context, and gives the sequential concatenation
+    of the resulting scores as its value.
 
     .. rubric:: Premodifiers
 
@@ -1016,16 +1024,12 @@ G/!? G/ G/!? G3*").show(True)
     <コンテキスト属性名> op\\ ``=`` <単純式>
         <コンテキスト属性名> ``=`` <コンテキスト属性名> op <単純式> と
         等価です。opは単純式の中で使える演算子のいずれかです。
-    ``$``\\ <Python変数名>\\ ``=(``\\ <Python式>\\ ``)`` および \
-    ``$``\\ <Python変数名>\\ ``=``\\ \
-<Python関数名>\\ ``(``\\ <Python引数>\\ ``,`` ... ``)``
-        <Python変数名>を、右辺の値を持つ変数として定義します。定義された
+    ``$``\\ <Python変数名> ``=`` <単純式>
+        <Python変数名>を、<単純式>の値を持つ変数として定義します。定義された
         変数は MML 文字列の中でのみで有効です。
-    ``$``\\ <Python関数名1>\\ ``(``\\ <Python仮引数リスト>\\ ``)=(``\\ \
-<Python式>\\ ``)`` および \
-    ``$``\\ <Python関数名1>\\ ``(``\\ <Python仮引数リスト>\\ ``)=``\\ \
-<Python関数名2>\\ ``(``\\ <Python引数>\\ ``,`` ... ``)``
-        右辺の値を戻り値とする関数を、<Python関数名1>の名前で定義します。
+    ``$``\\ <Python関数名>\\ ``(``\\ <Python仮引数リスト>\\ ``)`` ``=`` \
+<単純式>
+        <単純式>の値を戻り値とする関数を、<Python関数名>の名前で定義します。
         <Python仮引数リスト>において、``=`` に続けられたデフォルト値を含める
         ことは可能ですが、``*`` や ``**`` は使用できません。定義された関数は
         MML 文字列の中でのみで有効です。
@@ -1044,10 +1048,14 @@ G/!? G/ G/!? G3*").show(True)
     .. rubric:: 単純式
 
     <単純式> は、整数、浮動小数点数、音価定数(L4など)、コンテキスト属性名、
-    括弧で囲んだ単純式、``$(`` と ``)`` で囲まれたPythonの式、``$`` に続く
-    Pythonの関数呼び出し、またはこれらを演算子(``+``, ``-``, ``*``, ``/``,
+    ``"`` または ``'`` で囲まれた文字列、括弧で囲んだ単純式、``$(`` と ``)``
+    で囲まれたPythonの式、``$`` に続くPythonの関数呼び出し、``${`` と ``}``
+    で囲まれたコマンドの列、またはこれらを演算子(``+``, ``-``, ``*``, ``/``,
     ``//``, ``%`` のいずれか) で結合したものです。使用できるコンテキスト属性
     名は、dt, tk, ch, v, nv, L, duoffset, du, durate, dr, o, key のみです。
+    ``${`` と ``}`` で囲まれたコマンドの列は、コピーされた別のコンテキストを
+    用いてコマンド列を実行し、その結果のスコア群を逐次的に結合したものが値と
+    なります。
 
     .. rubric:: 前置修飾子
 

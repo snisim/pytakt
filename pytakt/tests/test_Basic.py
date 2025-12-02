@@ -83,27 +83,27 @@ def test_mml():
     assert mml("$note(C4, v=v+10)") == safe_mml("$note(C4, v=v+10)") == \
         mml("$note(C4, v=90)")
     assert mml("$note(C4, ch=ch+1)") == mml("C4(ch=2)")
-    assert mml("$zz=(C4) $vv=(50+10) $note(zz, v=vv)") == mml("c(v=60)")
-    assert safe_mml("$zz=(C4) $vv=(50+10)  $note(zz, v=vv)") == mml("c(v=60)")
+    assert mml("$zz=$(C4) $vv=50+10 $note(zz, v=vv)") == mml("c(v=60)")
+    assert safe_mml("$zz=$(C4) $vv=50+10 $note(zz, v=vv)") == mml("c(v=60)")
     try:
         x = zz
     except NameError:
         pass
     else:
         assert False
-    assert safe_mml("$f(x)=(vol(x+10)+expr(x)) $f(50)") == \
+    assert safe_mml("$f(x)=$vol(x+10)+$expr(x) $f(50)") == \
         mml("$vol(60) $expr(50)")
-    assert safe_mml("$f(x, y=2) = (vol(x+10*y)+expr(x)*y) $f(50)") == \
+    assert safe_mml("$f(x, y=2) = $(vol(x+10*y)+expr(x)*y) $f(50)") == \
         mml("$vol(70) $expr(50) $expr(50)")
-    assert safe_mml("$f(x, y=2) = mml('$vol(x) $mod(y)') $f(50, 4)") == \
-        mml("$f(x, y=2) = mml('$vol(x) $mod(y)') $f(50, 4)") == \
+    assert safe_mml("$f(x, y=2) = $mml('$vol(x) $mod(y)') $f(50, 4)") == \
+        mml("$f(x, y=2) = $mml('$vol(x) $mod(y)') $f(50, 4)") == \
         mml("$vol(50) $mod(4)")
-    assert safe_mml("$f() = mml('cde') $f() $f()") == \
-        mml("$f() = mml('cde') $f() $f()") == mml("cdecde")
-    assert safe_mml("$T() = Transpose('M2') {cd}|T()") == \
-        mml("$T() = Transpose('M2') {cd}|T()") == mml("de")
-    assert safe_mml("$Trill() = Product('{L16 cd}@@') g|Trill()") == \
-        mml("$Trill() = Product('{L16 cd}@@') g|Trill()") == mml("L16 gaga")
+    assert safe_mml("$f(x=L4) = ${L=$(x) cde} $f() $f(L8) f") == \
+        mml("$f(x=L4) = ${L=$(x) cde} $f() $f(L8) f") == mml("cde L8 cde L4 f")
+    assert safe_mml("$T() = $Transpose('M2') {cd}|T()") == \
+        mml("$T() = $Transpose('M2') {cd}|T()") == mml("de")
+    assert safe_mml("$Trill() = $Product('{L16 cd}@@') g|Trill()") == \
+        mml("$Trill() = $Product('{L16 cd}@@') g|Trill()") == mml("L16 gaga")
     try:
         safe_mml("""$mml("v=$eval('0')")""")
     except NameError:
