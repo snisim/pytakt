@@ -16,9 +16,9 @@
 #      shuffle-repeat - the list of pitches on the scale between LOW and HIGH
 #          is once randomly shuffled and then repeated.
 #  Rhythm patterns: Rhythm patterns described in Pytakt MML.  Pitches in the
-#    patterns are ignored.  Duration, velocity, and delta time in the patterns
-#    are considered.  If two or more patterns are specified, they are
-#    randomly selected each time they are applied.
+#    patterns are ignored.  Duration, velocity, delta time, MIDI channels, and
+#    non-note events in the patterns are considered.  If two or more patterns
+#    are specified, they are randomly selected each time they are applied.
 #
 #  The strings in the Comboboxes can be edited.
 #
@@ -171,7 +171,7 @@ class RandomStream(tkinter.Frame):
             side=tkinter.LEFT, padx=20, pady=20)
         self.rhythmboxes = [
             MyCombobox(rhythm_frame, values=self.rhythmlist, initial='c',
-                       width=10, validate=self.validate_rhythm,
+                       width=14, validate=self.validate_rhythm,
                        command=self.master.restart, addnewvalue=True),
             MyCombobox(rhythm_frame, values=self.rhythmlist, initial='',
                        width=8, validate=self.validate_rhythm,
@@ -203,9 +203,8 @@ class RandomStream(tkinter.Frame):
 
     def validate_rhythm(self):
         try:
-            self.rhythms = [
-                takt.EventList(takt.safe_mml(rb.get())).Filter(takt.NoteEvent)
-                for rb in self.rhythmboxes]
+            self.rhythms = [takt.safe_mml(rb.get()).evlist()
+                            for rb in self.rhythmboxes]
         except takt.MMLError:
             return False
         return True
@@ -243,18 +242,22 @@ class RandomStream(tkinter.Frame):
 
         zipped_lists = []
         for evlist in self.rhythms:
-            if evlist:
-                t1list = [ev.t for ev in evlist]
+            notes = evlist.Filter(takt.NoteEvent)
+            ctrls = takt.EventList(evlist.Reject(takt.NoteEvent), duration=0)
+            if notes:
+                t1list = [ev.t for ev in notes]
                 # t2list is a list of the next event's time for each event
-                t2list = t1list[1:] + [evlist.duration]
-                zipped_lists.append(list(zip(t1list, t2list, evlist)))
+                t2list = t1list[1:] + [notes.duration]
+                ctllist = [ctrls] + [takt.empty() for _ in range(len(notes)-1)]
+                zipped_lists.append(list(zip(t1list, t2list, notes, ctllist)))
         if not zipped_lists:
             return takt.EventList()
         rhythm_stream = itertools.chain.from_iterable(
             random.choice(zipped_lists) for _ in itertools.count())
         return takt.genseq(
-            takt.note(n, ev.L, step=t2-t1, v=ev.v, du=ev.get_du(), dt=ev.dt)
-            for n, (t1, t2, ev) in zip(pitch_stream, rhythm_stream))
+            ctrls + takt.note(n, ev.L, step=t2-t1, v=ev.v,
+                              du=ev.get_du(), dt=ev.dt, ch=ev.ch)
+            for n, (t1, t2, ev, ctrls) in zip(pitch_stream, rhythm_stream))
 
 
 class GUIMain(tkinter.Frame):

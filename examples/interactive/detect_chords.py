@@ -18,5 +18,5 @@ while True:
         if len(chord_buffer) >= 2:
             chord = Chord.from_chroma_profile(
                 chroma_profile(chord_buffer), bass=min(chord_buffer))
-            print(chord_buffer, chord.name())
+            print(sorted(chord_buffer), chord.name())
         chord_buffer.clear()
