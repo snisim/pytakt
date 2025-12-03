@@ -80,6 +80,9 @@ def test_mml():
         pass
     else:
         assert False
+    assert mml("$note(C4, v=v+10)") == safe_mml("$note(C4, v=v+10)") == \
+        mml("$note(C4, v=90)")
+    assert mml("$note(C4, ch=ch+1)") == mml("C4(ch=2)")
 
 
 def test_effectors():

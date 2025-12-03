@@ -56,6 +56,10 @@ class MMLConfigError(MMLError):
         self.nextpos = nextpos
 
 
+_context_variables = ["dt", "tk", "ch", "v", "nv", "L",
+                      "duoffset", "durate", "du", "dr", "o", "key"]
+
+
 # MML grammar begin
 def score(): return ZeroOrMore(command), EOF
 def command(): return [setlength,
@@ -88,8 +92,7 @@ def modifier(): return [suffixchar,
 # \x00はsuffixes/prefixesが空のときにエラーになるのを防ぐ
 def suffixchar(): return RegExMatch('[\x00%s]' % re.escape(config.suffixes))
 def prefixchar(): return RegExMatch('[\x00%s]' % re.escape(config.prefixes))
-def context_variable(): return ["dt", "tk", "ch", "v", "nv", "L",
-                                "duoffset", "du", "durate", "dr", "o", "key"]
+def context_variable(): return _context_variables
 def length_constant(): return RegExMatch(r'L\d+(DOT){0,2}')
 def context_variable_lhs(): return context_variable()
 def assign_op(): return ["=", "+=", "-=", "*=", "/=", "//=", "%="]
@@ -391,17 +394,20 @@ class MMLEvaluator(object):
         else:
             assert False
 
+    def python_eval(self, text):
+        for var in _context_variables:
+            self.globals[var] = getattr(context(), var)
+        if self.safe_mode:
+            return safe_eval(text, self.globals, self.locals)
+        else:
+            return eval(text, self.globals, self.locals)
+
     def eval_modified_command(self, node) -> _Optional[Score]:
         com = 0
         while node[com].rule_name == 'prefixchar':
             com += 1
         if node[com][0].value == '$':
-            if self.safe_mode:
-                nc = safe_eval(self.evalnode(node[com][1]),
-                               self.globals, self.locals).copy()
-            else:
-                nc = eval(self.evalnode(node[com][1]),
-                          self.globals, self.locals).copy()
+            nc = self.python_eval(self.evalnode(node[com][1])).copy()
         else:
             nc = newcontext()
         nc.addattr('_accidentals', '')
@@ -483,10 +489,7 @@ class MMLEvaluator(object):
         elif node[0].value == '|':
             evaltext = self.evalnode(node[1])
             try:
-                if self.safe_mode:
-                    eff = safe_eval(evaltext, self.globals, self.locals)
-                else:
-                    eff = eval(evaltext, self.globals, self.locals)
+                eff = self.python_eval(evaltext)
             except Exception as e:
                 raise MMLError(
                     "Error occurred during effector evaluation at %s: '%s'" %
@@ -517,10 +520,7 @@ class MMLEvaluator(object):
                                                     Ticks, None]:
         evaltext = self.evalnode(node[-1])
         try:
-            if self.safe_mode:
-                return safe_eval(evaltext, self.globals, self.locals)
-            else:
-                return eval(evaltext, self.globals, self.locals)
+            return self.python_eval(evaltext)
         except Exception as e:
             raise MMLError(
                 "Error occurred within the Python expression at %s: '%s'" %
@@ -661,9 +661,9 @@ G/!? G/ G/!? G3*").show(True)
         :mod:`pytakt.constants` module. For example, ``L8`` makes
         subsequent notes and rests eighth-note length.
     <context attribute name> ``=`` <simple expression>
-        Changes the value of a context attribute (e.g. ``v=100``).
-        Only dt, tk, ch, v, nv, L, duoffset, du,durate, dr, o, and key are
-        available as context attribute names. See below for simple expressions.
+        Changes the value of a context attribute (limited to those available
+        in simple expressions) (e.g. ``v=100``).
+        See below for simple expressions.
     <context attribute name> op\\ ``=`` <simple expression>
         Equivalent to <context attribute name> ``=`` <context attribute name>
         op <simple expression>, where op is one of the operators that can be
@@ -693,7 +693,9 @@ commands ``}``
         Note that the names defined in the following modules can be used in
         the MML string without specifying the package or module name:
         pytakt.pitch, pytakt.sc, pytakt.constants, pytakt.gm.drums,
-        pytakt.scale, pytakt.effector.
+        pytakt.scale, pytakt.effector. Additionally, context attributes
+        available in simple expressions can be referenced as variables
+        within the Python code.
 
     .. rubric:: Simple Expressions
 
@@ -703,6 +705,8 @@ commands ``}``
     and ``)``, a Python function call following ``$``, or an expression that
     combines these with the following operators: ``+``, ``-``, ``*``, ``/``,
     ``//``, and ``%``.
+    Only dt, tk, ch, v, nv, L, duoffset, du, durate, dr, o, and key are
+    available as the context attribute names.
 
     .. rubric:: Premodifiers
 
@@ -862,9 +866,8 @@ G/!? G/ G/!? G3*").show(True)
         なります。たとえば、``L8`` は以降の音符・休符を8分音符の長さに設定
         します。
     <コンテキスト属性名> ``=`` <単純式>
-        コンテキスト属性の値を変更します (例: ``v=100``)。
-        使用できるコンテキスト属性名は、dt, tk, ch, v, nv, L, duoffset, du,
-        durate, dr, o, key のみです。単純式については下を見てください。
+        コンテキスト属性（単純式で利用できるものに限る）の値を変更します
+        (例: ``v=100``)。単純式については下を見てください。
     <コンテキスト属性名> op\\ ``=`` <単純式>
         <コンテキスト属性名> ``=`` <コンテキスト属性名> op <単純式> と
         等価です。opは単純式の中で使える演算子のいずれかです。
@@ -892,14 +895,16 @@ G/!? G/ G/!? G3*").show(True)
         なお、次のモジュールで定義されている名前は、MML文字列の中では
         パッケージ名やモジュール名を指定せずに使えます: pytakt.pitch,
         pytakt.sc, pytakt.constants, pytakt.gm.drums, pytakt.scale,
-        pytakt.effector
+        pytakt.effector。また、単純式で利用できるコンテキスト属性はPython
+        コードの中で変数として参照可能です。
 
     .. rubric:: 単純式
 
     <単純式> は、整数、浮動小数点数、音価定数(L4など)、コンテキスト属性名、
     括弧で囲んだ単純式、``$(`` と ``)`` で囲まれたPythonの式、``$`` に続く
     Pythonの関数呼び出し、またはこれらを演算子(``+``, ``-``, ``*``, ``/``,
-    ``//``, ``%`` のいずれか) で結合したものです。
+    ``//``, ``%`` のいずれか) で結合したものです。使用できるコンテキスト属性
+    名は、dt, tk, ch, v, nv, L, duoffset, du, durate, dr, o, key のみです。
 
     .. rubric:: 前置修飾子
 
