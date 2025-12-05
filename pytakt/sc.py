@@ -56,14 +56,7 @@ def _getparams(kwargs, *attrs):
         # コンテキストには入っているがattrsには入っていない引数はrtnに含めない
         if not context().has_attribute(k) or k in attrs:
             rtn[k] = v
-    for k in attrs:
-        if k == 'ch' and not isinstance(rtn[k], numbers.Integral):
-            raise TypeError("`ch' must be an integer.")
-        if k == 'v' and not isinstance(rtn[k], numbers.Real):
-            raise TypeError("`v' must be a number.")
-        if k == 'nv' and not isinstance(rtn[k], (numbers.Real, type(None))):
-            raise TypeError("`nv' must be a number or None.")
-    if isinstance(rtn['dt'], numbers.Real) and abs(rtn['dt']) > MAX_DELTA_TIME:
+    if abs(rtn['dt']) > MAX_DELTA_TIME:
         raise ValueError("`dt' has too large absolute value")
     return rtn
 
@@ -146,8 +139,6 @@ du=240)])
     """
     if not isinstance(pitch, numbers.Real):
         raise TypeError("`pitch' must be a Pitch object or a MIDI note number")
-    if not isinstance(L, (numbers.Real, type(None))):
-        raise TypeError("`L' must be a number.")
     if not isinstance(step, (numbers.Real, type(None))):
         raise TypeError("`step' must be a number.")
 
@@ -157,10 +148,6 @@ du=240)])
             L = context().L
         else:
             context().L = L
-        if not isinstance(context().duoffset, numbers.Real) or \
-           not isinstance(context().durate, numbers.Real):
-            raise TypeError(
-                "`du', `dr', `duoffset', and `durate' must be numbers.")
         ev = NoteEvent(0, pitch, L, **_getparams(kwargs, 'v', 'nv', 'ch'))
         if context().du != L:
             ev.du = context().du

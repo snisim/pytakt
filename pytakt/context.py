@@ -13,6 +13,8 @@ import threading
 from typing import List, Tuple, Any
 from pytakt.utils import int_preferred
 from pytakt.constants import L4
+from pytakt.pitch import Key
+
 
 __all__ = ['Context', 'context', 'newcontext']
 
@@ -253,23 +255,28 @@ class Context(object):
             属性にはリストのコピーが格納されます。
         kwargs: コンテキストに対する追加の属性を指定します。
     """
-    __slots__ = ('dt', 'tk', 'ch', 'v', 'nv', 'L', 'duoffset', 'durate',
-                 'o', 'key', 'effectors', '_outer_context', '__dict__')
+    __slots__ = ('_dt', '_tk', '_ch', '_v', '_nv', '_L',
+                 '_duoffset', '_durate', '_o', '_key',
+                 '_effectors_',  # '_effectors' has name conflict with mml.py
+                 '_outer_context', '__dict__')
+    _attributes = ('dt', 'tk', 'ch', 'v', 'nv', 'L',
+                   'duoffset', 'durate', 'o', 'key', 'effectors')
+    _pseudo_attributes = ('du', 'dr')
     _newtrack_count = 1
 
     def __init__(self, dt=0, L=L4, v=80, nv=None, duoffset=0, durate=100,
                  tk=1, ch=1, o=4, key=0, effectors=[], **kwargs):
-        self.dt = dt
-        self.L = L
-        self.v = v
-        self.nv = nv
-        self.duoffset = duoffset
-        self.durate = durate
-        self.tk = tk
-        self.ch = ch
-        self.o = o
-        self.key = key
-        self.effectors = effectors.copy()
+        self._dt = dt
+        self._L = L
+        self._v = v
+        self._nv = nv
+        self._duoffset = duoffset
+        self._durate = durate
+        self._tk = tk
+        self._ch = ch
+        self._o = o
+        self._key = key
+        self._effectors_ = effectors.copy()
         self._outer_context = None
         self.__dict__.update(kwargs)
 
@@ -282,32 +289,151 @@ class Context(object):
         複製されたコンテキストを返します。effectors 属性値についてはリスト
         の複製が行われます。それ以外の属性については浅いコピーとなります。
         """
-        return self.__class__(self.dt, self.L, self.v, self.nv,
-                              self.duoffset, self.durate, self.tk, self.ch,
-                              self.o, self.key,
-                              self.effectors, **self.__dict__)
+        return self.__class__(self._dt, self._L, self._v, self._nv,
+                              self._duoffset, self._durate, self._tk, self._ch,
+                              self._o, self._key,
+                              self._effectors_, **self.__dict__)
     __copy__ = copy
 
-    def __getattr__(self, name):
-        if name == 'du':
-            duo = self.duoffset if isinstance(self.duoffset, numbers.Real) \
-                  else self.duoffset(self.L)
-            return int_preferred(max(0, duo + self.L * self.durate / 100))
-        elif name == 'dr':
-            return self.durate
-        else:
-            return object.__getattribute__(self, name)
+    @property
+    def dt(self):
+        return self._dt
+
+    @dt.setter
+    def dt(self, value):
+        if not isinstance(value, numbers.Real):
+            raise TypeError("`dt' must be a number")
+        self._dt = value
+
+    @property
+    def L(self):
+        return self._L
+
+    @L.setter
+    def L(self, value):
+        if not isinstance(value, numbers.Real):
+            raise TypeError("`L' must be a number")
+        self._L = value
+
+    @property
+    def v(self):
+        return self._v
+
+    @v.setter
+    def v(self, value):
+        if not isinstance(value, numbers.Real):
+            raise TypeError("`v' must be a number")
+        self._v = value
+
+    @property
+    def nv(self):
+        return self._nv
+
+    @nv.setter
+    def nv(self, value):
+        if not isinstance(value, (numbers.Real, type(None))):
+            raise TypeError("`nv' must be a number or None")
+        self._nv = value
+
+    @property
+    def duoffset(self):
+        return self._duoffset
+
+    @duoffset.setter
+    def duoffset(self, value):
+        if not isinstance(value, numbers.Real) and not callable(value):
+            raise TypeError("`duoffset' must be a number or a function")
+        self._duoffset = value
+
+    @property
+    def durate(self):
+        return self._durate
+
+    @durate.setter
+    def durate(self, value):
+        if not isinstance(value, numbers.Real):
+            raise TypeError("`durate' must be a number")
+        self._durate = value
+
+    @property
+    def tk(self):
+        return self._tk
+
+    @tk.setter
+    def tk(self, value):
+        if not isinstance(value, numbers.Integral):
+            raise TypeError("`tk' must be an integer")
+        self._tk = value
+
+    @property
+    def ch(self):
+        return self._ch
+
+    @ch.setter
+    def ch(self, value):
+        if not isinstance(value, numbers.Integral):
+            raise TypeError("`ch' must be an integer")
+        self._ch = value
+
+    @property
+    def o(self):
+        return self._o
+
+    @o.setter
+    def o(self, value):
+        if not isinstance(value, numbers.Integral):
+            raise TypeError("`o' must be an integer")
+        self._o = value
+
+    @property
+    def key(self):
+        return self._key
+
+    @key.setter
+    def key(self, value):
+        if not isinstance(value, (numbers.Integral, str, Key)):
+            raise TypeError("`key' must be an integer, string, or Key")
+        self._key = value
+
+    @property
+    def effectors(self):
+        return self._effectors_
+
+    @effectors.setter
+    def effectors(self, value):
+        if not isinstance(value, list) or any(not callable(x) for x in value):
+            raise TypeError("`effectors' must be a list of callables")
+        self._effectors_ = value
+
+    @property
+    def du(self):
+        duo = self._duoffset if isinstance(self._duoffset, numbers.Real) \
+            else self._duoffset(self._L)
+        return int_preferred(max(0, duo + self._L * self._durate / 100))
+
+    @du.setter
+    def du(self, value):
+        if not isinstance(value, numbers.Real) and not callable(value):
+            raise TypeError("`du' must be a number or a function")
+        self._duoffset = value
+        self._durate = (100 if isinstance(value, numbers.Real) and value < 0
+                        else 0)
+
+    @property
+    def dr(self):
+        return self._durate
+
+    @dr.setter
+    def dr(self, value):
+        if not isinstance(value, numbers.Real):
+            raise TypeError("`dr' must be a number")
+        self._duoffset = 0
+        self._durate = value
 
     def __setattr__(self, name, value):
-        if name in self.__slots__ or name in self.__dict__:
+        if (name in self._attributes) or (name in self._pseudo_attributes) or \
+           (name in self.__slots__) or (name in self.__dict__):
             object.__setattr__(self, name, value)
-        elif name == 'du':
-            self.duoffset = value
-            self.durate = (100 if isinstance(value, numbers.Real) and value < 0
-                           else 0)
-        elif name == 'dr':
-            self.duoffset = 0
-            self.durate = value
         else:
             raise AttributeError(
                 'No such attribute %r. Use addattr() to add a new attribute.'
@@ -332,21 +458,22 @@ class Context(object):
 
     def has_attribute(self, name) -> bool:
         """
-        Returns true if `name` is an attribute of the context.
-        Differs from hasattr(self, name) in that it does not target
-        method names.
+        Returns true if `name` is an attribute of the context (including
+        pseudo attributes). Differs from hasattr(self, name) in that this
+        function does not target method names.
 
         Args:
             name(str): name of the attribute
         """
         """
-        `name` がコンテキストの属性であれば真を返します。メソッド名は対象に
-        しない点において、hasattr(self, name) とは異なります。
+        `name` がコンテキストの属性（疑似属性を含む）であれば真を返します。
+        メソッド名は対象にしない点において、hasattr(self, name)とは異なります。
 
         Args:
             name(str): 属性の名前
         """
-        return name in (*self.__slots__, 'du', 'dr', *self.__dict__)
+        return (name in self._attributes) or \
+            (name in self._pseudo_attributes) or (name in self.__dict__)
 
     def reset(self) -> None:
         """
@@ -367,12 +494,7 @@ class Context(object):
         """
         属性名のリストを返します。
         """
-        attrs = []
-        attrs += self.__slots__
-        attrs.remove('__dict__')
-        attrs.remove('_outer_context')
-        attrs += self.__dict__
-        return attrs
+        return [*self._attributes, *self.__dict__]
 
     def items(self) -> List[Tuple[str, Any]]:
         """
