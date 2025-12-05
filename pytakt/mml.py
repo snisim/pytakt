@@ -204,9 +204,7 @@ class MMLAction(object):
 
     @staticmethod
     def mod_undefined(char):
-        def func():
-            raise MMLError("Undefined modifier charactor `%c'" % char)
-        return func
+        return None
 
     @staticmethod
     def cmd_note(pitch_char):
@@ -227,9 +225,7 @@ class MMLAction(object):
 
     @staticmethod
     def cmd_undefined(char):
-        def func():
-            raise MMLError("Undefined command charactor `%c'" % char)
-        return func
+        return None
 
     @staticmethod
     def no_op():
@@ -237,7 +233,8 @@ class MMLAction(object):
 
 
 class MMLConfig(object):
-    default_char_actions: Mapping[Char, Callable[[], _Optional[Score]]] = {
+    default_char_actions: Mapping[
+        Char, _Optional[Callable[[], _Optional[Score]]]] = {
         '^': MMLAction.mod_octaveup,
         '_': MMLAction.mod_octavedown,
         "'": MMLAction.mod_octaveup,
@@ -446,9 +443,11 @@ class MMLEvaluator(object):
         else:
             try:
                 action = config.char_actions[node.value[0]]
+                if not action:
+                    raise KeyError()
             except KeyError:
-                raise MMLError("Unknown command `%c' at %s"
-                               % (node.value, self.linecol(node.position)))
+                raise MMLError("Unknown command `%c' at %s" % (
+                    node.value, self.linecol(node.position, True)))
             for flat_sign in node.value[1:]:
                 if flat_sign == 'b':
                     MMLAction.mod_flat()
@@ -498,9 +497,13 @@ class MMLEvaluator(object):
 
     def eval_prefixchar(self, node) -> _Optional[Score]:
         try:
-            return config.char_actions[node.value]()
+            action = config.char_actions[node.value]
+            if not action:
+                raise KeyError()
         except KeyError:
-            MMLAction.mod_undefined(node.value)()
+            raise MMLError("Undefined behavior of the modifier `%c' at %s" % (
+                    node.value, self.linecol(node.position, True)))
+        return action()
 
     eval_suffixchar = eval_prefixchar
 
@@ -972,13 +975,23 @@ G/!? G/ G/!? G3*").show(True)
     """
     global parser
 
-    def linecol(pos):
+    def linecol(pos, withtext=False):
         if text.find('\n') == -1:
-            return 'position %d' % (pos,)
+            msg = 'position %d' % (pos,)
         else:
             line = text.count('\n', 0, pos) + 1
             col = pos - text.rfind('\n', 0, pos)
-            return 'line %d, column %d' % (line, col)
+            msg = 'line %d, column %d' % (line, col)
+        if withtext:
+            linestart = text.rfind('\n', 0, pos) + 1
+            if text[linestart:pos].strip() == '':  # 行先頭でのエラー
+                linestart = text.rfind('\n', 0, linestart - 1) + 1
+            lineend = text.find('\n', pos)
+            if lineend == -1:
+                lineend = len(text)
+            msg += ":\n    %s ===> %s <===" \
+                % ((text + '.')[linestart:pos], (text + '.')[pos:lineend])
+        return msg
 
     # outerglobals(), outerlocals()は mml関数を呼び出した元の環境を取得する。
     #  (これを行わないと、mmlモジュールの中の名前しかアクセスできない)
@@ -999,17 +1012,8 @@ G/!? G/ G/!? G3*").show(True)
         try:
             parse_tree = parser.parse(text)
         except NoMatch as e:
-            pos = e.position
-            linestart = text.rfind('\n', 0, pos) + 1
-            if text[linestart:pos].strip() == '':  # 行先頭でのエラー
-                linestart = text.rfind('\n', 0, linestart - 1) + 1
-            lineend = text.find('\n', pos)
-            if lineend == -1:
-                lineend = len(text)
             raise MMLError(
-                "Syntax error at %s:\n    %s ===> %s <==="
-                % (linecol(pos), (text + '.')[linestart:pos],
-                   (text + '.')[pos:lineend])) from None
+                "Syntax error at " + linecol(e.position, True)) from None
 
         evaluator = MMLEvaluator(newglobals, locals, _safe_mode, linecol)
         effectors = context().effectors
@@ -1017,7 +1021,8 @@ G/!? G/ G/!? G3*").show(True)
             try:
                 s = evaluator.evalnode(parse_tree)
             except MMLConfigError as e:
-                text = (' ' * e.nextpos) + text[e.nextpos:]
+                text = re.sub(r'[^\n]', ' ', text[:e.nextpos]) + \
+                    text[e.nextpos:]
                 if retry_count > 0:
                     retry_count -= 1
                     continue
