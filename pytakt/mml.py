@@ -111,8 +111,8 @@ def balanced_paren(): return Sequence(RegExMatch(r'\s*\('),
                                       ZeroOrMore(balanced_paren_body),
                                       ")", skipws=False)
 def balanced_paren_body(): return [balanced_paren,
-                                   RegExMatch(r'"([^"\n\\]|\\.)*"'),
-                                   RegExMatch(r"'([^'\n\\]|\\.)*'"),
+                                   RegExMatch(r'"([^"\\]|\\.)*"'),
+                                   RegExMatch(r"'([^'\\]|\\.)*'"),
                                    RegExMatch(r'[^()]')]
 
 def expression(): return term, ZeroOrMore(["+", "-"], term)
