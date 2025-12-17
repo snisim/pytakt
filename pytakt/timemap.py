@@ -315,16 +315,28 @@ class TimeSignatureMap(object):
         i = max(0, bisect_right(self.tsig_ticks_list, ticks) - 1)
         return self.tsig_event_list[i]
 
-    def num_measures(self) -> int:
+    def num_measures(self, count_bar0=True) -> int:
         """
         Returns the total number of measures in the score; not available
         for EventStream.
+
+        Args:
+            count_bar0(bool): If True (default), returns the number of
+                measures including the incomplete measure at the beginning
+                caused by anacrusis.
         """
         """
         スコア全体の小節数を返します。EventStreamに対しては使えません。
+
+        Args:
+            count_bar0(bool): True (default) の場合、弱起による冒頭の
+                不完全小節を含めた小節数を返します。
         """
         mbt = self.ticks2mbt(self.score.get_duration() - EPSILON*2)
-        return mbt[0] - self.measures_list[0] + 1
+        if count_bar0:
+            return mbt[0] - self.measures_list[0] + 1
+        else:
+            return mbt[0]
 
     def ticks2mbt(self, ticks) -> Tuple[int, Ticks, int, Ticks]:
         """

@@ -776,6 +776,9 @@ class TaktToMusic21:
 
                 if meas_index == 0 and tsigmap.ticks2mbt(0)[0] == 0:
                     m21measure.padAsAnacrusis()
+                    if hasattr(m21measure, 'showNumber'):
+                        m21measure.showNumber = \
+                            music21.stream.enums.ShowNumber.NEVER
 
                 m21part.append(m21measure)
 

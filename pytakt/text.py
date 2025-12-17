@@ -777,10 +777,12 @@ def showsummary(score, default_tempo=125.0) -> None:
         if ev.is_text_event():
             textevents.add(ev.mtype)
 
-    print("Total duration: %r ticks, %r seconds   Measures: %r" %
+    nmeas = timemap.num_measures(count_bar0=False)
+    nmeas_a = timemap.num_measures(count_bar0=True)
+    print("Total duration: %r ticks, %r seconds   Measures: %r%s" %
           (round(evlist.duration, S_ROUND),
            round(timemap.ticks2sec(evlist.duration), S_ROUND),
-           timemap.num_measures()))
+           nmeas, (' (%r)' % nmeas_a) if nmeas != nmeas_a else ''))
 
     print("Event time (ticks): %r-%r" % statis(ev.t for ev in evlist)[:2],
           end='')
