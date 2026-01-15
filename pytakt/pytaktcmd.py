@@ -223,10 +223,10 @@ When invoked with no arguments, it enters interactive mode.""",
         os.environ['PYTAKT_MAGNIFY'] = str(args.magnify)
     if args.geometry is not None:
         os.environ['PYTAKT_GEOMETRY'] = args.geometry
+    set_device(args)
 
     if args.mode == 'i':
         print("pytakt version", takt.__version__)
-        set_device(args)
         cmd = 'from pytakt import *; from pytakt.midiio import *; '
         if sys.platform == 'win32':
             try:
@@ -237,7 +237,6 @@ When invoked with no arguments, it enters interactive mode.""",
         else:
             os.execl(sys.executable, sys.executable, '-i', '-c', cmd)
     elif args.mode == 'l':
-        set_device(args)
         from pytakt.midiio import show_devices
         show_devices()
         sys.exit(0)
@@ -340,10 +339,8 @@ When invoked with no arguments, it enters interactive mode.""",
         else:
             score.writejson(args.outfile)
     elif args.mode == 'p':
-        set_device(args)
         score.play()
     else:  # -g option
-        set_device(args)
         for i, celm in enumerate(args.ctrl):
             if celm not in ('auto', 'verbose'):
                 sign = 1
