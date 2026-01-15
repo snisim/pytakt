@@ -760,6 +760,8 @@ _QUEUE_LOOK_AHEAD = TICKS_PER_QUARTER * 16
 
 _METRONOME_TRACK = 65536
 
+_KEYBOARD_INTERRUPT_RERAISING_PERIOD = 100  # msec
+
 
 def _play_rec(score, rec=False, outdev=None, indev=None, metro=None,
               monitor=False, callback=None):
@@ -861,6 +863,12 @@ def _play_rec(score, rec=False, outdev=None, indev=None, metro=None,
         recevlist.duration = current_time() - toffset
         # The following print() avoids command-line corruption by '^C'
         print(f"{'record' if rec else 'play'} interrupted")
+
+        # To avoid the problem that programs like "while True: mml('c').play()"
+        # can never be terminated by pressing Ctrl-C, we re-raise
+        # KeyboardInterrupt for a short period after starting play()/record().
+        if current_time() < toffset + _KEYBOARD_INTERRUPT_RERAISING_PERIOD:
+            raise
     finally:
         resume_tempo_scale()
         close_input_device(indevnum)
