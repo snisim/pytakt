@@ -187,8 +187,8 @@ def test_effectors():
         mml("C/(du=10)D") + EventList([NoteEvent(0, E4, 240, du=240)], 240)
     assert mml("CDEF").Clip(490, 500) == mml("D(L=10)")
     assert mml("$vol(50)C$vol(60)DEF").Clip(960, 1440) == mml("$vol(60)E")
-    assert mml("[C{EF}/G]").UnpairNoteEvents().PairNoteEvents() == \
-        EventList(mml("[C{EF}/G]"))
+    assert mml("[C{E(dr=75)F(dt=10)}/G]").UnpairNoteEvents().PairNoteEvents() \
+        == EventList(mml("[C{E(dr=75)F(dt=10)}/G]"))
     assert mml("[{rE}C*]").Clip(0, 480) == mml("C")
     assert s.UnpairNoteEvents().PairNoteEvents() == s
     with pytest.warns(TaktWarning):
@@ -261,7 +261,9 @@ def test_product():
 #         lambda i, m: mml("L32rC" if i else "L32Cr").Repeat(), chord=True)),
 #                   key=lambda ev: str(type(ev))) == \
 #         sorted(EventList(mml("L32CFCFCECE")), key=lambda ev: str(type(ev)))
-
+    assert mml('c').Product(lambda: mml('e').UnpairNoteEvents()) == mml('e')
+    assert mml('c').UnpairNoteEvents().Product('c*@@') == \
+        mml('c').UnpairNoteEvents()
 
 def test_apply():
     assert mml("CDEF`").Apply("{C!C`>C/C/}") == mml("C!D`>E/F`/")

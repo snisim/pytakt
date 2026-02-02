@@ -1754,7 +1754,7 @@ class _StreamReader:
         if (self.limit is not None) and (self.topev is None) and self.notedict:
             _, ev = self.notedict.popitem()
             self.topev = NoteOffEvent(self.limit, ev.n, None, ev.tk, ev.ch,
-                                      **ev.__dict__)
+                                      ev.dt, **ev.__dict__)
 
     def top(self) -> Optional[Event]:
         return self.topev
@@ -1998,6 +1998,7 @@ class Product(Effector):
                                 max(0, tailscore.get_duration() - ev.L),
                                 initializer=False)
                             taillen = tailscore.get_duration()
+                    pscore = pscore.PairNoteEvents()
                     if isinstance(pscore, EventStream) or \
                        pscore.get_duration() != 0:
                         pscore = EventList(pscore.Clip(
@@ -2567,8 +2568,8 @@ class PairNoteEvents(Effector):
                     yield outqueue.popleft()
                 ev = next(stream)
                 if isinstance(ev, NoteOnEvent):
-                    noteev = NoteEvent(ev.t, ev.n, None, ev.v, None,
-                                       tk=ev.tk, ch=ev.ch, **ev.__dict__)
+                    noteev = NoteEvent(ev.t, ev.n, None, ev.v, None, tk=ev.tk,
+                                       ch=ev.ch, dt=ev.dt, **ev.__dict__)
                     if self.ref_links:
                         noteev.noteonev = ev
                     notedict.pushnote(ev, noteev)
@@ -2645,13 +2646,14 @@ class UnpairNoteEvents(Effector):
                     if self.ref_links:
                         dic['noteev'] = ev
                     offev = NoteOffEvent(ev.t + ev.L, ev.n, ev.nv,
-                                         ev.tk, ev.ch, **dic)
+                                         ev.tk, ev.ch, ev.dt, **dic)
                     if hasattr(ev, 'du'):
                         offev.dt += ev.du - ev.L
                         _check_dt(offev)
                     heapq.heappush(noteoffbuf,
                                    (ev.t + ev.L, next(seqno), offev))
-                    yield NoteOnEvent(ev.t, ev.n, ev.v, ev.tk, ev.ch, **dic)
+                    yield NoteOnEvent(ev.t, ev.n, ev.v,
+                                      ev.tk, ev.ch, ev.dt, **dic)
                 else:
                     yield ev
         except StopIteration as e:

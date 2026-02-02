@@ -2340,9 +2340,10 @@ def genseq(elms=[], **kwargs) -> 'EventStream':
 
             while True:
                 argmin = None
-                tmin = math.inf
+                tmin = None
+                # Note that buf[i][0].t and nexttime are possibly math.inf
                 for i in range(len(buf)):
-                    if buf[i][0].t < tmin:
+                    if argmin is None or buf[i][0].t < tmin:
                         tmin = buf[i][0].t
                         argmin = i
                 if argmin is None or tmin > nexttime:
