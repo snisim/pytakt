@@ -274,6 +274,29 @@ def test_apply():
         mml("CDEF").Apply("C$vol(70)rDr$vol(80)E$vol(90)F")
 
 
+def test_mapstream():
+    pitches = []
+
+    def func(stream):
+        try:
+            while True:
+                ev = next(stream)
+                pitches.append(ev.n)
+                yield ev
+        except StopIteration as e:
+            return e.value
+
+    s = mml('c{de}/').Retrograde()
+    assert s.mapstream(func) == s.sorted()
+    assert s.stream().mapstream(func).evlist() == s.sorted()
+    assert pitches == [E4, D4, C4, E4, D4, C4]
+    s = mml('[c(dt=30){r(L=50)d(dt=99)}{r(L=100)e(dt=-99)}]')
+    pitches = []
+    assert s.mapstream(func, sort_by_ptime=True) == s
+    assert s.stream().mapstream(func, sort_by_ptime=True).evlist() == s
+    assert pitches == [E4, C4, D4, E4, C4, D4]
+
+
 def test_chord_iterator():
     c4 = NoteEvent(t=0, n=C4, L=480, v=80, nv=None, tk=1, ch=1)
     e4 = NoteEvent(t=0, n=E4, L=240, v=80, nv=None, tk=1, ch=1)

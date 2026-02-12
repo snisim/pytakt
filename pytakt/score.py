@@ -19,7 +19,8 @@ from typing import Union, List, Generator, Callable, Optional
 from pytakt.event import Event, NoteEvent, NoteOnEvent, NoteOffEvent, \
     NoteEventClass, CtrlEvent, KeyPressureEvent, TempoEvent, \
     KeySignatureEvent, TimeSignatureEvent, LoopBackEvent
-from pytakt.constants import C_DATA, C_DATA_L, C_NRPCL, EPSILON, L32
+from pytakt.constants import C_DATA, C_DATA_L, C_NRPCL, EPSILON, L32, \
+    MAX_DELTA_TIME
 from pytakt.utils import int_preferred, std_time_repr, NoteDict, Ticks
 from pytakt.context import context
 
@@ -527,7 +528,7 @@ durfunc=lambda d: d*2)``
         cls = EventList if isinstance(self, Tracks) else self.__class__
         return cls(gen(), **self.__dict__)
 
-    def mapstream(self, func) -> 'Score':
+    def mapstream(self, func, *, sort_by_ptime=False) -> 'Score':
         """
         For each event list or event stream in the score, it calls the
         transforming function `func` on the stream, and returns a new score
@@ -551,6 +552,12 @@ durfunc=lambda d: d*2)``
                 (such a function can be implemented by outputting converted
                 events with 'yield' and returning the converted duration
                 with 'return').
+            sort_by_ptime(bool):
+                If this is True, the event stream passed as the argument to
+                `func` will be sorted by performance time (the sum of the t
+                attribute value and the dt attribute value). It is assumed
+                that the order of events yielded by `func` is also in the
+                order of performance time.
         """
         """ スコア中のイベントリストやイベントストリームに対して、
         ストリームに対する変換関数 `func` を呼び、それが生成するストリーム
@@ -570,13 +577,25 @@ durfunc=lambda d: d*2)``
                 変換後の演奏長を持つようなイベントのイテレータを返す必要
                 があります (関数内で、変換後のイベントを順に yield し、変換後
                 の演奏長を return すれば、そのような関数になります）。
+            sort_by_ptime(bool):
+                Trueの場合、`func` に引数として渡されるイベントストリームが、
+                演奏上の時刻（t属性値とdt属性値の和) でソートされたものに
+                なります。`func` が yield するイベントの順序も演奏上の時刻順
+                であることを前提としています。
         """
         if isinstance(self, EventList):
+            if sort_by_ptime:
+                return self.__class__(
+                    func(self.stream()._sorted(use_ptime=True)),
+                    **self.__dict__).sorted()
             return self.__class__(func(self.stream()), **self.__dict__)
         elif isinstance(self, Tracks):
             return self.__class__((s.mapstream(func) for s in self),
                                   **self.__dict__)
         elif isinstance(self, EventStream):
+            if sort_by_ptime:
+                return self.__class__(func(self._sorted(use_ptime=True)),
+                                      **self.__dict__)._sorted()
             return self.__class__(func(self), **self.__dict__)
         else:
             raise Exception("%r is not a score" % self.__class__.__name__)
@@ -2177,6 +2196,27 @@ class EventStream(Score):
 
         return self.__class__(_noteoff_inserted(self), **self.__dict__)
 
+    def _sorted(self, use_ptime=False,
+                disorder_limit=MAX_DELTA_TIME*2) -> 'EventStream':
+        def _generator(self):
+            delaybuf = []
+            seqno = itertools.count()
+            try:
+                while True:
+                    ev = next(self)
+                    t = ev.ptime() if use_ptime else ev.t
+                    while delaybuf and delaybuf[0][0] < t - disorder_limit:
+                        yield delaybuf[0][2]
+                        heapq.heappop(delaybuf)
+                    heapq.heappush(delaybuf, (t, next(seqno), ev))
+            except StopIteration as e:
+                while delaybuf:
+                    yield delaybuf[0][2]
+                    heapq.heappop(delaybuf)
+                return e.value
+
+        return self.__class__(_generator(self), **self.__dict__)
+
 
 class RealTimeStream(EventStream):
     """
@@ -2194,6 +2234,10 @@ class RealTimeStream(EventStream):
         from pytakt.midiio import queue_event as _queue_event
         _queue_event(ev, (ev.t if time is None else time) + self.starttime,
                      devnum)
+
+    def _sorted(self, use_ptime=True,
+                disorder_limit=MAX_DELTA_TIME) -> 'EventStream':
+        return self
 
 
 def seq(elms=[], **kwargs) -> 'EventList':
