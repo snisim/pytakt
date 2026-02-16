@@ -820,7 +820,7 @@ def _play_rec(score, rec=False, outdev=None, indev=None, metro=None,
                 # qt はキューに入れるべきシステム時刻
                 qt = ev.t - _QUEUE_LOOK_AHEAD + toffset
             except StopIteration as e:
-                if isstream:
+                if isstream and not isinstance(score, RealTimeStream):
                     queue_event(LoopBackEvent(e.value, 'done'),
                                 e.value + toffset)
                 ev = None
@@ -828,7 +828,7 @@ def _play_rec(score, rec=False, outdev=None, indev=None, metro=None,
                 if ev is None:
                     done = True
             else:
-                if ev is None or qt >= current_time():
+                if ev is None or (isstream and qt >= current_time()):
                     resume_tempo_scale()
                     if ev is not None:
                         queue_event(LoopBackEvent(qt, 'next'))

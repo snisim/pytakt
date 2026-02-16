@@ -295,6 +295,7 @@ static void midiOutThreadBody(void *arg)
     /* shutdown - close all devices */
     for( int i = 0; i < midiOutHandles.size(); i++ ) {
 	if( midiOutHandles[i] ) {
+	    doCancelMessages(i, ALL_TRACKS);
 	    SysDep::midiout_close(midiOutHandles[i]);
 	    midiOutHandles[i] = NULL;
 	}
@@ -341,6 +342,7 @@ void MidiOut::closeDevice(int devNum)
     if( devNum < 0 ) return;
     SysDep::mutex_lock(&midiOutMutex);
     if( devNum < midiOutHandles.size() && midiOutHandles[devNum] ) {
+	doCancelMessages(devNum, ALL_TRACKS);
 	SysDep::midiout_close(midiOutHandles[devNum]);
 	midiOutHandles[devNum] = NULL;
     }
