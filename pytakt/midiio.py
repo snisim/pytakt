@@ -119,6 +119,7 @@ from pytakt.constants import TICKS_PER_QUARTER
 from pytakt.score import Score, EventList, EventStream, RealTimeStream, Tracks
 from pytakt.mml import mml
 from pytakt.timemap import _current_tempo_value
+import pytakt.frameutils
 
 __all__ = ['DEV_DUMMY', 'DEV_LOOPBACK']  # extended later
 
@@ -887,7 +888,8 @@ def play(score, dev=None, callback=None) -> None:
     elapsed, or until a keyboard interrupt is received.
 
     Args:
-        score(Score): Score to be played. It may be an infinite-length score.
+        score(Score or str): Score to be played. It may be an infinite-length
+            score. If this argument is a string, it is considered as MML.
         dev: Target output device. If None, the currently selected output
             device is used; otherwise, the target device is the result of
             calling :func:`find_output_device` with this as argument.
@@ -907,7 +909,8 @@ def play(score, dev=None, callback=None) -> None:
     あるいはキーボード・インタラプトを受けるまでリターンしません。
 
     Args:
-        score(Score): 演奏対象のスコア。無限長スコアであっても構いません。
+        score(Score or str): 演奏対象のスコア。無限長スコアであっても
+            構いません。この引数が文字列の場合はMMLだと見なされます。
         dev: 対象となる出力デバイス。Noneの場合は現在選択されている
             出力デバイス、それ以外の場合はこれを引数として
             :func:`find_output_device` を呼んだ結果が対象のデバイス
@@ -921,8 +924,9 @@ def play(score, dev=None, callback=None) -> None:
             :func:`queue_event` で出力キューに挿入すれば、その時刻に再び
             コールバック関数が呼ばれるようにスケジュールすることができます。
     """
-    # scoreにMML文字列を渡せるようにしないのは、MML中でPython関数を
-    # 呼んだときに関数スコープの問題を生じやすいから。
+    if isinstance(score, str):
+        score = mml(score, pytakt.frameutils.outerglobals(),
+                    pytakt.frameutils.outerlocals())
     _play_rec(score, False, dev, callback=callback)
 
 
