@@ -13,6 +13,7 @@ as well as simple text-based music production or building music applications.
 
 * [Paper](https://doi.org/10.1080/09298215.2025.2540434)
 * [Pytakt API Documents](http://u-aizu.ac.jp/~nisim/pytakt/index.html)
+* [The Pytakt MML Tutorial](http://u-aizu.ac.jp/~nisim/pytakt/mml/)
 
 
 ## Main Features

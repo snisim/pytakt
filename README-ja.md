@@ -12,6 +12,7 @@ Pytakt は、音符やMIDIコントロールチェンジといった**イベン�
 * [短い論文](https://ipsj.ixsq.nii.ac.jp/record/235875/files/IPSJ-Z86-2C-02.pdf)
 * [論文(英文)](https://doi.org/10.1080/09298215.2025.2540434)
 * [Pytakt API ドキュメント](http://u-aizu.ac.jp/~nisim/pytakt-ja/index.html)
+* [Pytakt MML チュートリアル](http://u-aizu.ac.jp/~nisim/pytakt-ja/mml/)
 
 
 ## 主な機能
