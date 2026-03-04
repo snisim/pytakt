@@ -135,20 +135,28 @@ class Pitch(int):
     information about enharmonics.
 
     Attributes:
-        sf (int): Enharmonics information (sharp-flat), indicating the number
+        sf(int): Enharmonics information (sharp-flat), indicating the number
             of sharps/flats, including those due to key signatures in
             the score. It is one of 2, -1, 0, 1, and 2, where a positive value
             indicates the number of sharps and a negative value indicates the
             number of flats. For example, if the object has 61 as an integer
             value (i.e., the MIDI note number is 61), it represents the C#4
             note pitch if sf is 1, and represents Db4 if sf is -1.
+        cents(int or float): Deviation between the pitch assuming equal
+            temperament and the actual pitch (the actual pitch minus the equal
+            temperament pitch) expressed in cents (1/100th of a semitone).
 
     Args:
-        value(int, str, or Pitch): Either an integer, a Pitch object, or
-            a string representing the pitch. If it is an integer, its value is
-            the MIDI note number; if it is a Pitch, its integer value is
-            the MIDI note number. The pitch can also be specified by a string
-            consisting of the following characters.
+        value(int, float, str, or Pitch): Either an integer, a floating-
+            point number, a Pitch object, or a string representing the pitch.
+            If it is an integer, it becomes the MIDI note number;
+            if it is a Pitch, its integer value becomes the MIDI note number.
+            Floating-point numbers are regarded as real-valued MIDI note
+            numbers; their rounded value becomes the MIDI note number, and the
+            difference between the original value and the rounded value is
+            used to set the cents attribute.
+            The pitch can also be specified by a string consisting of the
+            following characters.
 
             * 'A' to 'G' for pitch name (lowercase letters are also acceptable;
               ``B`` represents an 11 semitones higher pitch than ``C``)
@@ -177,6 +185,11 @@ class Pitch(int):
             argument of the Key() constructor. Default is C major.
         octave(int, optional): Octave value when `value` is str and
             the string does not contain an octave number.
+        cents(int or float, optional): Specifies the value of the cents
+            attribute. This argument cannot be used when the `value` argument
+            is a floating-point number. When this argument is omitted,
+            the value of the cents attribute is, if `value` is Pitch,
+            its cents value, and 0 otherwise.
 
     Examples:
         >>> Pitch(61)   # MIDI note number 61
@@ -207,8 +220,8 @@ class Pitch(int):
     .. rubric:: Arithmetic Rules
 
     * Comparison between Pitch objects (equality and order comparison) is
-      performed only by the note number. The value of sf has no effect on the
-      result of the comparison. For example, Cs4 == Db4 is true.
+      performed only by the note number. The values of sf and cents have no
+      effect on the result of the comparison. For example, Cs4 == Db4 is true.
     * The result of (Pitch - Pitch) will be an Interval.
     * The result of (Pitch + Interval), (Interval + Pitch), or
       (Pitch - Interval) will be a Pitch, and sf will be calculated
@@ -222,18 +235,24 @@ class Pitch(int):
     intクラスとは異なります。
 
     Attributes:
-        sf (int): 異名同音に関する情報 (sharp-flat)で、楽譜上での調号による
+        sf(int): 異名同音に関する情報 (sharp-flat)で、楽譜上での調号による
              ものを含めたシャープ/フラットの数を表します。2, -1, 0, 1, 2 の
              いずれかで、正ならばシャープの数、負ならばその絶対値が
              フラットの数を表します。例えば、オブジェクトが整数値として61を
              持つ場合（つまり、MIDIノート番号が61の場合)、sfが1であれば
              C#4音を表し、sfが-1であればDb4音を表します。
+        cents(int or float): 平均律を仮定したときのピッチと実際のピッチとの
+             ずれ (実際のピッチから平均律のピッチを引いたもの）をセント
+             (半音の1/100)単位で表します。
 
     Args:
-        value(int, str, or Pitch): 整数、Pitchオブジェクト、もしくは音高を
-            表す文字列。整数ならその値、Pitchならその整数値がMIDIノート番号
-            となります。
-            また、以下の文字から構成された文字列によって音高を指定できます。
+        value(int, float, str, or Pitch): 整数、浮動小数点数、Pitch
+            オブジェクト、もしくは音高を表す文字列。整数ならその値、
+            Pitchならその整数値がMIDIノート番号となります。
+            浮動小数点数は実数のMIDIノート番号とみなされ、それを丸めたものが
+            MIDIノート番号となり、元の値とそれとの差がcents属性の設定に使われ
+            ます。この他、以下の文字から構成された文字列によっても音高を指定
+            できます。
 
             * 音名を表す 'A' から 'G' (小文字でも可。
               'B' は 'C' の長七度上を表す)
@@ -258,6 +277,10 @@ class Pitch(int):
             Key()コンストラクタの第1引数。defaultはハ長調。
         octave(int, optional): `value` がstrで、かつ文字列内にオクターブ
             番号が含まれていないときのオクターブ値。
+        cents(int or float, optional): cents属性の値を指定します。
+            `value` 引数が浮動小数点数のとき、この引数は使用できません。
+            この引数を省略したときのcents属性の値は、`value` がPitchならその
+            centsの値、それ以外なら0となります。
 
     Examples:
         >>> Pitch(61)   # MIDIノート番号=61
@@ -288,7 +311,7 @@ class Pitch(int):
     .. rubric:: 演算規則
 
     * Pitch型どうしの比較 (等値比較、大小比較) はノート番号だけで行われ、
-      sf の値は比較の結果に影響しません。例えば、
+      sf属性やcents属性の値は比較の結果に影響しません。例えば、
       Cs4 == Db4 は True になります。
     * Pitch - Pitch の結果は Interval型になります。
     * Pitch + Interval, Interval + Pitch, Pitch - Interval の結果は Pitch 型
@@ -296,25 +319,36 @@ class Pitch(int):
     * それ以外の演算は int 型としての演算となります。
     """
 
-    def __new__(cls, value, sf=None, key=0, octave=4):
+    def __new__(cls, value, sf=None, key=0, octave=4, cents=None):
         if sf is not None and not -2 <= sf <= 2:
             raise ValueError('sf must be in [-2,2] range')
+        if cents is not None and not isinstance(cents, numbers.Real):
+            raise TypeError('cents must be a number')
         if isinstance(value, str):
-            return Pitch._new_from_str(value, sf, key, octave)
+            return Pitch._new_from_str(value, sf, key, octave, cents)
         elif isinstance(value, Pitch):
             obj = int.__new__(cls, value)
             obj.sf = sf if sf is not None else value.sf
+            obj.cents = cents if cents is not None else value.cents
             return obj
         elif isinstance(value, numbers.Integral):
             obj = int.__new__(cls, value)
             obj.sf = sf
             if sf is None:
                 obj.sf = obj._fixsf_impl(key)
+            obj.cents = 0 if cents is None else cents
             return obj
+        elif isinstance(value, numbers.Real):
+            if cents is not None:
+                raise TypeError("Cannot use 'cents' with non-integer pitches")
+            # 下の数値トリックは Pitch(60.1) の cents がちょうど10になり、かつ
+            # Pitch(60+1/3).tofloat() == 60+1/3 が成り立つようにしたもの
+            return Pitch(takt_round(value), sf, key, octave,
+                         (value * 5 - takt_round(value) * 5) * 20)
         else:
             raise TypeError('%r is not a valid value for Pitch' % value)
 
-    def _new_from_str(string, osf, key, octave):
+    def _new_from_str(string, osf, key, octave, cents):
         key = 0 if key is None else key
         m = re.match(
             "([',^_]*)([a-gA-G])([0-9]*)([-+sfn#b%',^_]*)([0-9]*)\\s*$",
@@ -342,7 +376,7 @@ class Pitch(int):
 #            sf = -Key(key).getsf(p)
 #            p -= sf
         return Pitch(p + sf + (octave + 1) * 12,
-                     osf if osf is not None else sf)
+                     osf if osf is not None else sf, cents=cents)
 
     def __repr__(self):
         return self.tostr(lossless=True)
@@ -436,10 +470,13 @@ class Pitch(int):
             pitch_strings[_NSTBL_INDEX[chroma(np)]],
             sfn[1 if alter < 0 else 0] * abs(alter),
             str(oc) if octave or lossless else '')
+        cstr = (', cents=%r' % self.cents) if self.cents != 0 else ''
         if lossless and (oc < 0 or oc >= 10):
-            return "Pitch(%d, %r)" % (self, self.sf)
+            return "Pitch(%d, %r%s)" % (self, self.sf, cstr)
         elif lossless and alter != self.sf:
-            return "Pitch(%s, %r)" % (string, self.sf)
+            return "Pitch(%s, %r%s)" % (string, self.sf, cstr)
+        elif lossless and self.cents != 0:
+            return "Pitch(%s%s)" % (string, cstr)
         else:
             return string
 
@@ -551,6 +588,14 @@ class Pitch(int):
         else:
             raise ValueError("Invalid 'enh' value")
 
+    def tofloat(self) -> float:
+        """ Returns a floating-point MIDI note number considering the cents
+            attribute.
+        """
+        """ cents属性を考慮した浮動小数点のMIDIノート番号を返します。
+        """
+        return self + self.cents/100
+
     def freq(self, afreq=440.0) -> float:
         """ Returns the frequency assuming equal temperament.
 
@@ -568,13 +613,14 @@ class Pitch(int):
             afreq(float, optional):
                 A4音の周波数(Hz)を指定します。
         """
-        return afreq * (2 ** ((self - 69) / 12))
+        return afreq * (2 ** ((self - 69 + self.cents/100) / 12))
 
     @staticmethod
-    def from_freq(freq, sf=None, key=0,
-                  afreq=440.0, fractional=False) -> Union['Pitch', float]:
-        """ Constructs a Pitch object that is closest to the frequency `freq`
-        assuming equal temperament.
+    def from_freq(freq, sf=None, key=0, afreq=440.0,
+                  fractional=False, microtone=True) -> Union['Pitch', float]:
+        """ Constructs a Pitch object from the frequency `freq` assuming equal
+        temperament. The MIDI note number is selected to be as close as
+        possible to the specified frequency.
 
         Args:
             freq(float): frequency
@@ -587,11 +633,14 @@ class Pitch(int):
             afreq(float, optional):
                 Specifies the frequency (Hz) of the A4 pitch
             fractional(bool, optional):
-                If True, a fractional MIDI note number is returned instead of
-                a Pitch object.
+                If True, a floating-point MIDI note number is returned
+                instead of a Pitch object.
+            microtone(bool, optional):
+                If True, sets the cents attribute of the Pitch object based
+                on the frequency. If False, the cents attribute is always 0.
         """
-        """ 平均律を仮定したときの周波数から、それに最も
-        周波数の近いPitchオブジェクトを構築します。
+        """ 平均律を仮定したときの周波数から、Pitchオブジェクトを構築します。
+        MIDIノート番号は指定した周波数に最も近くなるように選ばれます。
 
         Args:
             freq(float): 周波数
@@ -602,12 +651,17 @@ class Pitch(int):
             afreq(float, optional):
                 A4音の周波数(Hz)を指定します。
             fractional(bool, optional):
-                Trueの場合、Pitchオブジェクトのかわりに、実数のMIDIノート
-                番号を返します。
+                Trueの場合、Pitchオブジェクトのかわりに、浮動小数点のMIDI
+                ノート番号を返します。
+            microtone(bool, optional):
+                Trueの場合、周波数に基づいてPitchオブジェクトのcents属性を
+                設定します。Falseの場合、cents属性は常に0になります。
         """
         notenum = math.log2(freq / afreq) * 12 + 69
         if fractional:
             return notenum
+        elif microtone:
+            return Pitch(notenum, sf, key)
         else:
             return Pitch(takt_round(notenum), sf, key)
 
@@ -638,6 +692,10 @@ class Interval(int):
         ds(int): Signed distance on the staff.
             This is one less than the number of degrees, e.g., 2 for
             third intervals. Negative for negative intervals.
+        cents(int or float): Deviation between the interval assuming equal
+            temperament and the actual interval (the actual interval minus
+            the equal temperament interval) expressed in cents (1/100th of
+            a semitone).
 
     Args:
         value(str or int): When it is a string, it specifies the interval like
@@ -659,21 +717,24 @@ class Interval(int):
             When it is an integer, it specifies the interval by semitones.
         ds(int, optional): When `value` is an integer, the value of the ds
             attribute must be specified by this argument.
+        cents(int or float, optional): Specifies the value of the cents
+            attribute.
 
     .. rubric:: Arithmetic Rules
 
     * Comparison between Interval objects (equality and order comparisons) is
-      performed only be semitones. The value of the ds attribute has no effect
-      on the result of the comparison. For example,
+      performed only be semitones. The values of the ds and cents attributes
+      have no effect on the result of the comparison. For example,
       Interval('A4') == Interval('d5') is true.
-    * Sign inversion of an Interval inverts the signs of both the semitone and
-      ds values.
+    * Sign inversion of an Interval inverts the signs of the semitone, ds,
+      and cents values.
     * The result of adding two Interval objects will be an Interval where
-      the two intervals are stacked together (the semitones and ds values are
-      added to each).
+      the two intervals are stacked together (the semitones, ds, and cents
+      values are added to each).
     * The subtraction (x-y) between Interval objects is equivalent to x+(-y).
     * Multiplication of an Interval and an integer results in an Interval
-      where each of the semitone and ds values is multiplied by the integer.
+      where each of the semitone, ds, and cents values is multiplied by the
+      integer.
     * The result of a remainder operation (x % y) between Interval objects is
       an Interval, which is equivalent to x - (int(x) // int(y)) * y.
     * For operations between Interval and Pitch, see the operation rules of
@@ -707,6 +768,9 @@ class Interval(int):
         ds(int): 五線譜上での符号付き距離 (signed distance on the staff)。
             これは、度数より1少ない数で、例えば、"～3度" という音程では
             すべて2になります。負の音程では負になります。
+        cents(int or float): 平均律を仮定したときの音程と実際の音程との
+             ずれ (実際の音程から平均律の音程を引いたもの）をセント
+             (半音の1/100)単位で表します。
 
     Args:
         value(str or int): str型の場合、下のような文字列で音程を指定します。
@@ -725,19 +789,20 @@ class Interval(int):
             int型のときは、半音数で音程を指定します。
         ds(int, optional): `value` がint型のときは、この引数によって
             ds属性の値を指定する必要があります。
+        cents(int or float, optional): cents属性の値を指定します。
 
     .. rubric:: 演算規則
 
     * Interval型どうしの比較 (等値比較、大小比較) は半音数だけで行われ、
-      ds属性の値は比較の結果に影響しません。例えば、Interval('A4') ==
-      Interval('d5') は True になります。
-    * Interval 型の符号反転は、半音数、ds値をともに符号反転させます。
+      ds属性やcents属性の値は比較の結果に影響しません。例えば、
+      Interval('A4') == Interval('d5') は True になります。
+    * Interval 型の符号反転は、半音数、ds値, cents値をすべて符号反転させます。
     * Interval 型どうしの加算の結果は Interval 型になり、2つの音程を積み
-      重ねた音程 (半音数、ds値をそれぞれ加えたもの) になります。
+      重ねた音程 (半音数、ds値, cents値をそれぞれ加えたもの) になります。
     * Interval 型どうしの減算(x-y)の結果は Interval 型になり、x+(-y)と
       等価です。
     * Interval 型と整数との乗算の結果は Interval 型になり、
-      半音数、ds値それぞれを整数倍したものになります。
+      半音数、ds値、cents値それぞれを整数倍したものになります。
     * Interval 型どうしの剰余演算(x % y)の結果は Interval型になり、これは
       x - (int(x) // int(y)) * y と等価です。
     * Interval 型と Pitch 型の間の演算については、Pitch クラスの演算規則
@@ -762,17 +827,18 @@ class Interval(int):
         >>> Interval('A4') + 1
         7
     """
-    def __new__(cls, value, ds=None):
+    def __new__(cls, value, ds=None, cents=0):
         if isinstance(value, numbers.Integral):
             obj = int.__new__(cls, value)
             if ds is None:
                 raise Exception("Requires 2nd argument when 'value' is int")
             obj.ds = ds
+            obj.cents = cents
             return obj
         else:
-            return Interval._parse_str(value)
+            return Interval._parse_str(value, cents)
 
-    def _parse_str(string):
+    def _parse_str(string, cents):
         m = re.match("(-?)([PpMm]|[Aa]+|[Dd]+)([0-9]+)$", string)
         if not m:
             raise ValueError("Invalid interval name")
@@ -791,12 +857,13 @@ class Interval(int):
             semi += len(quality)
         elif quality[0] in "Dd":
             semi -= len(quality) + (1 - perf)
-        return Interval(semi * sign, ds * sign)
+        return Interval(semi * sign, ds * sign, cents)
 
     def __repr__(self):
         if self < 0 or \
            (self == 0 and self.ds < 0):  # use -'d2' rather than 'A0'
-            return "Interval('-" + repr(Interval(-self, -self.ds))[10:]
+            return "Interval('-" + \
+                repr(Interval(-self, -self.ds, self.cents))[10:]
         (oc, i) = divmod(self.ds, 7)
         semi = _MAJOR_TONES[i] + oc * 12
         perf = _IS_PERFECT[i]
@@ -808,30 +875,34 @@ class Interval(int):
             s = 'A' * (self - semi)
         else:
             s = 'd' * (semi - (1 - perf) - self)
-        return "Interval('%s%d')" % (s, self.ds + 1)
+        cstr = (', cents=%r' % self.cents) if self.cents != 0 else ''
+        return "Interval('%s%d'%s)" % (s, self.ds + 1, cstr)
 
     def __pos__(self):
-        return Interval(int(self), self.ds)
+        return Interval(int(self), self.ds, self.cents)
 
     def __neg__(self):
-        return Interval(-int(self), -self.ds)
+        return Interval(-int(self), -self.ds, -self.cents)
 
     def __add__(self, other):
         if isinstance(other, Interval):
-            return Interval(int(self) + int(other), self.ds + other.ds)
+            return Interval(int(self) + int(other), self.ds + other.ds,
+                            self.cents + other.cents)
         else:
             # return int.__add__(self, other) だと Interval + Pitch が失敗する
             return NotImplemented
 
     def __sub__(self, other):
         if isinstance(other, Interval):
-            return Interval(int(self) - int(other), self.ds - other.ds)
+            return Interval(int(self) - int(other), self.ds - other.ds,
+                            self.cents - other.cents)
         else:
             return NotImplemented
 
     def __mul__(self, other):
         if type(other) is int:
-            return Interval(int(self) * other, self.ds * other)
+            return Interval(int(self) * other, self.ds * other,
+                            self.cents * other)
         else:
             # NotImplemented だと Interval * Interval がエラーになる
             return int.__mul__(self, other)
@@ -859,7 +930,7 @@ class Interval(int):
         sf = semi - n
         # sf が+-2に収まらない場合は、範囲内に修正
         sf = 2 if sf > 2 else -2 if sf < -2 else sf
-        return Pitch(semi, sf)
+        return Pitch(semi, sf, cents=pitch.cents+interval.cents)
 
     @staticmethod
     def _pitch_subtract(p1, p2):
@@ -868,7 +939,15 @@ class Interval(int):
         d = _SEMITONES_TO_DS[k]
         if k == 6 and chroma(n2) == 11:
             d += 1  # augmented 4th => diminished 5th
-        return Interval(int(p1) - int(p2), d + oc * 7)
+        return Interval(int(p1) - int(p2), d + oc * 7, p1.cents - p2.cents)
+
+    def tofloat(self) -> float:
+        """ Returns the interval as floating-point semitones considering
+            the cents attribute.
+        """
+        """ cents属性を考慮した浮動小数点の半音数を返します。
+        """
+        return self + self.cents/100
 
 
 _KEY_TAB = [

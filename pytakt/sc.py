@@ -26,7 +26,7 @@ from pytakt.constants import C_MOD, C_BREATH, C_FOOT, C_PORTA, C_VOL, C_EXPR, \
     M_SEQNO, M_TEXT, M_COPYRIGHT, M_TRACKNAME, M_INSTNAME, M_LYRIC, M_MARK, \
     M_EOT, M_KEYSIG, M_CHPREFIX, M_DEVNO, MAX_DELTA_TIME, L64
 from pytakt.context import context, newcontext, Context
-from pytakt.pitch import Key
+from pytakt.pitch import Key, Pitch
 from pytakt.utils import takt_round
 from pytakt.interpolator import Interpolator
 from pytakt.chord import Chord
@@ -75,8 +75,9 @@ def note(pitch, L=None, step=None, **kwargs) -> EventList:
     will always be 0.
 
     Args:
-        pitch(Pitch or int): Specifies the pitch of the note.
-            The n attribute of the generated NoteEvent will have this value.
+        pitch(Pitch, int, float or str): Specifies the pitch of the note.
+            The n attribute of the generated NoteEvent will have a Pitch
+            object constructed with an argument of this value.
         L(ticks, optional): Specifies the note value (note length).
             If omitted, it takes the value from the L attribute of the context.
             The L attribute of the generated NoteEvent will have this value.
@@ -109,8 +110,9 @@ du=240)])
     します。生成される NoteEvent の時刻 (t属性値) は常に 0 となります。
 
     Args:
-        pitch(Pitch or int): 音符のピッチを指定します。
-            生成される NoteEvent のn属性はこの値となります。
+        pitch(Pitch, int, float or str): 音符のピッチを指定します。
+            生成される NoteEvent のn属性は、この値をコンストラクタ引数として
+            作成したPitchオブジェクトとなります。
         L(ticks, optional): 音価を指定します。
             省略すると、コンテキストのL属性の値になります。
             生成される NoteEvent のL属性はこの値となります。
@@ -137,8 +139,6 @@ du=240)])
             NoteEvent(t=0, n=Db5, L=480, v=80, nv=None, tk=1, ch=3, dt=30, \
 du=240)])
     """
-    if not isinstance(pitch, numbers.Real) and pitch is not None:
-        raise TypeError("`pitch' must be a Pitch object or a MIDI note number")
     if not isinstance(step, (numbers.Real, type(None))):
         raise TypeError("`step' must be a number.")
 
@@ -148,7 +148,8 @@ du=240)])
             L = context().L
         else:
             context().L = L
-        ev = NoteEvent(0, pitch, L, **_getparams(kwargs, 'v', 'nv', 'ch'))
+        ev = NoteEvent(0, Pitch(pitch), L,
+                       **_getparams(kwargs, 'v', 'nv', 'ch'))
         if context().du != L:
             ev.du = context().du
         return _apply_effectors(EventList([ev], L if step is None else step))

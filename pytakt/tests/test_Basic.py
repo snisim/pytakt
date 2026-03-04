@@ -23,6 +23,13 @@ def test_pitch():
         assert(int(n - n2) == int(n) - int(n2))
         p2 = Pitch(n, key=k) - Pitch(n2, key=k) + Pitch(n2, key=k)
         assert(p2 == n and p2.sf == Pitch(n, key=k).sf)
+    p = Pitch(C4, cents=10) + Interval('P5', cents=2) * 4
+    assert p == E6 and p.cents == 18
+    assert p.tofloat() == 88.18
+    iv = (Interval('P5', cents=2) * 12) % Interval('P8')
+    assert iv == 0 and iv.cents == 24
+    p += iv
+    assert p == E6 and p.cents == 42
 
 
 def test_mml():
@@ -199,6 +206,15 @@ def test_effectors():
     assert s2[4].noteev is s[3]
     assert s2.PairNoteEvents(True)[3].noteonev is s2[3]
     assert s2.PairNoteEvents(True)[3].noteoffev is s2[4]
+    assert mml('[C E|MT(-25) G]').Microtone() == \
+        mml('[$bend(0) C ch=2 $bend(-1024) E ch=3 $bend(0) G] ch=2 $bend(0)')
+    assert mml("$bend(100) [c e|MT(-25) {gag|MT(10)f|MT(50)}//]").Microtone() \
+        == mml("$bend(100) ch=2 $bend(100) ch=3 $bend(100) ch=4 $bend(100)"
+               "[ch=1 C ch=2 $bend(-924) E"
+               "ch=3 {G A $bend(510) G $bend(-1948) F#}//]"
+               "ch=2 $bend(100) ch=3 $bend(100)")
+    s = mml('CDE').Temperament((0, 0, 10, 0, 0, 0, 0, 0, 0, 0, 0, 0), 1/8)
+    assert s[1].n.cents == -77.5
 
 
 def test_tie():

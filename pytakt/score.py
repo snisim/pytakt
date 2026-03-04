@@ -1377,6 +1377,9 @@ isinstance(ev, (NoteEvent, NoteOnEvent))])
     PairNoteEvents: Callable[..., 'Score'] = None
     UnpairNoteEvents: Callable[..., 'Score'] = None
     RetriggerNotes: Callable[..., 'Score'] = None
+    Microtone: Callable[..., 'Score'] = None
+    MT: Callable[..., 'Score'] = None
+    Temperament: Callable[..., 'Score'] = None
 
 
 class _EventFinder(object):
