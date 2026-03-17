@@ -1174,21 +1174,40 @@ class XmlEvent(Event):
         kwargs: additional attribute for the event
 
     List of valid events
-        ========== ============ ============================= ================
-        xtype      desc.         value                        optional attrs.
-        ========== ============ ============================= ================
-        'clef'     clef         'G', 'F', 'C'                 line(int),
-                                'percussion', 'TAB',          octave_change
-                                'jianpu', 'none'              (int)
-        'barline'  bar line     'dashed', 'dotted', 'heavy',
-                                'heavy-heavy', 'heavy-light',
-                                'light-heavy', 'light-light',
-                                'none', 'regular', 'short',
-                                'tick', 'double', 'final',
-                                'repeat-start', 'repeat-end'
-        'chord'    chord symbol Chord
-        'text'     generic text str
-        ========== ============ ============================= ================
+        ============ ============ ============================= ===============
+        xtype        desc.         value                        optional attrs.
+        ============ ============ ============================= ===============
+        'clef'       clef         'G', 'F', 'C'                 line(int),
+                                  'percussion', 'TAB',          octave_change
+                                  'jianpu', 'none'              (int)
+        'barline'    bar line     'dashed', 'dotted', 'heavy',
+                                  'heavy-heavy', 'heavy-light',
+                                  'light-heavy', 'light-light',
+                                  'none', 'regular', 'short',
+                                  'tick', 'double', 'final',
+                                  'repeat-start', 'repeat-end'
+        'chord'      chord symbol Chord
+        'text'       generic text str
+        'pagelayout' page layout  N/A                           height, width,
+                     info.                                      topmargin,
+                                                                bottommargin,
+                                                                leftmargin,
+                                                                rightmargin
+                                                                (millimeters)
+                                                                scaling
+                                                                (mm/staffline)
+        'staffgroup' staff group- list, tuple or set of int,
+                     ing info.    'brace', 'bracket', 'square',
+                                  'line' or 'none' [1]
+        ============ ============ ============================= ===============
+
+        [1] This represents the grouping of staffs using a (nested) collection
+        of track numbers. Strings such as ‘brace’ represent the shape of the
+        symbol used for staff grouping; the default is ‘bracket’ for a list,
+        ‘square’ for a tuple, and ‘brace’ for a set. To specify a non-default
+        symbol, include a string in the elements, such as (‘line’, 3, 4).
+        When the collection is a set, it is treated as staves within a part,
+        such as the right and left hands in a piano part.
     """
     """ 五線譜のための追加情報を記述したイベントのクラスです。
 
@@ -1208,21 +1227,40 @@ class XmlEvent(Event):
         kwargs: イベントに対して追加の属性を指定します。
 
     有効なイベントの一覧
-        ========== ============ ============================= ================
-        xtype      desc.         value                        optional attrs.
-        ========== ============ ============================= ================
-        'clef'     音部記号     'G', 'F', 'C'                 line(int),
-                                'percussion', 'TAB',          octave_change
-                                'jianpu', 'none'              (int)
-        'barline'  小節区切り   'dashed', 'dotted', 'heavy',
-                                'heavy-heavy', 'heavy-light',
-                                'light-heavy', 'light-light',
-                                'none', 'regular', 'short',
-                                'tick', 'double', 'final',
-                                'repeat-start', 'repeat-end'
-        'chord'    コード記号   Chord
-        'text'     汎用テキスト str
-        ========== ============ ============================= ================
+        ============ ============ ============================= ===============
+        xtype        desc.         value                        optional attrs.
+        ============ ============ ============================= ===============
+        'clef'       音部記号     'G', 'F', 'C'                 line(int),
+                                  'percussion', 'TAB',          octave_change
+                                  'jianpu', 'none'              (int)
+        'barline'    小節区切り   'dashed', 'dotted', 'heavy',
+                                  'heavy-heavy', 'heavy-light',
+                                  'light-heavy', 'light-light',
+                                  'none', 'regular', 'short',
+                                  'tick', 'double', 'final',
+                                  'repeat-start', 'repeat-end'
+        'chord'      コード記号   Chord
+        'text'       汎用テキスト str
+        'pagelayout' ページレイア なし                          height, width,
+                     ウト情報                                   topmargin,
+                                                                bottommargin,
+                                                                leftmargin,
+                                                                rightmargin
+                                                                (millimeters)
+                                                                scaling
+                                                                (mm/staffline)
+        'staffgroup' 段のグルーピ list, tuple or set of int,
+                     ング         'brace', 'bracket', 'square',
+                                  'line' or 'none' [1]
+        ============ ============ ============================= ===============
+
+        [1] トラック番号のコレクション(ネスト可能)によって、段のグルーピング
+        を表します。'brace' 等の文字列は段のグルーピングに使われるシンボルの
+        形状を表し、コレクションがlistのときは 'bracket', tupleのときは
+        'sqaure', setのときは 'brace' がそれぞれデフォルトになります。
+        非デフォルトのシンボルを指定するには ('line', 3, 4) のように要素に
+        文字列を含めます。コレクションがsetのときは、ピアノの右手と左手の
+        ような、パート内の段 (stave) として扱われます。
     """
     __slots__ = ('xtype', 'value',)
 

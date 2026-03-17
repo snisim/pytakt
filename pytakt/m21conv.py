@@ -232,6 +232,70 @@ class TaktToMusic21:
         m21textexpr.placement = 'above'
         return m21textexpr
 
+    def gen_pagelayout(self, m21layout, ev):
+        def _mm_to_tenth(mm, scale):
+            if not isinstance(mm, numbers.Real):
+                raise TypeError("pagelayout parameter must be a number")
+            return round(mm * 10 / scale, 2)
+
+        if m21layout is None:
+            m21layout = music21.layout.ScoreLayout()
+        scale = getattr(ev, 'scaling', 7/4)
+        m21layout.scalingMillimeters = scale * 4
+        m21layout.scalingTenths = 40
+        m21layout.pageLayout = music21.layout.PageLayout(
+            pageHeight=_mm_to_tenth(getattr(ev, 'height', 297), scale),
+            pageWidth=_mm_to_tenth(getattr(ev, 'width', 210), scale),
+            leftMargin=_mm_to_tenth(getattr(ev, 'leftmargin', 10), scale),
+            rightMargin=_mm_to_tenth(getattr(ev, 'rightmargin', 10), scale),
+            topMargin=_mm_to_tenth(getattr(ev, 'topmargin', 10), scale),
+            bottomMargin=_mm_to_tenth(getattr(ev, 'bottommargin', 10), scale))
+        return m21layout
+
+    def parse_staffgroup(self, value,
+                         ntracks) -> List[Tuple[str, bool, List[int]]]:
+        result = []
+        tracks = []
+        gtype = None
+        ispartstaff = False
+        if isinstance(value, list):
+            gtype = 'bracket'
+        elif isinstance(value, tuple):
+            gtype = 'square'
+        elif isinstance(value, (set, frozenset)):
+            gtype = 'brace'
+            ispartstaff = True
+        else:
+            raise TypeError("Bad value for 'staffgroup': %r" % (value,))
+        for elm in value:
+            if isinstance(elm, int):
+                if not 0 <= elm < ntracks:
+                    raise TypeError("Bad track number in 'staffgroup': %d"
+                                    % elm)
+                tracks.append(elm)
+            elif isinstance(elm, str):
+                if elm not in ['brace', 'bracket', 'square', 'line', 'none']:
+                    raise TypeError("No such staffgroup symbol: %r" % elm)
+                gtype = elm
+            else:
+                subgroup = self.parse_staffgroup(elm, ntracks)
+                tracks.extend(subgroup[0][2])
+                result.extend(subgroup)
+        if not tracks:
+            raise TypeError("Empty collection in 'staffgroup'")
+        # setの場合は順序が乱れている可能性があるためsortが必要
+        result.insert(0, (gtype, ispartstaff, sorted(tracks)))
+        return result
+
+    def in_staffgroups(self, staffgroups, trk) -> bool:
+        # staffgroupに出現するトラックである場合にTrue（staffgroupが無いなら
+        # 常にTrue)
+        return any(trk in tracks for _, _, tracks in staffgroups)
+
+    def in_partstaffgroups(self, staffgroups, trk) -> bool:
+        return any(trk in tracks for _, ispartstaff, tracks in staffgroups
+                   if ispartstaff)
+
     def to_measures(self, evlist, tsigmap) -> List[EventList]:
         result = []
         quant = self.min_note
@@ -671,6 +735,7 @@ class TaktToMusic21:
         metaevents = evlist.Filter(MetaEvent)
         m21score = music21.stream.Score()
         m21metadata = music21.metadata.Metadata()
+        m21layout = None
         for ev in metaevents:
             if ev.mtype == M_TEXT and ev.tk == 0:
                 if m21metadata.title is None:
@@ -684,17 +749,32 @@ class TaktToMusic21:
                     str(m21metadata.copyright) + ', ' + msg)
 
         skip0 = tracks and not tracks[0].Filter(NoteEvent)
+        tracknum_to_part = {}
+        staffgroups = sum([self.parse_staffgroup(ev.value, len(tracks))
+                           for ev in tracks[0].Filter(XmlEvent)
+                           if ev.xtype == 'staffgroup'], [])
+        barlines = tracks[0].Filter(lambda ev: isinstance(ev, XmlEvent) and
+                                    ev.xtype == 'barline')
         for track_number, track_evlist in enumerate(tracks):
-            if (track_number == 0 and skip0) or not track_evlist:
+            if ((track_number == 0 and skip0) or not track_evlist) and \
+               not self.in_staffgroups(staffgroups, track_number):
                 continue
             if skip0:
                 # track 0 をスキップしたときは、その中のXmlEventを
-                # 最初の空でないトラックに移動する。
+                # 最初の表示されるトラックに移動する。
                 track_evlist = tracks[0].Filter(XmlEvent) & track_evlist
-                track_evlist.sort()
                 skip0 = False
+            elif track_number != 0:
+                # track 0 にある xml-barline のイベントをコピーする
+                track_evlist = EventList([ev.copy().update(tk=track_number)
+                                          for ev in barlines], duration=0) & \
+                               track_evlist
+            track_evlist.sort()
             measures = self.to_measures(track_evlist, tsigmap)
-            m21part = music21.stream.Part(id=f'Track {track_number}')
+            partclass = music21.stream.PartStaff if self.in_partstaffgroups(
+                staffgroups, track_number) else music21.stream.Part
+            m21part = partclass(id=f'Track {track_number}')
+            tracknum_to_part[track_number] = m21part
             # 下のコードは　m21part に stream.Measure以外の要素を置かない
             # ことを前提としている
             last_tsig = None
@@ -765,6 +845,9 @@ class TaktToMusic21:
                         if offset == 0 and meas_index != 0 and \
                            ev.value != 'repeat-start':
                             m21part[-1].rightBarline = self.gen_barline(ev)
+                        elif ev.t >= meas_evlist.duration:
+                            # 最後の小節の終わりの線の場合
+                            m21measure.rightBarline = self.gen_barline(ev)
                         else:
                             # 小節の中間のbarlineは、少なくともmusic21 version
                             # 6.7.1 では、MusicXMLに出力されないようだ。
@@ -773,6 +856,13 @@ class TaktToMusic21:
                         m21measure.insert(offset, self.gen_chordsym(ev))
                     elif isinstance(ev, XmlEvent) and ev.xtype == 'text':
                         m21measure.insert(offset, self.gen_stafftext(ev))
+                    elif isinstance(ev, XmlEvent) and ev.xtype == 'pagelayout':
+                        m21layout = self.gen_pagelayout(m21layout, ev)
+                    elif isinstance(ev, XmlEvent) and ev.xtype == 'staffgroup':
+                        if ev.tk != 0:
+                            warnings.warn("Ignoring XmlEvent of 'staffgroup' "
+                                          "in a track other than Track 0",
+                                          TaktWarning)
 
                 if meas_index == 0 and tsigmap.ticks2mbt(0)[0] == 0:
                     m21measure.padAsAnacrusis()
@@ -786,18 +876,22 @@ class TaktToMusic21:
                 # default clef
                 if not m21part[0].hasElementOfClass(music21.clef.Clef):
                     # ChordSymbolは取り除かないと予期しない影響を及ぼすようだ
-                    s = m21part.flat.getElementsNotOfClass(
+                    s = m21part.flatten().getElementsNotOfClass(
                         music21.harmony.ChordSymbol)
-                    default_clef = music21.clef.bestClef(s)
+                    default_clef = music21.clef.bestClef(s.stream())
                     m21part[0].insert(0, default_clef)
                 # default final bar-line
-                barlines = m21part[-1].getElementsByClass(music21.bar.Barline)
-                if all(bl.offset == 0 for bl in barlines):
+                if m21part[-1].rightBarline is None:
                     m21part[-1].rightBarline = 'final'
 
             m21score.insert(0, m21part)
 
         m21score.insert(0, m21metadata)
+        if m21layout is not None:
+            m21score.append(m21layout)
+        for gtype, _, tracks in staffgroups:
+            m21score.append(music21.layout.StaffGroup(
+                [tracknum_to_part[trk] for trk in tracks], symbol=gtype))
         return m21score
 
 
@@ -1013,6 +1107,45 @@ class Music21ToTakt:
                                     str(m21metadata.copyright), tk=0))
         return result
 
+    def conv_layout(self, m21layout) -> List[XmlEvent]:
+        result = []
+        if m21layout.pageLayout:
+            if m21layout.scalingMillimeters is not None and \
+               m21layout.scalingTenths is not None:
+                scale = m21layout.scalingMillimeters / m21layout.scalingTenths
+            else:
+                scale = 7 / 40
+            args = {}
+            for argname, value in \
+                (('height', m21layout.pageLayout.pageHeight),
+                 ('width', m21layout.pageLayout.pageWidth),
+                 ('leftmargin', m21layout.pageLayout.leftMargin),
+                 ('rightmargin', m21layout.pageLayout.rightMargin),
+                 ('topmargin', m21layout.pageLayout.topMargin),
+                 ('bottommargin', m21layout.pageLayout.bottomMargin)):
+                if value is not None:
+                    args[argname] = round(value * scale, 2)
+            args['scaling'] = scale * 10
+            result.append(XmlEvent(0, 'pagelayout', None, tk=0, **args))
+        return result
+
+    def conv_staffgroup(self, m21staffgroups, m21parts) -> List[XmlEvent]:
+        result = []
+        for staffgroup in m21staffgroups:
+            try:
+                tracks = [m21parts.index(part)+1 for part in staffgroup]
+            except ValueError:
+                warnings.warn("Ignoring an inconsistent StaffGroup: %r"
+                              % (staffgroup,), TaktWarning)
+                continue
+            tracks.insert(0, 'none' if staffgroup.symbol is None
+                          else staffgroup.symbol)
+            if all(isinstance(part, music21.stream.PartStaff)
+                   for part in staffgroup):
+                tracks = set(tracks)
+            result.append(XmlEvent(0, 'staffgroup', tracks, tk=0))
+        return result
+
     def move_metaevents_to_track0(self, tracks, bar0len) -> None:
         keysigs = tracks.Filter(KeySignatureEvent)
         # トラックごとに異なる key/time signature を持っている場合は移動しない
@@ -1072,6 +1205,9 @@ class Music21ToTakt:
         m21metadata = m21score.getElementsByClass(music21.metadata.Metadata)
         if m21metadata:
             track0.extend(self.conv_metadata(m21metadata[0]))
+        m21layout = m21score.getElementsByClass(music21.layout.ScoreLayout)
+        if m21layout:
+            track0.extend(self.conv_layout(m21layout[0]))
         m21parts = m21score.getElementsByClass(music21.stream.Part)
         if not m21parts:
             m21parts = [m21score]
@@ -1094,7 +1230,7 @@ class Music21ToTakt:
             self.grace_count = 0
             self.grace_notes_in_process = []
             self.create_voice_map(m21part, voice_map)
-            flattened = m21part.flat
+            flattened = m21part.flatten()
             ksclass = music21.key.Key if flattened.hasElementOfClass(
                 music21.key.Key) else music21.key.KeySignature
             for m21elm in flattened:
@@ -1115,7 +1251,8 @@ class Music21ToTakt:
                     evlist.append(self.conv_tempo(m21elm, m21elm.offset))
                 elif isinstance(m21elm, music21.expressions.RehearsalMark):
                     evlist.append(self.conv_mark(m21elm, m21elm.offset))
-                elif isinstance(m21elm, music21.instrument.Instrument):
+                elif (isinstance(m21elm, music21.instrument.Instrument) and
+                      m21elm.instrumentName is not None):
                     evlist.append(self.conv_instname(m21elm, m21elm.offset,
                                                      tknum))
                 elif isinstance(m21elm, music21.clef.Clef):
@@ -1136,6 +1273,9 @@ class Music21ToTakt:
             tknum += 1
         for evlist in tracks:
             evlist.duration = maxduration
+        m21staffgroups = m21score.getElementsByClass(music21.layout.StaffGroup)
+        if m21staffgroups:
+            track0.extend(self.conv_staffgroup(m21staffgroups, list(m21parts)))
         self.move_metaevents_to_track0(tracks, bar0len)
         tracks.sort()
         return tracks

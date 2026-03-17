@@ -1092,7 +1092,22 @@ def keysig(keydesc, minor=0, **kwargs) -> EventList:
         return meta(M_KEYSIG, key, **kwargs)
 
 
-def xml(xtype, value, *, duration=0, **kwargs) -> EventList:
+def _check_staffgroup(value):
+    if isinstance(value, list):
+        return [_check_staffgroup(elm) for elm in value]
+    elif isinstance(value, tuple):
+        return tuple(_check_staffgroup(elm) for elm in value)
+    elif isinstance(value, (set, frozenset)):
+        return set(_check_staffgroup(elm) for elm in value)
+    elif isinstance(value, (int, str)):
+        return value
+    elif isinstance(value, Context):
+        return value.tk
+    else:
+        raise TypeError("Bad typed value for 'staffgroup': %r" % (value,))
+
+
+def xml(xtype, value=None, *, duration=0, **kwargs) -> EventList:
     """ Generates an EventList containing an XmlEvent (additional information
     event for staff notation). See :class:`.XmlEvent` for a list of information
     types.
@@ -1118,29 +1133,44 @@ def xml(xtype, value, *, duration=0, **kwargs) -> EventList:
     **参照されるコンテキスト属性**
         dt, tk, effectors
     """
+    track = context().tk
     if xtype == 'clef':
-        if value.lower() not in \
+        if not isinstance(value, str) or value.lower() not in \
            ('g', 'f', 'c', 'percussion', 'tab', 'jianpu', 'none'):
             raise ValueError("Invalid clef type %r" % (value,))
     elif xtype == 'barline':
-        if (value.lower() not in
+        if (not isinstance(value, str) or value.lower() not in
             ('dashed', 'dotted', 'heavy', 'heavy-heavy', 'heavy-light',
              'light-heavy', 'light-light', 'none', 'regular', 'short',
              'tick', 'double', 'final', 'repeat-start', 'repeat-end')):
             raise ValueError("Invalid barline type %r" % (value,))
+        track = 0
     elif xtype == 'chord':
         if isinstance(value, str):
             value = Chord(value)
         elif not isinstance(value, Chord):
-            raise TypeError("Bad data type for a chord")
+            raise TypeError("Bad argument for 'chord': %r" % (value,))
     elif xtype == 'text':
         if not isinstance(value, str):
-            raise TypeError("Bad data type for a text")
+            raise TypeError("Bad argument for 'text': %r" % (value,))
+    elif xtype == 'pagelayout':
+        if value is not None:
+            raise TypeError("'pagelayout' can not take the 'value' argument")
+        for k in kwargs:
+            if k not in ('width', 'height', 'topmargin', 'bottommargin',
+                         'leftmargin', 'rightmargin', 'scaling'):
+                raise TypeError("Bad keyword argument %r" % (k,))
+        track = 0
+    elif xtype == 'staffgroup':
+        value = _check_staffgroup(value)
+        track = 0
     else:
         raise Exception("Unknown XmlEvent type %r" % (xtype,))
 
-    return _apply_effectors(
-        EventList([XmlEvent(0, xtype, value, **_getparams(kwargs))], duration))
+    with newcontext(tk=track):
+        return _apply_effectors(
+            EventList([XmlEvent(0, xtype, value, **_getparams(kwargs))],
+                      duration))
 
 
 # モジュールで定義された関数を自動的に __all__ に含める
