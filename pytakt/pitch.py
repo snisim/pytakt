@@ -839,12 +839,12 @@ class Interval(int):
             return Interval._parse_str(value, cents)
 
     def _parse_str(string, cents):
-        m = re.match("(-?)([PpMm]|[Aa]+|[Dd]+)([0-9]+)$", string)
+        m = re.match("(-?)([PpMm]|[Aa]+|[Dd]+)(-?)([0-9]+)$", string)
         if not m:
             raise ValueError("Invalid interval name")
-        sign = -1 if m.group(1) == '-' else 1
+        sign = -1 if m.group(1) == '-' or m.group(3) == '-' else 1
         quality = m.group(2)
-        ds = int(m.group(3)) - 1
+        ds = int(m.group(4)) - 1
         (oc, i) = divmod(ds, 7)
         semi = _MAJOR_TONES[i] + oc * 12
         perf = _IS_PERFECT[i]
@@ -859,11 +859,14 @@ class Interval(int):
             semi -= len(quality) + (1 - perf)
         return Interval(semi * sign, ds * sign, cents)
 
-    def __repr__(self):
+    def tostr(self) -> str:
+        """ Returns a string representing the interval ('P5', 'A4', 'dd3',
+        etc.).
+        """
+        """ 音程を表す文字列('P5', 'A4', 'dd3' など)に変換します。"""
         if self < 0 or \
            (self == 0 and self.ds < 0):  # use -'d2' rather than 'A0'
-            return "Interval('-" + \
-                repr(Interval(-self, -self.ds, self.cents))[10:]
+            return "-" + (-self).tostr()
         (oc, i) = divmod(self.ds, 7)
         semi = _MAJOR_TONES[i] + oc * 12
         perf = _IS_PERFECT[i]
@@ -875,8 +878,11 @@ class Interval(int):
             s = 'A' * (self - semi)
         else:
             s = 'd' * (semi - (1 - perf) - self)
+        return "%s%d" % (s, self.ds + 1)
+
+    def __repr__(self):
         cstr = (', cents=%r' % self.cents) if self.cents != 0 else ''
-        return "Interval('%s%d'%s)" % (s, self.ds + 1, cstr)
+        return "Interval('%s'%s)" % (self.tostr(), cstr)
 
     def __pos__(self):
         return Interval(int(self), self.ds, self.cents)

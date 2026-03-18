@@ -17,12 +17,13 @@ from fractions import Fraction
 from pytakt.score import Score, EventList, EventStream, Tracks
 from pytakt.event import NoteEvent, CtrlEvent, MetaEvent, TimeSignatureEvent, \
     KeySignatureEvent, TempoEvent, XmlEvent
-from pytakt.pitch import Pitch, Key
+from pytakt.pitch import Pitch, Key, Interval
 from pytakt.constants import TICKS_PER_QUARTER, EPSILON, \
     M_TEXT, M_COPYRIGHT, M_TEMPO, M_TRACKNAME, M_INSTNAME, M_MARK, BEGIN, END
 from pytakt.timemap import TimeSignatureMap
 from pytakt.utils import Ticks, int_preferred, TaktWarning
 from pytakt.chord import Chord
+from pytakt.effector import Transpose
 from typing import List, Tuple, Optional, Iterator, Union
 
 
@@ -197,8 +198,23 @@ class TaktToMusic21:
             return string.encode(errors='surrogateescape').\
                 decode(errors='replace')
 
-    def gen_instname(self, ev):
-        return music21.instrument.Instrument(self.checkstr(ev.value))
+    def gen_and_insert_instname(self, m21measure, offset, ev):
+        found = False
+        for m21elm in m21measure:
+            if (isinstance(m21elm, music21.instrument.Instrument) and
+                m21elm.offset == offset and
+                (isinstance(ev, MetaEvent) and m21elm.instrumentName == '' or
+                 isinstance(ev, XmlEvent) and m21elm.transposition is None)):
+                found = True
+                break
+        if not found:
+            m21elm = music21.instrument.Instrument('')
+            m21measure.insert(offset, m21elm)
+        if isinstance(ev, MetaEvent):
+            m21elm.instrumentName = self.checkstr(ev.value)
+        elif isinstance(ev, XmlEvent):
+            m21elm.transposition = \
+                music21.interval.Interval((ev.value).tostr())
 
     def gen_clef(self, ev):
         sign = ev.value
@@ -295,6 +311,23 @@ class TaktToMusic21:
     def in_partstaffgroups(self, staffgroups, trk) -> bool:
         return any(trk in tracks for _, ispartstaff, tracks in staffgroups
                    if ispartstaff)
+
+    def get_transposition(self, time, before=False):
+        transpose = 0
+        for tr in self.transposes:
+            if tr.t < time or (tr.t == time and not before):
+                transpose = tr.value
+            else:
+                break
+        return transpose
+
+    def transpose_event(self, ev):
+        transpose = self.get_transposition(ev.t)
+        if transpose == 0:
+            return ev
+        else:
+            # 実音から記譜音へ変換するので、transposeは符号反転が必要
+            return Transpose(-transpose)(ev)
 
     def to_measures(self, evlist, tsigmap) -> List[EventList]:
         result = []
@@ -780,17 +813,27 @@ class TaktToMusic21:
             last_tsig = None
             keysig0 = keysigs[0].copy()
             keysig = keysigs[track_number].copy()
+            self.transposes = [XmlEvent(0, 'transpose', 0)]
 
             for meas_index, meas_evlist in enumerate(measures):
                 m21measure = music21.stream.Measure(
                     number=meas_index + tsigmap.ticks2mbt(0)[0])
+
+                # update transposes
+                del self.transposes[:-1]
+                self.transposes.extend(meas_evlist.Filter(
+                    lambda ev: isinstance(ev, XmlEvent) and
+                    ev.xtype == 'transpose'))
 
                 # insert key signature if any
                 while keysig and keysig[0].t <= meas_evlist.start:
                     m21measure.append(self.gen_keysig(keysig.pop(0)))
                     keysig0 = None
                 while keysig0 and keysig0[0].t <= meas_evlist.start:
-                    m21measure.append(self.gen_keysig(keysig0.pop(0)))
+                    # track 0 にある keysig をコピーするときは、xml-transpose
+                    # に従って移調する。一方、track 1以降のものは移調しない。
+                    m21measure.append(self.gen_keysig(
+                        self.transpose_event(keysig0.pop(0))))
 
                 # insert time signature if any
                 if meas_index == 0 and tsigmap.ticks2mbt(0)[0] == 0:
@@ -803,7 +846,8 @@ class TaktToMusic21:
                     last_tsig = tsig
 
                 # insert notes and rests
-                voices = self.assign_voices(meas_evlist.Filter(NoteEvent))
+                voices = self.assign_voices(
+                    meas_evlist.Filter(NoteEvent).mapev(self.transpose_event))
                 for voice_idx, voice_evlist in enumerate(voices):
                     if len(voices) >= 2:
                         out = music21.stream.Voice(id=str(voice_idx+1))
@@ -838,7 +882,11 @@ class TaktToMusic21:
                             # 2つ目の TrackNameイベント
                             m21part.partAbbreviation = self.checkstr(ev.value)
                     elif isinstance(ev, MetaEvent) and ev.mtype == M_INSTNAME:
-                        m21measure.insert(offset, self.gen_instname(ev))
+                        self.gen_and_insert_instname(m21measure, offset, ev)
+                    elif isinstance(ev, XmlEvent) and ev.xtype == 'transpose':
+                        if self.get_transposition(ev.t, True) != ev.value:
+                            self.gen_and_insert_instname(m21measure,
+                                                         offset, ev)
                     elif isinstance(ev, XmlEvent) and ev.xtype == 'clef':
                         m21measure.insert(offset, self.gen_clef(ev))
                     elif isinstance(ev, XmlEvent) and ev.xtype == 'barline':
@@ -944,7 +992,8 @@ class Music21ToTakt:
         else:
             return int_preferred(m21pitch.ps)
 
-    def conv_note(self, m21elm, offset, tknum, voice_idx) -> List[NoteEvent]:
+    def conv_note(self, m21elm, offset,
+                  tknum, transpose, voice_idx) -> List[NoteEvent]:
         def create_note_event(m21note, note_idx):
             ev = NoteEvent(t=(int_preferred(offset * TICKS_PER_QUARTER) +
                               self.grace_count),
@@ -1007,6 +1056,10 @@ class Music21ToTakt:
             else:
                 self.grace_count += 1
 
+        if transpose is not None:
+            eff = Transpose(transpose, transpose_keysig=False)
+            result = [eff(ev) for ev in result]
+
         return result
 
     def conv_timesig(self, m21timesig, offset) -> TimeSignatureEvent:
@@ -1048,9 +1101,18 @@ class Music21ToTakt:
                 MetaEvent(0, M_TRACKNAME, m21part.partAbbreviation, tknum))
         return result
 
-    def conv_instname(self, m21instrument, offset, tknum) -> MetaEvent:
-        return MetaEvent(int_preferred(offset * TICKS_PER_QUARTER),
-                         M_INSTNAME, m21instrument.instrumentName, tknum)
+    def conv_instname(self, m21instrument, offset, tknum) -> List[MetaEvent]:
+        result = []
+        t = int_preferred(offset * TICKS_PER_QUARTER)
+        if m21instrument.instrumentName is not None:
+            result.append(
+                MetaEvent(t, M_INSTNAME, m21instrument.instrumentName, tknum))
+        if m21instrument.transposition is not None:
+            result.append(
+                XmlEvent(t, 'transpose',
+                         Interval(m21instrument.transposition.directedName),
+                         tknum))
+        return result
 
     def conv_clef(self, m21clef, offset, tknum) -> XmlEvent:
         return XmlEvent(int_preferred(offset * TICKS_PER_QUARTER),
@@ -1233,11 +1295,12 @@ class Music21ToTakt:
             flattened = m21part.flatten()
             ksclass = music21.key.Key if flattened.hasElementOfClass(
                 music21.key.Key) else music21.key.KeySignature
+            transpose = None
             for m21elm in flattened:
                 if isinstance(m21elm, music21.note.Note) or \
                    type(m21elm) is music21.chord.Chord:
                     evlist.extend(
-                        self.conv_note(m21elm, m21elm.offset, tknum,
+                        self.conv_note(m21elm, m21elm.offset, tknum, transpose,
                                        voice_map.get(m21elm.id, None)))
                 elif isinstance(m21elm, ksclass):
                     keysigev = self.conv_keysig(m21elm, m21elm.offset)
@@ -1251,10 +1314,11 @@ class Music21ToTakt:
                     evlist.append(self.conv_tempo(m21elm, m21elm.offset))
                 elif isinstance(m21elm, music21.expressions.RehearsalMark):
                     evlist.append(self.conv_mark(m21elm, m21elm.offset))
-                elif (isinstance(m21elm, music21.instrument.Instrument) and
-                      m21elm.instrumentName is not None):
-                    evlist.append(self.conv_instname(m21elm, m21elm.offset,
+                elif isinstance(m21elm, music21.instrument.Instrument):
+                    evlist.extend(self.conv_instname(m21elm, m21elm.offset,
                                                      tknum))
+                    if m21elm.transposition is not None:
+                        transpose = Interval(m21elm.transposition.directedName)
                 elif isinstance(m21elm, music21.clef.Clef):
                     evlist.append(self.conv_clef(m21elm, m21elm.offset, tknum))
                 elif isinstance(m21elm, music21.bar.Barline):

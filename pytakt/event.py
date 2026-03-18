@@ -1193,19 +1193,22 @@ class XmlEvent(Event):
                                                                 bottommargin,
                                                                 leftmargin,
                                                                 rightmargin
-                                                                (millimeters)
+                                                                (millimeters);
                                                                 scaling
                                                                 (mm/staffline)
         'staffgroup' staff group- list, tuple or set of int,
                      ing info.    'brace', 'bracket', 'square',
                                   'line' or 'none' [1]
+        'transpose'  transposing  Interval
+                     at notation
         ============ ============ ============================= ===============
 
-        [1] This represents the grouping of staffs using a (nested) collection
-        of track numbers. Strings such as ‘brace’ represent the shape of the
-        symbol used for staff grouping; the default is ‘bracket’ for a list,
-        ‘square’ for a tuple, and ‘brace’ for a set. To specify a non-default
-        symbol, include a string in the elements, such as (‘line’, 3, 4).
+        [1] This represents the grouping of staffs using a (possibly nested)
+        collection of track numbers. Strings such as 'brace' represent the
+        shape of the symbol used for staff grouping; the default is 'bracket'
+        for a list, 'square' for a tuple, and 'brace' for a set. To specify
+        a non-default symbol, include a string in the elements, such as
+        ('line', 3, 4).
         When the collection is a set, it is treated as staves within a part,
         such as the right and left hands in a piano part.
     """
@@ -1246,12 +1249,13 @@ class XmlEvent(Event):
                                                                 bottommargin,
                                                                 leftmargin,
                                                                 rightmargin
-                                                                (millimeters)
+                                                                (millimeters);
                                                                 scaling
                                                                 (mm/staffline)
         'staffgroup' 段のグルーピ list, tuple or set of int,
                      ング         'brace', 'bracket', 'square',
                                   'line' or 'none' [1]
+        'transpose'  記譜時の移調 Interval
         ============ ============ ============================= ===============
 
         [1] トラック番号のコレクション(ネスト可能)によって、段のグルーピング

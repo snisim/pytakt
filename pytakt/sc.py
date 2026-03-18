@@ -26,7 +26,7 @@ from pytakt.constants import C_MOD, C_BREATH, C_FOOT, C_PORTA, C_VOL, C_EXPR, \
     M_SEQNO, M_TEXT, M_COPYRIGHT, M_TRACKNAME, M_INSTNAME, M_LYRIC, M_MARK, \
     M_EOT, M_KEYSIG, M_CHPREFIX, M_DEVNO, MAX_DELTA_TIME, L64
 from pytakt.context import context, newcontext, Context
-from pytakt.pitch import Key, Pitch
+from pytakt.pitch import Key, Pitch, Interval
 from pytakt.utils import takt_round
 from pytakt.interpolator import Interpolator
 from pytakt.chord import Chord
@@ -1164,6 +1164,11 @@ def xml(xtype, value=None, *, duration=0, **kwargs) -> EventList:
     elif xtype == 'staffgroup':
         value = _check_staffgroup(value)
         track = 0
+    elif xtype == 'transpose':
+        if isinstance(value, str):
+            value = Interval(value)
+        elif not isinstance(value, Interval):
+            raise TypeError("Bad argument for 'transpose': %r" % (value,))
     else:
         raise Exception("Unknown XmlEvent type %r" % (xtype,))
 

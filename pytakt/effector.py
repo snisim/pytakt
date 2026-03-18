@@ -26,6 +26,7 @@ from pytakt.context import context, newcontext
 from pytakt.score import Score, EventList, EventStream, Tracks, \
     DEFAULT_LIMIT, genseq, RealTimeStream
 from pytakt.interpolator import Interpolator
+import pytakt.sc
 from pytakt.sc import note
 from pytakt.constants import L32, L1, MAX_DELTA_TIME, EPSILON, LOG_EPSILON, \
     BEGIN, END, C_BEND, C_SUSTAIN
@@ -213,9 +214,14 @@ class Transpose(EventEffector):
         value(Interval, str, or int): Amount of transposition.
             If this is a string, it is the same as `Interval(value)`.
         scale(Scale, optional): Specifies the scale.
-        transpose_keysig: If this argument is Ture (default) and no scale is
-            specified, KeySignatureEvent is also transposed. Otherwise,
-            KeySignatureEvent is output as it is.
+        transpose_keysig(bool, optional): If this argument is Ture (default)
+            and no scale is specified, KeySignatureEvent is also transposed.
+            Otherwise, KeySignatureEvent is output as it is.
+        instrument(bool, optional): If this is True, an XmlEvent
+            (xtype='transpose') is inserted into the output so that correct
+            sheet music is generated for transposing instruments.
+            When this argument is True, `scale` cannot be specified.
+            Additionally, `transpose_keysig` is always set to False.
 
     Examples:
         * ``mml("CDE").Transpose('M3')`` generates a score equivalent to
@@ -240,9 +246,13 @@ class Transpose(EventEffector):
         value(Interval, str, or int): 上下の幅。str型のときは
             `Interval(value)` と同じ意味になります。
         scale(Scale, optional): スケールの指定。
-        transpose_keysig: この引数が Ture (デフォルト) で、かつスケールの指定が
-            ない場合、KeySignatureEvent も移調の対象とします。それ以外の場合、
-            KeySignatureEvent はそのまま出力されます。
+        transpose_keysig(bool, optional): この引数が Ture (デフォルト) で、
+            かつスケールの指定がない場合、KeySignatureEvent も移調の対象と
+            します。それ以外の場合、KeySignatureEvent はそのまま出力されます。
+        instrument(bool, optional): この引数が True ならば、移調楽器について
+            正しい譜面が生成されるように XmlEvent (xtype='transpose') を出力に
+            挿入します。この引数が True のとき、`scale` は指定できません。
+            また、`transpose_keysig` は常に False に設定されます。
 
     Examples:
         * ``mml("CDE").Transpose('M3')`` は ``mml("EF#G#")``
@@ -251,10 +261,16 @@ class Transpose(EventEffector):
         * ``mml("CDE").Transpose(DEG(3), scale=Scale(C4))`` は
           ``mml("EFG")`` と等価なスコアを生成します。
     """
-    def __init__(self, value, scale=None, transpose_keysig=True):
+    def __init__(self, value, scale=None, transpose_keysig=True,
+                 instrument=False):
+        if instrument and scale is not None:
+            raise Exception("'scale' can not be used if 'instrument' is True")
         self.value = Interval(value) if isinstance(value, str) else value
         self.scale = scale
         self.transpose_keysig = transpose_keysig
+        self.instrument = instrument
+        if instrument:
+            self.transpose_keysig = False
 
     def _process_event(self, ev) -> 'Event':
         if hasattr(ev, 'n'):
@@ -267,6 +283,13 @@ class Transpose(EventEffector):
             ev.value = Key.from_tonic(ev.value.gettonic() + self.value,
                                       ev.value.minor)
         return ev
+
+    def __call__(self, score_or_event) -> 'Score':
+        if self.instrument:
+            return pytakt.sc.xml('transpose', self.value) & \
+                super().__call__(score_or_event)
+        else:
+            return super().__call__(score_or_event)
 
 
 class Invert(EventEffector):
