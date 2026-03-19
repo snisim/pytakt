@@ -375,9 +375,13 @@ class ViewPaneBase(tkinter.Frame):
                         pane.canvas.move('cursor%d' % i, xnew - xold, 0)
 
     def item_enter_action(self, item, ev):
-        self.master.msgpane.showmsg(-1, ev.org_repr if hasattr(ev, 'org_repr')
-                                    else str(ev))
+        if self.master.focus_displayof() is None:
+            return
+        evstring = ev.org_repr if hasattr(ev, 'org_repr') else str(ev)
+        self.master.msgpane.showmsg(-1, evstring)
         self.current_ev = ev
+        self.master.clipboard_evstring = evstring
+        self.master.clipboard_time = ev.t
         self.master.msgpane.showmsg(
             0, f't: {std_time_repr(ev.t)}' +
             (f'-{std_time_repr(ev.t+ev.L)}' if hasattr(ev, 'L') else ''))
@@ -846,13 +850,17 @@ class XRulerPane(ViewPaneBase):
             self.master.msgpane.showmsg(4, f'{ksigev.tostr()}')
 
     def xr_motion_action(self, tkevent, snap=True):
+        if self.master.focus_displayof() is None:
+            return
         ticks = self._get_ticks(tkevent)
         if self._intersect(ticks, self.master.playstart):
             ticks = self.master.playstart
             self.master.playstart_tmp = None
+            self.master.clipboard_time = ticks
         elif self._intersect(ticks, self.master.playingpos):
             ticks = self.master.playingpos
             self.master.playstart_tmp = None
+            self.master.clipboard_time = ticks
         else:
             ticks = self.snapped_ticks(ticks) if snap else ticks
             self.master.playstart_tmp = ticks
@@ -1323,6 +1331,12 @@ class ViewerMain(tkinter.Frame):
             label='Close Pane', accelerator='Ctrl+D',
             command=lambda: self.close_ctrlpane(self.popupwidget.ctrlnum))
         self.mainmenu.add_separator()
+        self.mainmenu.add_command(label='Copy Time', accelerator='Ctrl+T',
+                                  command=self.copy_time)
+        self.mainmenu.add_command(label='Copy Event String',
+                                  accelerator='Ctrl+C',
+                                  command=self.copy_event_string)
+        self.mainmenu.add_separator()
         self.mainmenu.add_cascade(label='Zoom', menu=self.zoommenu)
         self.mainmenu.add_separator()
         self.mainmenu.add_cascade(label='MIDI I/F', menu=self.midimenu)
@@ -1483,6 +1497,10 @@ class ViewerMain(tkinter.Frame):
         self.master.bind_class(
             "Frame", 'a',
             lambda e: self.trackbuttonpane.button_click_action(-1))
+        self.master.bind_class("Frame", '<Control-t>',
+                               lambda e: self.copy_time())
+        self.master.bind_class("Frame", '<Control-c>',
+                               lambda e: self.copy_event_string())
         self.master.bind_class("Frame", 'p', lambda e: self.play())
         self.master.bind_class("Frame", '<space>', lambda e: self.pause())
         self.master.bind_class("Frame", 'r', lambda e: self.reset_cursors())
@@ -1497,6 +1515,16 @@ class ViewerMain(tkinter.Frame):
                                self.trackbuttonpane.tempo_scale_up())
         self.master.bind_class("Frame", '<Next>', lambda e:
                                self.trackbuttonpane.tempo_scale_down())
+
+    def copy_time(self):
+        if hasattr(self, 'clipboard_time'):
+            self.master.clipboard_clear()
+            self.master.clipboard_append(str(self.clipboard_time))
+
+    def copy_event_string(self):
+        if hasattr(self, 'clipboard_evstring'):
+            self.master.clipboard_clear()
+            self.master.clipboard_append(self.clipboard_evstring)
 
     #
     def update_playing_cursor(self):
