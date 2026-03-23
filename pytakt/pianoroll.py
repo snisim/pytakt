@@ -9,12 +9,14 @@ This module defines functions for the piano roll viewer.
 
 import tkinter
 import tkinter.simpledialog
+import tkinter.messagebox
+import tkinter.filedialog
 import math
 import sys
 import os
 import warnings
 from typing import Tuple, List, Set
-from pytakt.score import EventList, EventStream
+from pytakt.score import EventList, EventStream, Score
 from pytakt.event import NoteEventClass, NoteEvent, NoteOnEvent, \
     NoteOffEvent, MetaEvent, CtrlEvent, TempoEvent, KeyPressureEvent, \
     SysExEvent
@@ -22,17 +24,21 @@ from pytakt.constants import M_TRACKNAME, M_INSTNAME, CONTROLLERS, C_BEND, \
     C_PROG, C_KPR, C_CPR, C_TEMPO, TICKS_PER_QUARTER, EPSILON
 from pytakt.pitch import Pitch
 from pytakt.timemap import TimeMap, KeySignatureMap, current_tempo
-from pytakt.utils import std_time_repr
+from pytakt.utils import std_time_repr, get_file_type
 from pytakt.effector import Render
 from pytakt.gm import INSTRUMENTS
 from pytakt.gm.drums import DRUMS
+from pytakt.smf import readsmf
+from pytakt.text import readjson
+from pytakt.mml import readmml
 import pytakt.midiio as midiio
 
 __all__ = ['show']
 
 
 FONT_FAMILY = 'Helvetica' if sys.platform == 'win32' else 'TkDefaultFont'
-MAGNIFY = float(os.environ.get('PYTAKT_MAGNIFY', "1.0"))
+MAGNIFY = float(os.environ.get('PYTAKT_MAGNIFY',
+                               "0.8" if sys.platform == 'win32' else "1.0"))
 GEOMETRY = os.environ.get('PYTAKT_GEOMETRY')
 
 
@@ -43,8 +49,8 @@ def setup_globals(mag):
         VIEW_WIDTH=round(1400 * mag),
         # NOTE_PANE_VIEW_HEIGHT=PIXELS_PER_NOTE_NUM * 88
         NOTE_PANE_VIEW_HEIGHT=round(10 * mag) * 88,
-        CTRL_PANE_VIEW_HEIGHT=round(120 * mag),
-        CTRL_PANE_YMARGIN=round(10 * mag),
+        CTRL_PANE_VIEW_HEIGHT=round(100 * mag),
+        CTRL_PANE_YMARGIN=round(8 * mag),
         CTRL_THICKNESS=round(2 * mag),
         MSG_FONT=(FONT_FAMILY, round(13 * mag)),
         # WindowsではSCROLLBAR_WIDTHを11未満にすると矢印が不自然になる。
@@ -72,7 +78,7 @@ def setup_globals(mag):
         PLAY_BUTTON_WIDTH=round(35 * mag),
         BUTTON_BORDER=round(4 * mag),
         SHOW_LIMIT=5e5,
-        MENU_FONT=(FONT_FAMILY, round(12 * mag)),
+        MENU_FONT=(FONT_FAMILY, round(13 * mag)),
         CL_BACK='gray90',
         CL_HLINE='gray60',
         CL_HBAND='gray85',
@@ -951,8 +957,8 @@ class MessagePane(tkinter.Frame):
                                      uniform='a')
             self.labels.append(label)
             label.bind(RIGHTBUTTON,
-                       lambda e: self.master.mainmenu.tk_popup(e.x_root,
-                                                               e.y_root))
+                       lambda e: self.master.popupmenu.tk_popup(e.x_root,
+                                                                e.y_root))
         self.pack(side=tkinter.BOTTOM, fill='x')
 
     def showmsg(self, i, string):
@@ -990,7 +996,7 @@ class TrackButtonPane(tkinter.Frame):
         self.savedstate = [True for i in range(len(self.tracklist))]
         self.create_widgets()
         self.bind(RIGHTBUTTON,
-                  lambda e: self.master.mainmenu.tk_popup(e.x_root, e.y_root))
+                  lambda e: self.master.popupmenu.tk_popup(e.x_root, e.y_root))
         self.pack(side=tkinter.TOP, fill='x')
 
     def create_widgets(self):
@@ -1149,7 +1155,7 @@ class JumpToDialog(tkinter.simpledialog.Dialog):
         self.entry.grid(row=1, padx=50, columnspan=3, sticky='we')
 
         self.unit = tkinter.IntVar()
-        unitstr = ['ticks', 'measure[:beat]', 'seconds']
+        unitstr = ['measure[:beat]', 'ticks', 'seconds']
         for i in range(3):
             button = tkinter.Radiobutton(frame, value=i, variable=self.unit,
                                          text=unitstr[i])
@@ -1160,7 +1166,7 @@ class JumpToDialog(tkinter.simpledialog.Dialog):
         string = self.entry.get()
         unit = self.unit.get()
         try:
-            if unit == 1:
+            if unit == 0:
                 self.result = self.master.timemap.mbt2ticks(string)
             else:
                 self.result = float(string)
@@ -1171,6 +1177,22 @@ class JumpToDialog(tkinter.simpledialog.Dialog):
         if unit == 2:
             self.result = self.master.timemap.sec2ticks(self.result)
         return 1
+
+
+def show_message_window(parent, message):
+    msg_win = tkinter.Toplevel()
+    msg_win.overrideredirect(True)
+    label = tkinter.Label(msg_win, text=message, padx=50, pady=30,
+                          borderwidth=4, relief=tkinter.RIDGE)
+    label.pack(expand=1)
+    msg_win.update()
+    x = parent.winfo_rootx() + parent.winfo_width() // 2 \
+        - msg_win.winfo_width() // 2
+    y = parent.winfo_rooty() + parent.winfo_height() // 2 \
+        - msg_win.winfo_height() // 2
+    msg_win.geometry("+%d+%d" % (x, y))
+    msg_win.update()
+    return msg_win
 
 
 class ViewerMain(tkinter.Frame):
@@ -1185,6 +1207,7 @@ class ViewerMain(tkinter.Frame):
                                     duration=self.evlist_org.duration)
         else:
             self.evlist = self.evlist_org
+        self.score = score
         self.save_event_repr()
         self.create_note_hash()
         if not self.evlist.active_events_at(0, TempoEvent):
@@ -1214,6 +1237,7 @@ class ViewerMain(tkinter.Frame):
         self.pack(expand=1, fill='both')
         self.notepane.canvas.update()
         self.notepane.ycenter()
+        self.master.continue_viewing = False
 
     def parse_velocity(self, velocity):
         if isinstance(velocity, str):
@@ -1305,11 +1329,27 @@ class ViewerMain(tkinter.Frame):
             if ctrlnum not in viewmenuctrls:
                 viewmenuctrls.append(ctrlnum)
         viewmenuctrls.sort()
-        self.mainmenu = tkinter.Menu(self, tearoff=False, font=MENU_FONT)
-        self.viewmenu = tkinter.Menu(self.mainmenu, tearoff=False,
+        self.menubar = tkinter.Menu(self, font=MENU_FONT)
+
+        # File menu
+        self.filemenu = tkinter.Menu(self.menubar, tearoff=False,
                                      font=MENU_FONT)
-        self.zoommenu = self.create_zoommenu(self.mainmenu)
-        self.midimenu = self.create_midimenu(self.mainmenu)
+        self.menubar.add_cascade(label='File', menu=self.filemenu)
+        self.filemenu.add_command(label='Open', accelerator='Ctrl+O',
+                                  command=self.openfile)
+        self.filemenu.add_command(label='Save as', accelerator='Ctrl+S',
+                                  command=self.savefileas)
+        self.filemenu.add_command(label='Export', accelerator='Ctrl+E',
+                                  command=self.exportfile)
+        self.filemenu.add_separator()
+        self.filemenu.add_command(label='Quit', accelerator='Ctrl+W',
+                                  command=lambda: self.after(0, self.quit))
+        # 直接self.quitを呼ぶと、macでエラーメッセージが出てしまう ↑
+
+        # View menu
+        self.viewmenu = tkinter.Menu(self.menubar, tearoff=False,
+                                     font=MENU_FONT)
+        self.menubar.add_cascade(label='View', menu=self.viewmenu)
         self.viewmenu.add_command(
             label='Show/Hide all actively used controllers',
             accelerator='c',
@@ -1318,41 +1358,49 @@ class ViewerMain(tkinter.Frame):
             label='Show/Hide all used controllers',
             command=lambda: self.toggle_all_ctrlpanes(1))
         self.viewmenu.add_separator()
-        self.viewmenu.add_separator()
         self.viewmenu.add_command(label='Other controller',
                                   command=lambda: self.viewmenu_other_action())
         self.viewmenuvars = {}
         for ctrlnum in viewmenuctrls:
             self.add_viewmenuitem(ctrlnum)
-        self.mainmenu.add_cascade(label='Add/Delete Pane',
-                                  menu=self.viewmenu)
-        self.mainmenu.add_separator()
-        self.mainmenu.add_command(
+        self.viewmenu.add_separator()
+        self.zoommenu_viewmenu = self.create_zoommenu(self.viewmenu)
+        self.zoommenu_viewmenu.config(postcommand=lambda: self.setzoomcenter())
+        self.viewmenu.add_cascade(label='Zoom', menu=self.zoommenu_viewmenu)
+        self.viewmenu.add_separator()
+        self.viewmenu.add_command(label='Jump To', accelerator='j',
+                                  command=self.jump_to)
+
+        # Play menu
+        self.playmenu = tkinter.Menu(self.menubar, tearoff=False,
+                                     font=MENU_FONT)
+        self.menubar.add_cascade(label='Play', menu=self.playmenu)
+        self.playmenu.add_command(label='Play', accelerator='p',
+                                  command=self.play)
+        self.playmenu.add_command(label='Pause/Continue', accelerator='Space',
+                                  command=self.pause)
+        self.playmenu.add_command(label='Reset Cursors', accelerator='r',
+                                  command=self.reset_cursors)
+        self.playmenu.add_separator()
+        self.midimenu = self.create_midimenu(self.playmenu)
+        self.playmenu.add_cascade(label='MIDI I/F', menu=self.midimenu)
+
+        # popup menu (right button)
+        self.popupmenu = tkinter.Menu(self, tearoff=False, font=MENU_FONT)
+        self.popupmenu.add_command(
             label='Close Pane', accelerator='Ctrl+D',
             command=lambda: self.close_ctrlpane(self.popupwidget.ctrlnum))
-        self.mainmenu.add_separator()
-        self.mainmenu.add_command(label='Copy Time', accelerator='Ctrl+T',
-                                  command=self.copy_time)
-        self.mainmenu.add_command(label='Copy Event String',
-                                  accelerator='Ctrl+C',
-                                  command=self.copy_event_string)
-        self.mainmenu.add_separator()
-        self.mainmenu.add_cascade(label='Zoom', menu=self.zoommenu)
-        self.mainmenu.add_separator()
-        self.mainmenu.add_cascade(label='MIDI I/F', menu=self.midimenu)
-        self.mainmenu.add_separator()
-        self.mainmenu.add_command(label='Play', accelerator='p',
-                                  command=self.play)
-        self.mainmenu.add_command(label='Pause/Continue', accelerator='Space',
-                                  command=self.pause)
-        self.mainmenu.add_command(label='Reset Cursors', accelerator='r',
-                                  command=self.reset_cursors)
-        self.mainmenu.add_command(label='Jump To', accelerator='j',
-                                  command=self.jump_to)
-        self.mainmenu.add_separator()
-        self.mainmenu.add_command(label='Close Window', accelerator='Ctrl+W',
-                                  command=lambda: self.after(0, self.quit))
-        # 直接self.quitを呼ぶと、macでエラーメッセージが出てしまう ↑
+        self.popupmenu.add_separator()
+        self.zoommenu = self.create_zoommenu(self.popupmenu)
+        self.popupmenu.add_cascade(label='Zoom', menu=self.zoommenu)
+        self.popupmenu.add_separator()
+        self.popupmenu.add_command(label='Copy Time', accelerator='Shift+C',
+                                   command=self.copy_time)
+        self.popupmenu.add_command(label='Copy Event String',
+                                   accelerator='Ctrl+C',
+                                   command=self.copy_event_string)
+
+        self.master.config(menu=self.menubar)
 
     def add_viewmenuitem(self, ctrlnum):
         tkvar = tkinter.IntVar(value=ctrlnum in self.ctrlpanedict)
@@ -1465,18 +1513,29 @@ class ViewerMain(tkinter.Frame):
         return midimenu
 
     def menu_popup(self, widget, x, y):
-        self.mainmenu.entryconfigure(
+        self.popupmenu.entryconfigure(
             'Close Pane',
             state='normal' if isinstance(widget, CtrlViewPaneBase)
             else 'disabled')
         self.popupwidget = widget
         self.popupcoords = (x, y)
-        self.mainmenu.tk_popup(x, y)
+        self.popupmenu.tk_popup(x, y)
 
-    def quit(self):
+    def setzoomcenter(self):
+        self.popupwidget = self.notepane
+        self.popupcoords = (self.notepane.winfo_rootx() +
+                            self.notepane.winfo_width() // 2,
+                            self.notepane.winfo_rooty() +
+                            self.notepane.winfo_height() // 2)
+
+    def quit(self, keep_root_window=False):
         self.stop()
         midiio.set_tempo_scale(1.0)
-        self.master.destroy()
+        if keep_root_window:
+            self.destroy()
+            self.master.quit()
+        else:
+            self.master.destroy()
 
     def bind_keys(self):
         self.master.bind("<Escape>", lambda e: self.quit())
@@ -1494,10 +1553,13 @@ class ViewerMain(tkinter.Frame):
                 ("<Control-Key-%d>" % i),
                 lambda e, i=i:
                 self.trackbuttonpane.button_ctrl_click_action(i))
+        self.master.bind("<Control-o>", lambda e: self.openfile())
+        self.master.bind("<Control-s>", lambda e: self.savefileas())
+        self.master.bind("<Control-e>", lambda e: self.exportfile())
         self.master.bind_class(
             "Frame", 'a',
             lambda e: self.trackbuttonpane.button_click_action(-1))
-        self.master.bind_class("Frame", '<Control-t>',
+        self.master.bind_class("Frame", 'C',
                                lambda e: self.copy_time())
         self.master.bind_class("Frame", '<Control-c>',
                                lambda e: self.copy_event_string())
@@ -1526,7 +1588,69 @@ class ViewerMain(tkinter.Frame):
             self.master.clipboard_clear()
             self.master.clipboard_append(self.clipboard_evstring)
 
-    #
+    def openfile(self):
+        filename = tkinter.filedialog.askopenfilename(
+            filetypes=[("Standard MIDI file", (".mid", ".midi", ".smf")),
+                       ("Pytakt JSON file", ".json"),
+                       ("Pytakt MML file", ".mml"),
+                       ("MusicXML file", (".mxl", ".musicxml", ".xml")),
+                       ("All files", "*")])
+        if not filename:
+            return
+        try:
+            ftype = get_file_type(filename, ('smf', 'json', 'mml', 'mxl'))
+            if ftype == 'json':
+                score = readjson(filename)
+            elif ftype == 'mml':
+                score = readmml(filename)
+            elif ftype == 'mxl':
+                import music21
+                score = Score.from_music21(music21.converter.parse(filename))
+            else:
+                score = readsmf(filename)
+        except Exception as e:
+            tkinter.messagebox.showerror('Open', e)
+            return
+        self.master.title(filename)
+        self.master.score = score
+        self.master.continue_viewing = True
+        self.quit(keep_root_window=True)
+
+    def savefileas(self):
+        filename = tkinter.filedialog.asksaveasfilename(
+            filetypes=[("Standard MIDI file", (".mid", ".midi", ".smf")),
+                       ("Pytakt JSON file", ".json")])
+        if not filename:
+            return
+        try:
+            ftype = get_file_type(filename, ('smf', 'json'), guess=False)
+            if ftype == 'json':
+                self.score.writejson(filename)
+            else:
+                self.score.writesmf(filename)
+        except Exception as e:
+            tkinter.messagebox.showerror('Save as', e)
+            return
+        self.master.title(filename)
+
+    def exportfile(self):
+        filename = tkinter.filedialog.asksaveasfilename(
+            title="Export",
+            filetypes=[("MusicXML file (uncompressed)", (".musicxml", ".xml")),
+                       ("MusicXML file (compressed)", ".mxl")])
+        if not filename:
+            return
+        msg_win = show_message_window(self, "Converting to %r.." % filename)
+        try:
+            ftype = get_file_type(filename, ('mxl', 'musicxml'), guess=False)
+            self.score.music21().write(ftype, filename)
+        except Exception as e:
+            tkinter.messagebox.showerror('Export', e)
+            return
+        msg_win.destroy()
+        tkinter.messagebox.showinfo('Export',
+                                    "Successfully exported to %r" % filename)
+
     def update_playing_cursor(self):
         self.playingpos = midiio.current_time() - self.toffset
         if self.playingpos >= self.evlist.duration:
@@ -1864,12 +1988,15 @@ def show(score, velocity='auto', ctrlnums='auto', limit=SHOW_LIMIT,
         root.geometry(geometry)
     root.title(title)
     midiio.open_output_device()
-    try:
-        ViewerMain(root, score, velocity, ctrlnums, limit, render, bar0len,
-                   VIEW_WIDTH, NOTE_PANE_VIEW_HEIGHT,
-                   PIXELS_PER_QUARTER_NOTE / TICKS_PER_QUARTER,
-                   PIXELS_PER_NOTE_NUM).mainloop()
-    except Exception:
-        root.update()
-        root.destroy()  # これを行わないと再度ウィンドウを開けなくなる
-        raise
+    root.score = score
+    root.continue_viewing = True
+    while root.continue_viewing:
+        try:
+            ViewerMain(root, root.score, velocity, ctrlnums, limit, render,
+                       bar0len, VIEW_WIDTH, NOTE_PANE_VIEW_HEIGHT,
+                       PIXELS_PER_QUARTER_NOTE / TICKS_PER_QUARTER,
+                       PIXELS_PER_NOTE_NUM).mainloop()
+        except Exception:
+            root.update()
+            root.destroy()  # これを行わないと再度ウィンドウを開けなくなる
+            raise

@@ -313,7 +313,8 @@ def get_file_type(path, types=('smf', 'json', 'mxl', 'mml'),
 
     Returns:
         'smf' for standard MIDI files, 'json' for JSON files, 'mxl' for
-        MusicXML files, or 'mml' for MML files.
+        MusicXML files (but 'musicxml' for uncompressed MusicXML files,
+        if 'musicxml' is included in `types`), or 'mml' for MML files.
     """
     """
     `path` で指定されたファイルが、標準MIDIファイル、JSONファイル、
@@ -330,15 +331,21 @@ def get_file_type(path, types=('smf', 'json', 'mxl', 'mml'),
 
     Returns:
         標準MIDIファイルなら 'smf', jsonファイルなら 'json',
-        MusicXMLファイルなら 'mxl', MMLファイルなら 'mml'
+        MusicXMLファイルなら 'mxl' (但し、`types` に 'musicxml' が含まれて
+        いて、かつ uncompressed MusicXML ファイルなら 'musicxml')、
+        MMLファイルなら 'mml'
     """
     _, ext = os.path.splitext(path)
     ext = ext.lower()
     extdict = {}
+    has_musicxml = 'musicxml' in types
     for typ in types:
         elist = ('.mid', '.midi', '.smf') if typ == 'smf' else \
                 ('.json',) if typ == 'json' else \
-                ('.mxl', '.musicxml', '.xml') if typ == 'mxl' else \
+                ('.mxl', '.musicxml', '.xml') if typ == 'mxl' and \
+                not has_musicxml else \
+                ('.mxl',) if typ == 'mxl' and has_musicxml else \
+                ('.musicxml', '.xml') if typ == 'musicxml' else \
                 ('.mml',) if typ == 'mml' else ()
         for x in elist:
             extdict[x] = typ
