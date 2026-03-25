@@ -1103,6 +1103,40 @@ class Clip(Effector):
         return score.mapev(self._clip, durfunc=self._durfunc)
 
 
+class RemoveInitialSilence(Clip):
+    """
+    Remove the silent section (i.e. the section containing no NoteEvent or
+    NoteOnEvent) at the beginning.
+    CtrlEvent's, TempoEvent's, KeySignatureEvent's, and TimeSignatureEvent's
+    that are active at the end of the silent section are output all at the
+    beginning.
+    The structure of the score is preserved.
+    """
+    """
+    冒頭の無音区間 (NoteEventやNoteOnEventが無い区間）を取り除きます。
+    無音区間終わりの時点でアクティブな CtrlEvent, TempoEvent,
+    KeySignatureEvent, TimeSignatureEvent は冒頭でまとめて出力されます。
+    スコアの構造は保たれます。
+    """
+    def __init__(self):
+        super().__init__(start=None)
+
+    def __call__(self, score):
+        stream = score.tee().stream()
+        try:
+            while True:
+                ev = next(stream)
+                if isinstance(ev, (NoteEvent, NoteOnEvent)):
+                    self.s = ev.t
+                    break
+        except StopIteration as e:
+            self.s = e.value
+        self.e = self.end
+        self.iset = set(score.active_events_at(self.s, (CtrlEvent, MetaEvent)))
+        self.isstream = isinstance(score, EventStream)
+        return score.mapev(self._clip, durfunc=self._durfunc)
+
+
 class Arpeggio(Effector):
     """
     For each chord in the score (a group of notes started simultaneously),

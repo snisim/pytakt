@@ -215,6 +215,8 @@ def test_effectors():
                "ch=2 $bend(100) ch=3 $bend(100)")
     s = mml('CDE').Temperament((0, 0, 10, 0, 0, 0, 0, 0, 0, 0, 0, 0), 1/8)
     assert s[1].n.cents == -77.5
+    assert mml('$vol(50) [{rrc}{re}]').RemoveInitialSilence() \
+        == mml('$vol(50) [{rc}e]')
 
 
 def test_tie():

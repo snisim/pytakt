@@ -1359,6 +1359,7 @@ isinstance(ev, (NoteEvent, NoteOnEvent))])
     ToMilliseconds: Callable[..., 'Score'] = None
     Randomize: Callable[..., 'Score'] = None
     Clip: Callable[..., 'Score'] = None
+    RemoveInitialSilence: Callable[..., 'Score'] = None
     Arpeggio: Callable[..., 'Score'] = None
     Filter: Callable[..., 'Score'] = None
     Reject: Callable[..., 'Score'] = None
