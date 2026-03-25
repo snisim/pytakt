@@ -100,9 +100,20 @@ class TaktToMusic21:
         elif ticks == 'grace:16th':
             d = music21.duration.Duration('16th').getGraceDuration()
         elif tupdiv is not None:
+            div, tupletlen = tupdiv
+            displayed_note = self.min_note
+            while displayed_note < tupletlen / div:
+                displayed_note *= 2
+                # 付点2分に対する2連符の場合のように、標準の計算方法だと
+                # 連符区間が表示音符長の非整数倍になってしまう場合は、それを
+                # 避けるように表示音符をより短いものにする。
+                if abs((tupletlen / displayed_note) -
+                       (tupletlen // displayed_note)) > EPSILON:
+                    displayed_note //= 2
+                    break
             # 下のようにtupletsを指定しないと、三連符中の付点音符などで
             # 問題を生じる。
-            t = music21.duration.Tuplet(tupdiv, 1 << (tupdiv.bit_length() - 1))
+            t = music21.duration.Tuplet(div, tupletlen // displayed_note)
             d = music21.duration.Duration(ticks / (TICKS_PER_QUARTER *
                                                    t.tupletMultiplier()))
             d.tuplets = (t,)
@@ -174,7 +185,7 @@ class TaktToMusic21:
         return music21.key.KeySignature(keysigev.value.signs)
 
     def gen_tempo(self, tempoev):
-        m21tempo = music21.tempo.MetronomeMark(number=tempoev.value)
+        m21tempo = music21.tempo.MetronomeMark(number=round(tempoev.value, 1))
         m21tempo.placement = 'above'  # work in music21 8.3.0 but not in 6.7.1
         return m21tempo
 
@@ -461,9 +472,11 @@ class TaktToMusic21:
         unit = self.min_note * (1 << (div.bit_length() - 1)) / div
         tolerance = unit * self.TRIPLET_TIME_TOLERANCE if div == 3 else EPSILON
         (q, r) = divmod(time, unit)
-        if r < tolerance and (q % div) != 0:
+        powerof2 = (div & (div - 1)) == 0
+        # divが2のべき乗であるときは、連符の最初の音も対象にする
+        if r < tolerance and ((q % div) != 0 or powerof2):
             return q * unit
-        elif r > unit - tolerance and ((q+1) % div) != 0:
+        elif r > unit - tolerance and (((q+1) % div) != 0 or powerof2):
             return (q+1) * unit
         else:
             return None
@@ -512,6 +525,8 @@ class TaktToMusic21:
         def len_list(div):  # 連符区間長の候補
             # 例えば4/4拍子で2,3拍目にまたがる連符は除外した方が良いか？
             L = self.min_note * (1 << (div.bit_length() - 1))
+            if (div & (div - 1)) == 0:  # if div is a power of 2
+                L = (L * 3) // 2
             while L <= barend - barbegin:
                 yield L
                 L *= 2
@@ -528,12 +543,23 @@ class TaktToMusic21:
                 break
         best_quality = 0
         best_tuplet = None
-        for div in self.TUPLET_DIVISORS:
+        tuplet_divisors = self.TUPLET_DIVISORS
+        forced_len = None
+        # tuple属性は分割数または(分割数, 連符全体の長さ)を連符中の全ての
+        # 音符に指定する。
+        if hasattr(evlist[idx], 'tuplet'):
+            tupletspec = evlist[idx].tuplet
+            if isinstance(tupletspec, tuple) and len(tupletspec) >= 2:
+                tuplet_divisors, forced_len = (tupletspec[0],), tupletspec[1]
+            else:
+                tuplet_divisors = (tupletspec,)
+        for div in tuplet_divisors:
             for ev in events:
                 time = self.round_to_tuplet_time(ev.t, div)
                 if time is None:
                     continue
-                for tupletlen in len_list(div):
+                for tupletlen in ((forced_len,) if forced_len is not None
+                                  else len_list(div)):
                     tstart, quality = get_match_quality(time, div, tupletlen)
                     if tupletlen == tsig.beat_length():
                         quality += self.TUPLET_BEATLEN_REWARD
@@ -736,9 +762,9 @@ class TaktToMusic21:
                         (ev, evlist[idx]) = split_note(ev, tend)
                     else:
                         nextidx += 1
-                    output_note(ev, sub, div, tquant, toffquant)
+                    output_note(ev, sub, (div, tupletlen), tquant, toffquant)
                     idx += 1
-                flush_until(tend, sub, div, tquant, toffquant)
+                flush_until(tend, sub, (div, tupletlen), tquant, toffquant)
                 if len(sub[0].duration.tuplets) > 0 and \
                    len(sub[-1].duration.tuplets) > 0:
                     # 連符の最初と最後にマークをつける
