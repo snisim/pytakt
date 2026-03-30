@@ -962,9 +962,9 @@ class TaktToMusic21:
 
         m21score.insert(0, m21metadata)
         if m21layout is not None:
-            m21score.append(m21layout)
+            m21score.insert(0, m21layout)
         for gtype, _, tracks in staffgroups:
-            m21score.append(music21.layout.StaffGroup(
+            m21score.insert(0, music21.layout.StaffGroup(
                 [tracknum_to_part[trk] for trk in tracks], symbol=gtype))
         return m21score
 

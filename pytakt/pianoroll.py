@@ -1198,17 +1198,17 @@ def show_message_window(parent, message):
 class ViewerMain(tkinter.Frame):
     def __init__(self, master, score, velocity, ctrlnums, limit, render,
                  bar0len, width, height, pixels_per_tick, pixels_per_notenum):
-        self.evlist_org = EventList(score, limit=limit)\
+        self.evlist_org = EventList(score, limit=limit)
+        evlist_org_filtered = self.evlist_org\
             .Filter(NoteEventClass, CtrlEvent, SysExEvent, MetaEvent)\
             .ConnectTies().PairNoteEvents()
         if render:
             rend = Render()
-            self.evlist = EventList((rend(ev) for ev in self.evlist_org),
+            self.evlist = EventList((rend(ev) for ev in evlist_org_filtered),
                                     duration=self.evlist_org.duration)
         else:
-            self.evlist = self.evlist_org
-        self.score = score
-        self.save_event_repr()
+            self.evlist = evlist_org_filtered
+        self.save_event_repr(evlist_org_filtered)
         self.create_note_hash()
         if not self.evlist.active_events_at(0, TempoEvent):
             self.evlist.insert(0, TempoEvent(0, current_tempo()))
@@ -1295,8 +1295,8 @@ class ViewerMain(tkinter.Frame):
                                 ctrlnum)
         return result
 
-    def save_event_repr(self):
-        for ev, ev_org in zip(self.evlist, self.evlist_org):
+    def save_event_repr(self, evlist_org):
+        for ev, ev_org in zip(self.evlist, evlist_org):
             if ev is not ev_org:
                 ev.org_repr = repr(ev_org)
 
@@ -1625,9 +1625,9 @@ class ViewerMain(tkinter.Frame):
         try:
             ftype = get_file_type(filename, ('smf', 'json'), guess=False)
             if ftype == 'json':
-                self.score.writejson(filename)
+                self.evlist_org.writejson(filename)
             else:
-                self.score.writesmf(filename)
+                self.evlist_org.writesmf(filename)
         except Exception as e:
             tkinter.messagebox.showerror('Save as', e)
             return
@@ -1640,11 +1640,16 @@ class ViewerMain(tkinter.Frame):
                        ("MusicXML file (compressed)", ".mxl")])
         if not filename:
             return
-        msg_win = show_message_window(self, "Converting to %r.." % filename)
         try:
             ftype = get_file_type(filename, ('mxl', 'musicxml'), guess=False)
-            self.score.music21().write(ftype, filename)
         except Exception as e:
+            tkinter.messagebox.showerror('Export', e)
+            return
+        msg_win = show_message_window(self, "Converting to %r.." % filename)
+        try:
+            self.evlist_org.music21().write(ftype, filename)
+        except Exception as e:
+            msg_win.destroy()
             tkinter.messagebox.showerror('Export', e)
             return
         msg_win.destroy()
@@ -1996,7 +2001,7 @@ def show(score, velocity='auto', ctrlnums='auto', limit=SHOW_LIMIT,
                        bar0len, VIEW_WIDTH, NOTE_PANE_VIEW_HEIGHT,
                        PIXELS_PER_QUARTER_NOTE / TICKS_PER_QUARTER,
                        PIXELS_PER_NOTE_NUM).mainloop()
-        except Exception:
+        except (Exception, KeyboardInterrupt):
             root.update()
             root.destroy()  # これを行わないと再度ウィンドウを開けなくなる
             raise
