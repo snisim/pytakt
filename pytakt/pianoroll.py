@@ -1535,6 +1535,7 @@ class ViewerMain(tkinter.Frame):
             self.destroy()
             self.master.quit()
         else:
+            self.master.quit()
             self.master.destroy()
 
     def bind_keys(self):
@@ -2005,3 +2006,18 @@ def show(score, velocity='auto', ctrlnums='auto', limit=SHOW_LIMIT,
             root.update()
             root.destroy()  # これを行わないと再度ウィンドウを開けなくなる
             raise
+    # On a Mac, when show() is used from a Jupyter Notebook, closing the piano
+    # roll window may cause a spinning wait cursor to appear due to a Tkinter
+    # issue, and the notebook may get stuck. The code below ensures that
+    # `destroy()` is completed, thereby avoiding this problem.
+    if sys.platform == 'darwin':
+        try:
+            get_ipython()
+        except NameError:
+            pass
+        else:
+            root.update()
+            dummy_root = tkinter.Tk()
+            dummy_root.wait_visibility()
+            dummy_root.destroy()
+            root.update()
