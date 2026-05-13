@@ -1696,6 +1696,8 @@ class ViewerMain(tkinter.Frame):
         # midiio.playのようにtempo_scaleを一時的に0にしなくても出だしが
         # もたつかないのは、予め全イベントが時間順にソートされているから。
         for ev in initial_events:
+            if isinstance(ev, NoteEvent):
+                ev = ev.copy().update(L=ev.t + ev.L - pos)
             midiio.queue_event(ev, current_time)
         for ev in filtered:
             if ev.t > pos:
