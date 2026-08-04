@@ -50,18 +50,19 @@ def set_device(args):
 def filter_tracks(args, score):
     if args.tracks is None:
         return score
-    xs = []
+    tkset = set()
     for s in args.tracks.split(','):
         try:
             x = [int(num) for num in s.split('-')]
-            xs.append(x if len(x) == 1 else
-                      range(x[0], x[1]+1) if len(x) == 2 else 0/0)
+            if len(x) == 1:
+                tkset.add(x[0])
+            elif len(x) == 2:
+                tkset.update(range(x[0], x[1]+1))
+            else:
+                raise Exception()
         except Exception:
             error_exit("Bad track-number spec '%s'" % args.tracks)
-    for i in range(len(score)):
-        if not any(i in x for x in xs):
-            score[i] = takt.EventList()
-    return score
+    return score.Filter(lambda ev: ev.tk in tkset)
 
 
 # SMFを '-t' オプションでテキストに変換したときの可逆性について:
