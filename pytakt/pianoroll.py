@@ -1995,6 +1995,11 @@ def show(score, velocity='auto', ctrlnums='auto', limit=SHOW_LIMIT,
     if geometry is not None:
         root.geometry(geometry)
     root.title(title)
+    if sys.platform == 'win32':
+        root.attributes('-topmost', True)
+        root.update()
+        root.attributes('-topmost', False)
+        root.update()
     midiio.open_output_device()
     root.score = score
     root.continue_viewing = True
