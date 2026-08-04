@@ -309,7 +309,7 @@ Parameters are passed to :func:`.writejson`.
     他の引数の意味は :func:`showtext` と同じです。
     """
     def _writepyfile(f):
-        print("#pytakt " + __version__)
+        print("#pytakt " + __version__, file=f)
         print("from pytakt import *", file=f)
         print("from pytakt.sc import *", file=f)
         print("\nscore = ", end='', file=f)
