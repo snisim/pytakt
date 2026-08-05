@@ -2482,11 +2482,11 @@ class ConnectTies(Effector):
                                 notedict.push(getkey(firstev), (firstev, ev))
                             else:  # end
                                 del firstev.tie
+                            continue
                         except KeyError:
                             warnings.warn(self.errhdr + (
                                 "Beginning of the tie not found: %r" % (ev,)),
                                 TaktWarning, stacklevel=2)
-                        continue
                 evbuf.append(ev)
         except StopIteration as e:
             for _, ev in notedict.values():
