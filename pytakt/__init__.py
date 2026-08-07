@@ -24,5 +24,5 @@ __all__ = _context.__all__ + pitch.__all__ + event.__all__ + \
     [k for k in dir(constants) if not k.startswith('_')] + \
     score.__all__ + effector.__all__ + smf.__all__ + _mml.__all__ + \
     scale.__all__ + chord.__all__ + timemap.__all__ + \
-    interpolator.__all__ + utils.__all__  + text.__all__ + \
+    interpolator.__all__ + utils.__all__ + text.__all__ + \
     ['note', 'rest', 'sc', 'gm']
